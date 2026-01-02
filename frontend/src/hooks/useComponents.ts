@@ -67,22 +67,26 @@ export function useComponents() {
 
 export function useNavigation(initialScreen: Screen = 'dashboard') {
   const [screen, setScreen] = useState<Screen>(initialScreen);
-  const [history, setHistory] = useState<Screen[]>([]);
+  const historyRef = useRef<Screen[]>([]);
 
   const navigate = useCallback((newScreen: Screen) => {
-    setHistory((prev) => [...prev, screen]);
-    setScreen(newScreen);
-  }, [screen]);
+    setScreen((currentScreen) => {
+      historyRef.current = [...historyRef.current, currentScreen];
+      return newScreen;
+    });
+  }, []);
 
-  const goBack = useCallback(() => {
-    if (history.length > 0) {
-      const prev = history[history.length - 1];
-      setHistory((h) => h.slice(0, -1));
+  const goBack = useCallback((): boolean => {
+    if (historyRef.current.length > 0) {
+      const prev = historyRef.current[historyRef.current.length - 1];
+      historyRef.current = historyRef.current.slice(0, -1);
       setScreen(prev);
       return true;
     }
     return false;
-  }, [history]);
+  }, []);
 
-  return { screen, navigate, goBack, setScreen };
+  const canGoBack = historyRef.current.length > 0;
+
+  return { screen, navigate, goBack, setScreen, canGoBack };
 }

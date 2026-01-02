@@ -18,7 +18,7 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
   const [error, setError] = useState<string | null>(null);
 
   useInput((input, key) => {
-    if (key.escape) {
+    if (key.escape || input === 'q') {
       onCancel();
       return;
     }

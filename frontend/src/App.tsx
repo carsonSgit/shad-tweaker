@@ -14,7 +14,7 @@ import { StatusBar } from './components/StatusBar.js';
 
 export function App() {
   const { exit } = useApp();
-  const { screen, navigate, goBack } = useNavigation('dashboard');
+  const { screen, navigate, goBack, canGoBack } = useNavigation('dashboard');
   const {
     components,
     selectedPaths,
@@ -53,7 +53,9 @@ export function App() {
     // Don't handle input when in editor mode or loading
     if (loading) return;
 
-    if (input === 'q' && !['editor', 'preview'].includes(screen)) {
+    // Screens that handle their own 'q' for internal navigation
+    const screensWithInternalNav = ['editor', 'preview', 'templates', 'backups'];
+    if (input === 'q' && !screensWithInternalNav.includes(screen)) {
       if (!goBack()) {
         exit();
       }

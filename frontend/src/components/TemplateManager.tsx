@@ -59,13 +59,18 @@ export function TemplateManager({ onApplyTemplate, onBack }: TemplateManagerProp
     }
 
     if (mode === 'view') {
-      if (key.escape || input === 'q') {
+      if (key.escape) {
         setMode('list');
         setSelectedTemplate(null);
       } else if (input === 'a' && selectedTemplate) {
         onApplyTemplate(selectedTemplate.rules);
       } else if (input === 'd' && selectedTemplate) {
         handleDelete(selectedTemplate.name);
+      }
+      // 'q' in view mode goes back to list
+      if (input === 'q') {
+        setMode('list');
+        setSelectedTemplate(null);
       }
       return;
     }

@@ -7,9 +7,10 @@ interface HelpScreenProps {
 
 export function HelpScreen({ onBack }: HelpScreenProps) {
   useInput((input, key) => {
-    if (input === 'q' || key.escape) {
+    if (key.escape) {
       onBack();
     }
+    // 'q' handled by global App handler
   });
 
   const shortcuts = [

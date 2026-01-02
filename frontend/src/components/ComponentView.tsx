@@ -54,9 +54,10 @@ export function ComponentView({ component, onBack }: ComponentViewProps) {
       setScrollOffset((o) => Math.max(0, o - visibleLines));
     } else if (key.pageDown) {
       setScrollOffset((o) => Math.min(totalLines - visibleLines, o + visibleLines));
-    } else if (input === 'q' || key.escape) {
+    } else if (key.escape) {
       onBack();
     }
+    // Note: 'q' is handled by the global App handler
   });
 
   // Extract classes from content
