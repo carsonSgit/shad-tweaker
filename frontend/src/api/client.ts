@@ -159,6 +159,19 @@ export async function listBackups(): Promise<ApiResponse<{ backups: Backup[] }>>
   return request('/api/backup/list');
 }
 
+export interface BackupFilePreview {
+  path: string;
+  fileName: string;
+  currentContent: string;
+  backupContent: string;
+}
+
+export async function previewBackup(
+  backupId: string
+): Promise<ApiResponse<{ backupId: string; totalFiles: number; changedFiles: number; previews: BackupFilePreview[] }>> {
+  return request(`/api/backup/${encodeURIComponent(backupId)}/preview`);
+}
+
 // Health check
 export async function healthCheck(): Promise<ApiResponse<{ status: string }>> {
   return request('/api/health');

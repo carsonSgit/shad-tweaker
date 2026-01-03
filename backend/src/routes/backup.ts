@@ -5,6 +5,7 @@ import {
   restoreBackup,
   deleteBackup,
   getBackupDetails,
+  previewBackupRestore,
 } from '../services/backup.js';
 import { getCachedComponents } from '../services/scanner.js';
 import { logger } from '../utils/logger.js';
@@ -106,6 +107,39 @@ router.get('/:id', async (req: Request, res: Response) => {
       error: {
         message: 'Failed to get backup details',
         code: 'BACKUP_GET_ERROR',
+      },
+    });
+  }
+});
+
+router.get('/:id/preview', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const previews = await previewBackupRestore(id);
+
+    // Filter to only files with changes
+    const changedFiles = previews.filter(p => p.hasChanges);
+
+    res.json({
+      success: true,
+      backupId: id,
+      totalFiles: previews.length,
+      changedFiles: changedFiles.length,
+      previews: changedFiles.map(p => ({
+        path: p.path,
+        fileName: p.fileName,
+        currentContent: p.currentContent,
+        backupContent: p.backupContent,
+      })),
+    });
+  } catch (error) {
+    logger.error(`Failed to preview backup: ${req.params.id}`, error);
+    const message = error instanceof Error ? error.message : 'Failed to preview backup';
+    res.status(500).json({
+      success: false,
+      error: {
+        message,
+        code: 'BACKUP_PREVIEW_ERROR',
       },
     });
   }

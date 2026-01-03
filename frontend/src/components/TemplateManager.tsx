@@ -261,42 +261,40 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
     const preview = previews[previewIdx];
     const totalChanges = previews.reduce((sum, p) => sum + p.changes, 0);
 
-    // Use word-level diff to show actual changes clearly
-    const wordDiff = Diff.diffWords(preview.before, preview.after);
+    // Use line-level diff to show changes clearly
+    const lineDiff = Diff.diffLines(preview.before, preview.after);
 
-    // Build a list of changed sections for display
-    const changedSections: Array<{ removed: string; added: string; context: string }> = [];
-    let currentSection: { removed: string; added: string; context: string } | null = null;
+    // Build a list of changed line groups for display
+    const changedGroups: Array<{ removed: string[]; added: string[]; lineNum: number }> = [];
+    let lineNum = 1;
+    let currentGroup: { removed: string[]; added: string[]; lineNum: number } | null = null;
 
-    for (let i = 0; i < wordDiff.length; i++) {
-      const part = wordDiff[i];
+    for (const part of lineDiff) {
       if (part.added || part.removed) {
-        if (!currentSection) {
-          // Get some context before this change
-          const prevPart = wordDiff[i - 1];
-          const contextBefore = prevPart && !prevPart.added && !prevPart.removed
-            ? prevPart.value.slice(-30)
-            : '';
-          currentSection = { removed: '', added: '', context: contextBefore };
+        if (!currentGroup) {
+          currentGroup = { removed: [], added: [], lineNum };
         }
+        const lines = part.value.split('\n').filter(l => l.length > 0);
         if (part.removed) {
-          currentSection.removed += part.value;
+          currentGroup.removed.push(...lines);
         }
         if (part.added) {
-          currentSection.added += part.value;
+          currentGroup.added.push(...lines);
         }
-      } else if (currentSection) {
-        // End of a change section
-        changedSections.push(currentSection);
-        currentSection = null;
+      } else {
+        if (currentGroup) {
+          changedGroups.push(currentGroup);
+          currentGroup = null;
+        }
+        lineNum += part.value.split('\n').length - 1;
       }
     }
-    if (currentSection) {
-      changedSections.push(currentSection);
+    if (currentGroup) {
+      changedGroups.push(currentGroup);
     }
 
-    const visibleSections = 4;
-    const displaySections = changedSections.slice(scrollOffset, scrollOffset + visibleSections);
+    const visibleGroups = 3;
+    const displayGroups = changedGroups.slice(scrollOffset, scrollOffset + visibleGroups);
 
     return (
       <Box flexDirection="column">
@@ -313,7 +311,7 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
         <Box marginBottom={1}>
           <Text color="cyan">{preview.path.split(/[/\\]/).pop()}</Text>
-          <Text color="gray"> ({changedSections.length} change locations)</Text>
+          <Text color="gray"> ({changedGroups.length} change locations)</Text>
         </Box>
 
         {error && (
@@ -327,44 +325,39 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
             <Text color="gray">↑ {scrollOffset} more above</Text>
           )}
 
-          {displaySections.length === 0 ? (
+          {displayGroups.length === 0 ? (
             <Text color="yellow">No visible changes in this file</Text>
           ) : (
-            displaySections.map((section, idx) => (
+            displayGroups.map((group, idx) => (
               <Box key={idx} flexDirection="column" marginBottom={1}>
-                <Text color="gray">Change {scrollOffset + idx + 1}:</Text>
-                {section.context && (
-                  <Text color="gray">  ...{section.context.replace(/\n/g, '↵').slice(0, 40)}</Text>
-                )}
-                {section.removed && (
-                  <Box>
-                    <Text color="red">  - </Text>
-                    <Text color="red">{section.removed.replace(/\n/g, '↵').slice(0, 60)}</Text>
-                    {section.removed.length > 60 && <Text color="gray">...</Text>}
+                <Text color="gray">Line {group.lineNum}:</Text>
+                {group.removed.map((line, i) => (
+                  <Box key={`r${i}`}>
+                    <Text color="red">- </Text>
+                    <Text color="red">{line.trim().slice(0, 70)}</Text>
+                    {line.trim().length > 70 && <Text color="gray">...</Text>}
                   </Box>
-                )}
-                {section.added && (
-                  <Box>
-                    <Text color="green">  + </Text>
-                    <Text color="green">{section.added.replace(/\n/g, '↵').slice(0, 60)}</Text>
-                    {section.added.length > 60 && <Text color="gray">...</Text>}
+                ))}
+                {group.added.map((line, i) => (
+                  <Box key={`a${i}`}>
+                    <Text color="green">+ </Text>
+                    <Text color="green">{line.trim().slice(0, 70)}</Text>
+                    {line.trim().length > 70 && <Text color="gray">...</Text>}
                   </Box>
-                )}
+                ))}
               </Box>
             ))
           )}
 
-          {scrollOffset + visibleSections < changedSections.length && (
-            <Text color="gray">↓ {changedSections.length - scrollOffset - visibleSections} more below</Text>
+          {scrollOffset + visibleGroups < changedGroups.length && (
+            <Text color="gray">↓ {changedGroups.length - scrollOffset - visibleGroups} more below</Text>
           )}
         </Box>
 
-        <Box marginTop={1} flexDirection="column">
-          <Box marginTop={1}>
-            <Text color="gray">
-              [←/→] Switch file | [↑/↓] Scroll | [y/Enter] Apply | [q/Esc] Cancel
-            </Text>
-          </Box>
+        <Box marginTop={1}>
+          <Text color="gray">
+            [←/→] Switch file | [↑/↓] Scroll | [y/Enter] Apply | [q/Esc] Cancel
+          </Text>
         </Box>
       </Box>
     );

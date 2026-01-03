@@ -190,3 +190,49 @@ export async function cleanupOldBackups(maxBackups: number = DEFAULT_MAX_BACKUPS
 
   return deleted;
 }
+
+export interface BackupPreview {
+  path: string;
+  fileName: string;
+  currentContent: string;
+  backupContent: string;
+  hasChanges: boolean;
+}
+
+export async function previewBackupRestore(backupId: string): Promise<BackupPreview[]> {
+  const backupPath = path.join(getBackupBasePath(), backupId);
+  const manifestPath = path.join(backupPath, 'manifest.json');
+
+  if (!(await fs.pathExists(manifestPath))) {
+    throw new Error(`Backup not found: ${backupId}`);
+  }
+
+  const manifest: BackupManifest = await fs.readJson(manifestPath);
+  const previews: BackupPreview[] = [];
+
+  for (const file of manifest.files) {
+    try {
+      const backupContent = await fs.pathExists(file.backupPath)
+        ? await fs.readFile(file.backupPath, 'utf-8')
+        : '';
+
+      const currentContent = await fs.pathExists(file.originalPath)
+        ? await fs.readFile(file.originalPath, 'utf-8')
+        : '';
+
+      const hasChanges = currentContent !== backupContent;
+
+      previews.push({
+        path: file.originalPath,
+        fileName: path.basename(file.originalPath),
+        currentContent,
+        backupContent,
+        hasChanges,
+      });
+    } catch (error) {
+      logger.error(`Failed to preview ${file.originalPath}`, error);
+    }
+  }
+
+  return previews;
+}
