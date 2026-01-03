@@ -54,6 +54,11 @@ export async function createBackup(componentPaths: string[]): Promise<Backup> {
 
   logger.info(`Created backup ${backupId} with ${componentPaths.length} files`);
 
+  // Cleanup old backups asynchronously (don't block the response)
+  cleanupOldBackups().catch((err) => {
+    logger.warn('Failed to cleanup old backups', err);
+  });
+
   return {
     id: backupId,
     timestamp: manifest.timestamp,
@@ -150,7 +155,20 @@ export async function deleteBackup(backupId: string): Promise<boolean> {
   return true;
 }
 
-export async function cleanupOldBackups(maxBackups: number = 20): Promise<number> {
+export async function getBackupDetails(backupId: string): Promise<BackupManifest | null> {
+  const manifestPath = path.join(getBackupBasePath(), backupId, 'manifest.json');
+
+  if (!(await fs.pathExists(manifestPath))) {
+    return null;
+  }
+
+  return fs.readJson(manifestPath);
+}
+
+// Default max backups to keep
+const DEFAULT_MAX_BACKUPS = 20;
+
+export async function cleanupOldBackups(maxBackups: number = DEFAULT_MAX_BACKUPS): Promise<number> {
   const backups = await listBackups();
 
   if (backups.length <= maxBackups) {
@@ -166,16 +184,9 @@ export async function cleanupOldBackups(maxBackups: number = 20): Promise<number
     }
   }
 
-  logger.info(`Cleaned up ${deleted} old backups`);
-  return deleted;
-}
-
-export async function getBackupDetails(backupId: string): Promise<BackupManifest | null> {
-  const manifestPath = path.join(getBackupBasePath(), backupId, 'manifest.json');
-
-  if (!(await fs.pathExists(manifestPath))) {
-    return null;
+  if (deleted > 0) {
+    logger.info(`Cleaned up ${deleted} old backups`);
   }
 
-  return fs.readJson(manifestPath);
+  return deleted;
 }

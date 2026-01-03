@@ -57,15 +57,6 @@ export function generateDiff(oldContent: string, newContent: string): DiffResult
   };
 }
 
-export function generateUnifiedDiff(
-  filePath: string,
-  oldContent: string,
-  newContent: string
-): string {
-  const patch = Diff.createPatch(filePath, oldContent, newContent, 'original', 'modified');
-  return patch;
-}
-
 export function createPreview(
   path: string,
   oldContent: string,
@@ -81,11 +72,4 @@ export function createPreview(
     changes: diffResult.changes,
     lineNumbers: diffResult.lineNumbers,
   };
-}
-
-export function countChanges(oldContent: string, newContent: string): number {
-  if (oldContent === newContent) return 0;
-
-  const changes = Diff.diffLines(oldContent, newContent);
-  return changes.filter((c) => c.added || c.removed).length;
 }

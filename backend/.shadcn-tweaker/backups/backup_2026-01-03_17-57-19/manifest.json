@@ -1,0 +1,18 @@
+{
+  "id": "backup_2026-01-03_17-57-19",
+  "timestamp": "2026-01-03T17:57:19.984Z",
+  "files": [
+    {
+      "originalPath": "C:\\Users\\carso\\Documents\\shad-tui\\components\\ui\\card.tsx",
+      "backupPath": "C:\\Users\\carso\\Documents\\shad-tui\\backend\\.shadcn-tweaker\\backups\\backup_2026-01-03_17-57-19\\card.tsx"
+    },
+    {
+      "originalPath": "C:\\Users\\carso\\Documents\\shad-tui\\components\\ui\\button.tsx",
+      "backupPath": "C:\\Users\\carso\\Documents\\shad-tui\\backend\\.shadcn-tweaker\\backups\\backup_2026-01-03_17-57-19\\button.tsx"
+    },
+    {
+      "originalPath": "C:\\Users\\carso\\Documents\\shad-tui\\components\\ui\\dialog.tsx",
+      "backupPath": "C:\\Users\\carso\\Documents\\shad-tui\\backend\\.shadcn-tweaker\\backups\\backup_2026-01-03_17-57-19\\dialog.tsx"
+    }
+  ]
+}

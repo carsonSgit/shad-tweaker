@@ -104,10 +104,6 @@ export function getCachedComponents(): Component[] {
   return cachedComponents;
 }
 
-export function getComponentDirectory(): string {
-  return componentDirectory;
-}
-
 export async function getComponentByName(name: string): Promise<Component | null> {
   const component = cachedComponents.find((c) => c.name === name);
 

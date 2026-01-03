@@ -6,6 +6,7 @@ import {
   updateTemplate,
   deleteTemplate,
 } from '../services/template.js';
+import { applyChanges } from '../services/modifier.js';
 import { validateTemplateRules } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
@@ -191,6 +192,82 @@ router.delete('/:id', async (req: Request, res: Response) => {
       error: {
         message: 'Failed to delete template',
         code: 'TEMPLATE_DELETE_ERROR',
+      },
+    });
+  }
+});
+
+// Apply a template to components (applies all rules sequentially)
+router.post('/:id/apply', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { componentPaths } = req.body;
+
+    if (!Array.isArray(componentPaths) || componentPaths.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: 'componentPaths array is required',
+          code: 'VALIDATION_ERROR',
+        },
+      });
+      return;
+    }
+
+    const template = await getTemplate(id);
+    if (!template) {
+      res.status(404).json({
+        success: false,
+        error: {
+          message: `Template not found: ${id}`,
+          code: 'TEMPLATE_NOT_FOUND',
+        },
+      });
+      return;
+    }
+
+    // Apply each rule in sequence
+    const allModified: string[] = [];
+    let totalChanges = 0;
+    let backupId: string | undefined;
+
+    for (let i = 0; i < template.rules.length; i++) {
+      const rule = template.rules[i];
+      // Only create backup on first rule application
+      const result = await applyChanges(
+        componentPaths,
+        rule.find,
+        rule.replace,
+        rule.isRegex,
+        i === 0 // Only backup on first rule
+      );
+
+      if (i === 0 && result.backupId) {
+        backupId = result.backupId;
+      }
+
+      for (const path of result.modified) {
+        if (!allModified.includes(path)) {
+          allModified.push(path);
+        }
+      }
+      totalChanges += result.changes;
+    }
+
+    res.json({
+      success: true,
+      modified: allModified,
+      changes: totalChanges,
+      backupId,
+      rulesApplied: template.rules.length,
+    });
+  } catch (error) {
+    logger.error(`Failed to apply template: ${req.params.id}`, error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to apply template',
+        code: 'TEMPLATE_APPLY_ERROR',
       },
     });
   }

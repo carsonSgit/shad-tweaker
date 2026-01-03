@@ -106,13 +106,9 @@ export async function deleteTemplate(id: string): Promise<boolean> {
   return true;
 }
 
-export async function applyTemplate(template: Template, componentPaths: string[]): Promise<{
-  find: string;
-  replace: string;
-  isRegex: boolean;
-}[]> {
-  return template.rules;
-}
+// Note: Template application is handled by the frontend which loads template rules
+// into the editor and uses the edit/apply endpoint. The rules are returned from
+// getTemplate() and the frontend orchestrates the apply workflow.
 
 const DEFAULT_TEMPLATES: Array<{ name: string; rules: TemplateRule[] }> = [
   {

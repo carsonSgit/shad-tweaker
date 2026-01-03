@@ -67,13 +67,3 @@ export type Screen =
   | 'templates'
   | 'backups'
   | 'help';
-
-export interface AppState {
-  screen: Screen;
-  components: Component[];
-  selectedComponents: Set<string>;
-  currentComponent: Component | null;
-  loading: boolean;
-  error: string | null;
-  projectPath: string | null;
-}

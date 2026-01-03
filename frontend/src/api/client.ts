@@ -122,10 +122,20 @@ export async function createTemplate(
 }
 
 export async function deleteTemplate(
-  name: string
+  id: string
 ): Promise<ApiResponse<{ success: boolean }>> {
-  return request(`/api/templates/${encodeURIComponent(name)}`, {
+  return request(`/api/templates/${encodeURIComponent(id)}`, {
     method: 'DELETE',
+  });
+}
+
+export async function applyTemplate(
+  id: string,
+  componentPaths: string[]
+): Promise<ApiResponse<{ success: boolean; modified: string[]; changes: number; backupId?: string }>> {
+  return request(`/api/templates/${encodeURIComponent(id)}/apply`, {
+    method: 'POST',
+    body: JSON.stringify({ componentPaths }),
   });
 }
 

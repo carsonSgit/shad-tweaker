@@ -165,6 +165,12 @@ export function App() {
               navigate('components');
             }}
             onBack={() => goBack()}
+            selectedPaths={Array.from(selectedPaths)}
+            onDirectApply={(message) => {
+              setNotification({ message, type: 'success' });
+              scanComponents();
+              navigate('components');
+            }}
           />
         );
 

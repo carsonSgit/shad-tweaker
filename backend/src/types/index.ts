@@ -85,6 +85,7 @@ export interface ApiResponse<T = unknown> {
   };
 }
 
+// Configuration for the application (stored in .shadcn-tweaker/config.json)
 export interface Config {
   componentDirectory: string;
   backupRetentionDays: number;
