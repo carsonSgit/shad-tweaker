@@ -218,7 +218,11 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
       }
       if (key.return) {
         const category = QUICK_ACTION_CATEGORIES[categoryIndex];
-        if (category.type === 'simple' && category.find !== undefined && category.replace !== undefined) {
+        if (
+          category.type === 'simple' &&
+          category.find !== undefined &&
+          category.replace !== undefined
+        ) {
           // Direct action - no sub-options
           onPreview(category.find, category.replace, false);
         } else if (category.type !== 'simple') {
@@ -238,7 +242,11 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
       const num = parseInt(input, 10);
       if (num >= 1 && num <= Math.min(9, QUICK_ACTION_CATEGORIES.length)) {
         const category = QUICK_ACTION_CATEGORIES[num - 1];
-        if (category.type === 'simple' && category.find !== undefined && category.replace !== undefined) {
+        if (
+          category.type === 'simple' &&
+          category.find !== undefined &&
+          category.replace !== undefined
+        ) {
           onPreview(category.find, category.replace, false);
         } else if (category.type !== 'simple') {
           setSelectedCategory(category);
