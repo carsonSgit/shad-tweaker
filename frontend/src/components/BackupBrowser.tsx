@@ -1,7 +1,7 @@
 import * as Diff from 'diff';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SYMBOLS, THEME } from '../App.js';
 import type { BackupFilePreview } from '../api/client.js';
 import * as api from '../api/client.js';
@@ -29,7 +29,7 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
   const [previewIdx, setPreviewIdx] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
 
-  const fetchBackups = async () => {
+  const fetchBackups = useCallback(async () => {
     setLoading(true);
     const result = await api.listBackups();
     if (result.success && result.data) {
@@ -38,11 +38,11 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
       setError(result.error?.message || 'Failed to load backups');
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     fetchBackups();
-  }, []);
+  }, [fetchBackups]);
 
   const fetchPreview = async (backupId: string) => {
     setLoadingPreview(true);

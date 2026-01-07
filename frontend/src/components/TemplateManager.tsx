@@ -2,7 +2,7 @@ import * as Diff from 'diff';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import TextInput from 'ink-text-input';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SYMBOLS, THEME } from '../App.js';
 import * as api from '../api/client.js';
 import type { Preview, Template, TemplateRule } from '../types/index.js';
@@ -272,7 +272,7 @@ export function TemplateManager({
     ...templates.map((t) => ({ type: 'user' as const, item: t })),
   ];
 
-  const fetchComponents = async () => {
+  const fetchComponents = useCallback(async () => {
     const result = await api.getComponents();
     if (result.success && result.data) {
       setAvailableComponents(
@@ -285,9 +285,9 @@ export function TemplateManager({
         })
       );
     }
-  };
+  }, []);
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     setLoading(true);
     const result = await api.getTemplates();
     if (result.success && result.data) {
@@ -296,12 +296,12 @@ export function TemplateManager({
       setError(result.error?.message || 'Failed to load templates');
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     fetchTemplates();
     fetchComponents();
-  }, []);
+  }, [fetchTemplates, fetchComponents]);
 
   const fetchPreviewForRule = async (rule: TemplateRule) => {
     const pathsToUse = Array.from(
@@ -360,10 +360,10 @@ export function TemplateManager({
   };
 
   const handleQuickTemplateSelect = (qt: QuickTemplate) => {
-    if (qt.type === 'simple') {
+    if (qt.type === 'simple' && qt.find !== undefined && qt.replace !== undefined) {
       const rule: TemplateRule = {
-        find: qt.find!,
-        replace: qt.replace!,
+        find: qt.find,
+        replace: qt.replace,
         isRegex: qt.isRegex || false,
       };
       setSelectedQuickTemplate(qt);
@@ -374,7 +374,7 @@ export function TemplateManager({
       if (selectedPaths.length > 0) {
         setInternalSelectedPaths(new Set(selectedPaths));
       }
-    } else {
+    } else if (qt.type !== 'simple') {
       setSelectedQuickTemplate(qt);
       setSubOptionCursor(0);
       setMode('suboptions');
@@ -474,7 +474,9 @@ export function TemplateManager({
         return;
       }
       if (key.downArrow) {
-        setSubOptionCursor((c) => Math.min((selectedQuickTemplate.options?.length ?? 1) - 1, c + 1));
+        setSubOptionCursor((c) =>
+          Math.min((selectedQuickTemplate.options?.length ?? 1) - 1, c + 1)
+        );
         return;
       }
       if (key.return) {

@@ -218,10 +218,10 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
       }
       if (key.return) {
         const category = QUICK_ACTION_CATEGORIES[categoryIndex];
-        if (category.type === 'simple') {
+        if (category.type === 'simple' && category.find !== undefined && category.replace !== undefined) {
           // Direct action - no sub-options
-          onPreview(category.find!, category.replace!, false);
-        } else {
+          onPreview(category.find, category.replace, false);
+        } else if (category.type !== 'simple') {
           // Has sub-options
           setSelectedCategory(category);
           setMode('suboptions');
@@ -238,9 +238,9 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
       const num = parseInt(input, 10);
       if (num >= 1 && num <= Math.min(9, QUICK_ACTION_CATEGORIES.length)) {
         const category = QUICK_ACTION_CATEGORIES[num - 1];
-        if (category.type === 'simple') {
-          onPreview(category.find!, category.replace!, false);
-        } else {
+        if (category.type === 'simple' && category.find !== undefined && category.replace !== undefined) {
+          onPreview(category.find, category.replace, false);
+        } else if (category.type !== 'simple') {
           setSelectedCategory(category);
           setMode('suboptions');
           setSubOptionIndex(0);
@@ -256,7 +256,9 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
         return;
       }
       if (key.downArrow) {
-        setSubOptionIndex((prev) => Math.min((selectedCategory.options?.length ?? 1) - 1, prev + 1));
+        setSubOptionIndex((prev) =>
+          Math.min((selectedCategory.options?.length ?? 1) - 1, prev + 1)
+        );
         return;
       }
       if (key.return) {
