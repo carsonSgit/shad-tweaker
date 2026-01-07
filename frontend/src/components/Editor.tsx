@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import { THEME, SYMBOLS } from '../App.js';
+import { useState } from 'react';
+import { SYMBOLS, THEME } from '../App.js';
 
 interface EditorProps {
   selectedCount: number;
@@ -143,7 +143,7 @@ const QUICK_ACTION_CATEGORIES: QuickActionCategory[] = [
 const CLASS_PATTERNS: Record<string, string> = {
   'rounded-none': '\\brounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full)?\\b',
   'rounded-sm': '\\brounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full)?\\b',
-  'rounded': '\\brounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full)?\\b',
+  rounded: '\\brounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full)?\\b',
   'rounded-md': '\\brounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full)?\\b',
   'rounded-lg': '\\brounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full)?\\b',
   'rounded-xl': '\\brounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full)?\\b',
@@ -157,7 +157,7 @@ const CLASS_PATTERNS: Record<string, string> = {
   'ring-8': '\\bring(-0|-1|-2|-4|-8)?\\b',
   'shadow-none': '\\bshadow(-none|-sm|-md|-lg|-xl|-2xl)?\\b',
   'shadow-sm': '\\bshadow(-none|-sm|-md|-lg|-xl|-2xl)?\\b',
-  'shadow': '\\bshadow(-none|-sm|-md|-lg|-xl|-2xl)?\\b',
+  shadow: '\\bshadow(-none|-sm|-md|-lg|-xl|-2xl)?\\b',
   'shadow-md': '\\bshadow(-none|-sm|-md|-lg|-xl|-2xl)?\\b',
   'shadow-lg': '\\bshadow(-none|-sm|-md|-lg|-xl|-2xl)?\\b',
   'shadow-xl': '\\bshadow(-none|-sm|-md|-lg|-xl|-2xl)?\\b',
@@ -235,7 +235,7 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
         return;
       }
       // Number shortcuts for first 9 categories
-      const num = parseInt(input);
+      const num = parseInt(input, 10);
       if (num >= 1 && num <= Math.min(9, QUICK_ACTION_CATEGORIES.length)) {
         const category = QUICK_ACTION_CATEGORIES[num - 1];
         if (category.type === 'simple') {
@@ -256,7 +256,7 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
         return;
       }
       if (key.downArrow) {
-        setSubOptionIndex((prev) => Math.min(selectedCategory.options!.length - 1, prev + 1));
+        setSubOptionIndex((prev) => Math.min(selectedCategory.options?.length - 1, prev + 1));
         return;
       }
       if (key.return) {
@@ -277,7 +277,7 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
         return;
       }
       // Number shortcuts
-      const num = parseInt(input);
+      const num = parseInt(input, 10);
       if (num >= 1 && num <= Math.min(9, selectedCategory.options.length)) {
         const option = selectedCategory.options[num - 1];
         if (selectedCategory.type === 'select-from') {
@@ -328,13 +328,15 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
   const renderQuickMode = () => (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Quick Actions</Text>
+        <Text bold color={THEME.highlight}>
+          {SYMBOLS.diamond} Quick Actions
+        </Text>
         <Text color={THEME.muted}> ─ Select a modification</Text>
       </Box>
 
-      <Box 
-        flexDirection="column" 
-        borderStyle="single" 
+      <Box
+        flexDirection="column"
+        borderStyle="single"
         borderColor={THEME.muted}
         paddingX={1}
         marginBottom={1}
@@ -357,9 +359,7 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
                 </Text>
               </Box>
               <Text color={THEME.muted}>{category.description}</Text>
-              {category.type !== 'simple' && (
-                <Text color={THEME.accent}> {SYMBOLS.arrow}</Text>
-              )}
+              {category.type !== 'simple' && <Text color={THEME.accent}> {SYMBOLS.arrow}</Text>}
             </Box>
           );
         })}
@@ -367,10 +367,9 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
 
       <Box justifyContent="center">
         <Text color={THEME.muted}>
-          <Text color={THEME.secondary}>1-{Math.min(9, QUICK_ACTION_CATEGORIES.length)}</Text> Quick │{' '}
-          <Text color={THEME.secondary}>↵</Text> Select │{' '}
-          <Text color={THEME.secondary}>m</Text> Manual mode │{' '}
-          <Text color={THEME.secondary}>Esc</Text> Cancel
+          <Text color={THEME.secondary}>1-{Math.min(9, QUICK_ACTION_CATEGORIES.length)}</Text> Quick
+          │ <Text color={THEME.secondary}>↵</Text> Select │ <Text color={THEME.secondary}>m</Text>{' '}
+          Manual mode │ <Text color={THEME.secondary}>Esc</Text> Cancel
         </Text>
       </Box>
     </Box>
@@ -384,13 +383,18 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
       <Box flexDirection="column">
         <Box marginBottom={1}>
           <Text>{selectedCategory.icon} </Text>
-          <Text bold color={THEME.secondary}>{selectedCategory.label}</Text>
-          <Text color={THEME.muted}> ─ {selectedCategory.type === 'select-from' ? 'Select to remove' : 'Select target value'}</Text>
+          <Text bold color={THEME.secondary}>
+            {selectedCategory.label}
+          </Text>
+          <Text color={THEME.muted}>
+            {' '}
+            ─ {selectedCategory.type === 'select-from' ? 'Select to remove' : 'Select target value'}
+          </Text>
         </Box>
 
-        <Box 
-          flexDirection="column" 
-          borderStyle="single" 
+        <Box
+          flexDirection="column"
+          borderStyle="single"
           borderColor={THEME.secondary}
           paddingX={1}
           marginBottom={1}
@@ -420,9 +424,8 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
 
         <Box justifyContent="center">
           <Text color={THEME.muted}>
-            <Text color={THEME.secondary}>↵</Text> Apply │{' '}
-            <Text color={THEME.secondary}>1-9</Text> Quick │{' '}
-            <Text color={THEME.secondary}>Esc</Text> Back
+            <Text color={THEME.secondary}>↵</Text> Apply │ <Text color={THEME.secondary}>1-9</Text>{' '}
+            Quick │ <Text color={THEME.secondary}>Esc</Text> Back
           </Text>
         </Box>
       </Box>
@@ -433,26 +436,28 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
   const renderManualMode = () => (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color={THEME.highlight}>{SYMBOLS.arrow} Manual Find & Replace</Text>
+        <Text bold color={THEME.highlight}>
+          {SYMBOLS.arrow} Manual Find & Replace
+        </Text>
       </Box>
 
       {error && (
         <Box marginBottom={1} borderStyle="round" borderColor={THEME.error} paddingX={2}>
-          <Text color={THEME.error}>{SYMBOLS.cross} {error}</Text>
+          <Text color={THEME.error}>
+            {SYMBOLS.cross} {error}
+          </Text>
         </Box>
       )}
 
       <Box flexDirection="column" marginBottom={1}>
         <Box marginBottom={1}>
           <Box width={10}>
-            <Text color={activeField === 'find' ? THEME.secondary : THEME.muted}>
-              Find:
-            </Text>
+            <Text color={activeField === 'find' ? THEME.secondary : THEME.muted}>Find:</Text>
           </Box>
-          <Box 
-            borderStyle={activeField === 'find' ? 'round' : 'single'} 
+          <Box
+            borderStyle={activeField === 'find' ? 'round' : 'single'}
             borderColor={activeField === 'find' ? THEME.secondary : THEME.muted}
-            paddingX={1} 
+            paddingX={1}
             width={40}
           >
             {activeField === 'find' ? (
@@ -469,22 +474,16 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
 
         <Box marginBottom={1}>
           <Box width={10}>
-            <Text color={activeField === 'replace' ? THEME.secondary : THEME.muted}>
-              Replace:
-            </Text>
+            <Text color={activeField === 'replace' ? THEME.secondary : THEME.muted}>Replace:</Text>
           </Box>
-          <Box 
-            borderStyle={activeField === 'replace' ? 'round' : 'single'} 
+          <Box
+            borderStyle={activeField === 'replace' ? 'round' : 'single'}
             borderColor={activeField === 'replace' ? THEME.secondary : THEME.muted}
-            paddingX={1} 
+            paddingX={1}
             width={40}
           >
             {activeField === 'replace' ? (
-              <TextInput
-                value={replace}
-                onChange={setReplace}
-                onSubmit={handleSubmit}
-              />
+              <TextInput value={replace} onChange={setReplace} onSubmit={handleSubmit} />
             ) : (
               <Text color={replace ? THEME.highlight : THEME.muted}>
                 {replace || '(empty - will delete)'}
@@ -504,9 +503,8 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
 
       <Box justifyContent="center">
         <Text color={THEME.muted}>
-          <Text color={THEME.secondary}>Tab</Text> Switch │{' '}
-          <Text color={THEME.secondary}>↵</Text> Preview │{' '}
-          <Text color={THEME.secondary}>Ctrl+R</Text> Regex │{' '}
+          <Text color={THEME.secondary}>Tab</Text> Switch │ <Text color={THEME.secondary}>↵</Text>{' '}
+          Preview │ <Text color={THEME.secondary}>Ctrl+R</Text> Regex │{' '}
           <Text color={THEME.secondary}>Esc</Text> Back
         </Text>
       </Box>

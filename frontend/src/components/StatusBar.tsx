@@ -1,7 +1,6 @@
-import React from 'react';
 import { Box, Text } from 'ink';
+import { SYMBOLS, THEME } from '../App.js';
 import type { Screen } from '../types/index.js';
-import { THEME, SYMBOLS } from '../App.js';
 
 interface StatusBarProps {
   screen: Screen;
@@ -21,20 +20,15 @@ const screenLabels: Record<Screen, { label: string; icon: string }> = {
   help: { label: 'Help', icon: '?' },
 };
 
-export function StatusBar({
-  screen,
-  selectedCount,
-  totalCount,
-  notification,
-}: StatusBarProps) {
+export function StatusBar({ screen, selectedCount, totalCount, notification }: StatusBarProps) {
   const screenInfo = screenLabels[screen];
-  
+
   return (
     <Box flexDirection="column" marginTop={1}>
       {/* Notification Banner */}
       {notification && (
-        <Box 
-          marginBottom={1} 
+        <Box
+          marginBottom={1}
           paddingX={2}
           borderStyle="round"
           borderColor={notification.type === 'success' ? THEME.success : THEME.error}
@@ -53,7 +47,7 @@ export function StatusBar({
       <Box>
         <Text color={THEME.primary}>{'─'.repeat(42)}</Text>
       </Box>
-      
+
       <Box justifyContent="space-between">
         {/* Left: Current Screen */}
         <Box>

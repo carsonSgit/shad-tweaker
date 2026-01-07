@@ -1,13 +1,12 @@
-import React from 'react';
 import { Box, Text, useInput } from 'ink';
-import { THEME, SYMBOLS } from '../App.js';
+import { SYMBOLS, THEME } from '../App.js';
 
 interface HelpScreenProps {
   onBack: () => void;
 }
 
 export function HelpScreen({ onBack }: HelpScreenProps) {
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (key.escape) {
       onBack();
     }
@@ -60,24 +59,23 @@ export function HelpScreen({ onBack }: HelpScreenProps) {
     <Box flexDirection="column">
       {/* Header */}
       <Box marginBottom={1}>
-        <Text bold color={THEME.highlight}>[?] Help & Keyboard Shortcuts</Text>
+        <Text bold color={THEME.highlight}>
+          [?] Help & Keyboard Shortcuts
+        </Text>
       </Box>
 
       {/* Shortcuts Sections */}
       <Box flexDirection="column" marginBottom={1}>
-        {sections.map((section, sectionIdx) => (
+        {sections.map((section, _sectionIdx) => (
           <Box key={section.title} flexDirection="column" marginBottom={1}>
             <Box marginBottom={0}>
               <Text>{section.icon} </Text>
-              <Text bold color={THEME.secondary}>{section.title}</Text>
+              <Text bold color={THEME.secondary}>
+                {section.title}
+              </Text>
             </Box>
-            
-            <Box 
-              flexDirection="column" 
-              borderStyle="single" 
-              borderColor={THEME.muted}
-              paddingX={2}
-            >
+
+            <Box flexDirection="column" borderStyle="single" borderColor={THEME.muted} paddingX={2}>
               {section.shortcuts.map(({ key, desc }) => (
                 <Box key={key}>
                   <Box width={12}>
@@ -96,15 +94,12 @@ export function HelpScreen({ onBack }: HelpScreenProps) {
       <Box flexDirection="column" marginBottom={1}>
         <Box marginBottom={0}>
           <Text>{SYMBOLS.arrow} </Text>
-          <Text bold color={THEME.secondary}>Workflow</Text>
+          <Text bold color={THEME.secondary}>
+            Workflow
+          </Text>
         </Box>
-        
-        <Box 
-          flexDirection="column" 
-          borderStyle="round" 
-          borderColor={THEME.primary}
-          paddingX={2}
-        >
+
+        <Box flexDirection="column" borderStyle="round" borderColor={THEME.primary} paddingX={2}>
           {workflowSteps.map(({ step, text, icon }) => (
             <Box key={step}>
               <Text color={THEME.primary}>{step}. </Text>

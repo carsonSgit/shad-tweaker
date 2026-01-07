@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'fs-extra';
 import inquirer from 'inquirer';
-import { type ShadcnTweakerConfig, configExists, getDefaultConfig, saveConfig } from './config.js';
+import { configExists, getDefaultConfig, type ShadcnTweakerConfig, saveConfig } from './config.js';
 
 const COMMON_PATHS = [
   'src/components/ui',
