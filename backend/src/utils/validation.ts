@@ -236,12 +236,84 @@ function isRegexDangerous(pattern: string): boolean {
   return false;
 }
 
+/**
+ * Enforces a conservative "safe" subset of regex features.
+ *
+ * Disallows:
+ * - backreferences (e.g. \1, \2, ...)
+ * - lookarounds (e.g. (?=...), (?!...), (?<=...), (?<!...))
+ * - named capture groups (e.g. (?<name>...))
+ * - alternation (|) outside of character classes
+ * - inline flags (e.g. (?i))
+ * - nested quantifiers and overly large repetition ranges
+ */
+function isRegexSafe(pattern: string): boolean {
+  // Basic sanity: no control characters or newlines
+  if (/[^\x20-\x7E]/.test(pattern)) {
+    return false;
+  }
+
+  // Disallow backreferences like \1, \2, ... which can be complex to analyze
+  if (/\\[1-9]/.test(pattern)) {
+    return false;
+  }
+
+  // Disallow lookarounds and other (?...) constructs, including named groups
+  if (/\(\?/.test(pattern)) {
+    return false;
+  }
+
+  // Disallow alternation outside character classes
+  // This is a conservative check: any '|' is rejected.
+  if (/\|/.test(pattern)) {
+    return false;
+  }
+
+  // Disallow unbounded "any character" repetition like .* or .+
+  if (/(\.\*|\.\+)/.test(pattern)) {
+    return false;
+  }
+
+  // Disallow nested quantifiers such as (a+)+, (a*)*, (a+){m,n}
+  if (/\([^)]*[+*][^)]*\)[+*]/.test(pattern)) {
+    return false;
+  }
+  if (/\([^)]*[+*][^)]*\)\{/.test(pattern)) {
+    return false;
+  }
+
+  // Limit repetition ranges to small bounds to avoid catastrophic backtracking
+  const rangeRegex = /\{(\d+)(,(\d+))?\}/g;
+  let rangeMatch: RegExpExecArray | null = rangeRegex.exec(pattern);
+  while (rangeMatch !== null) {
+    const min = parseInt(rangeMatch[1], 10);
+    const max = rangeMatch[3] ? parseInt(rangeMatch[3], 10) : min;
+    // Reject very large or inverted ranges
+    if (Number.isNaN(min) || Number.isNaN(max) || min > max || max > 100) {
+      return false;
+    }
+    rangeMatch = rangeRegex.exec(pattern);
+  }
+
+  return true;
+}
+
 export function validateRegex(pattern: string): { valid: boolean; error?: string } {
   // Check for potentially dangerous patterns (ReDoS prevention)
   if (isRegexDangerous(pattern)) {
     return {
       valid: false,
       error: 'Pattern may cause performance issues (ReDoS). Please simplify the pattern.',
+    };
+  }
+
+  // Enforce a conservative safe-regex subset before compiling the pattern.
+  if (!isRegexSafe(pattern)) {
+    return {
+      valid: false,
+      error:
+        'Pattern uses unsupported or unsafe regex features. ' +
+        'Please use simple expressions without backreferences, lookarounds, or complex quantifiers.',
     };
   }
 
