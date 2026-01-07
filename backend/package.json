@@ -5,9 +5,9 @@
   "description": "Backend service for shadcn component tweaker",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "bun --watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "bun dist/server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

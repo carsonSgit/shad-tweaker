@@ -1,8 +1,8 @@
-import express from 'express';
 import cors from 'cors';
+import express from 'express';
+import backupRouter from './routes/backup.js';
 import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
-import backupRouter from './routes/backup.js';
 import templatesRouter from './routes/templates.js';
 import { initializeDefaultTemplates } from './services/template.js';
 import { logger } from './utils/logger.js';
@@ -11,11 +11,16 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // CORS configuration - restrict to local development
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://127.0.0.1:3000'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(
+  cors({
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
 // Request size limits to prevent DoS attacks
 app.use(express.json({ limit: '1mb' }));

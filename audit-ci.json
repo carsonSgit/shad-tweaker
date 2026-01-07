@@ -1,0 +1,10 @@
+{
+  "$schema": "https://github.com/IBM/audit-ci/raw/main/docs/schema.json",
+  "critical": true,
+  "high": true,
+  "moderate": false,
+  "low": false,
+  "report-type": "summary",
+  "skip-dev": false,
+  "allowlist": []
+}

@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
-import type { Component, Screen } from '../types/index.js';
+import { useCallback, useRef, useState } from 'react';
 import * as api from '../api/client.js';
+import type { Component, Screen } from '../types/index.js';
 
 export function useComponents() {
   const [components, setComponents] = useState<Component[]>([]);

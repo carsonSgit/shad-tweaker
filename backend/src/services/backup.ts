@@ -1,5 +1,5 @@
+import path from 'node:path';
 import fs from 'fs-extra';
-import path from 'path';
 import type { Backup, BackupManifest } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 
@@ -116,7 +116,9 @@ export async function listBackups(): Promise<Backup[]> {
   return backups;
 }
 
-export async function restoreBackup(backupId: string): Promise<{ success: boolean; restored: string[]; count: number }> {
+export async function restoreBackup(
+  backupId: string
+): Promise<{ success: boolean; restored: string[]; count: number }> {
   const backupPath = path.join(getBackupBasePath(), backupId);
   const manifestPath = path.join(backupPath, 'manifest.json');
 
@@ -216,11 +218,11 @@ export async function previewBackupRestore(backupId: string): Promise<BackupPrev
 
   for (const file of manifest.files) {
     try {
-      const backupContent = await fs.pathExists(file.backupPath)
+      const backupContent = (await fs.pathExists(file.backupPath))
         ? await fs.readFile(file.backupPath, 'utf-8')
         : '';
 
-      const currentContent = await fs.pathExists(file.originalPath)
+      const currentContent = (await fs.pathExists(file.originalPath))
         ? await fs.readFile(file.originalPath, 'utf-8')
         : '';
 

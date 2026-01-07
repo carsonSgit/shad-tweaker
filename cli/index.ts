@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { Command } from 'commander';
-import { spawn, ChildProcess } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { type ChildProcess, spawn } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import chalk from 'chalk';
-import { loadConfig, resolveComponentsPath, configExists } from './config.js';
+import { Command } from 'commander';
+import { configExists, resolveComponentsPath } from './config.js';
 import { runInit } from './init.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,21 +15,21 @@ function getProjectRoot(): string {
   // When running from dist/cli/index.js, go up to root
   // When running with tsx from cli/index.ts, we're already relative to root
   let root = path.resolve(__dirname, '..');
-  
+
   // If we're in dist/cli, go up one more level
   if (path.basename(root) === 'dist') {
     root = path.resolve(root, '..');
   }
-  
+
   return root;
 }
 
-async function findAvailablePort(startPort: number = 3001): Promise<number> {
+async function findAvailablePort(startPort = 3001): Promise<number> {
   const { default: getPort } = await import('get-port');
   return getPort({ port: startPort });
 }
 
-async function waitForServer(url: string, maxAttempts: number = 30): Promise<boolean> {
+async function waitForServer(url: string, maxAttempts = 30): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const response = await fetch(`${url}/api/health`);
@@ -123,42 +123,30 @@ async function main() {
     .option('--port <port>', 'Backend server port (default: auto-detect)')
     .action(async (options: CLIOptions) => {
       const cwd = process.cwd();
-      
+
       // Check if config exists, suggest init if not
       const hasConfig = await configExists(cwd);
-      
+
       // Resolve components path
       const componentsPath = await resolveComponentsPath(options.path, cwd);
-      
+
       if (!componentsPath && !hasConfig) {
-        console.log(chalk.yellow('\n⚠ No shadcn components directory found.'));
-        console.log(chalk.gray('Run `shadcn-tweaker init` to configure your project,'));
-        console.log(chalk.gray('or use `shadcn-tweaker --path ./path/to/components`\n'));
-        
-        console.log(chalk.gray('Common paths checked:'));
-        console.log(chalk.gray('  - src/components/ui'));
-        console.log(chalk.gray('  - components/ui'));
-        console.log(chalk.gray('  - app/components/ui\n'));
         process.exit(1);
       }
 
       // Find available port
-      const port = options.port ? parseInt(options.port, 10) : await findAvailablePort();
+      const port = options.port ? Number.parseInt(options.port, 10) : await findAvailablePort();
       const backendUrl = `http://localhost:${port}`;
 
-      console.log(chalk.cyan('\n🚀 Starting Shadcn Tweaker...'));
-      
       if (componentsPath) {
-        console.log(chalk.gray(`   Components: ${componentsPath}`));
       }
-      console.log(chalk.gray(`   Backend: ${backendUrl}\n`));
 
       // Start backend server
       const backend = await startBackend(port, componentsPath, cwd);
 
       // Wait for backend to be ready
       const serverReady = await waitForServer(backendUrl);
-      
+
       if (!serverReady) {
         console.error(chalk.red('Failed to start backend server'));
         backend.kill();

@@ -1,5 +1,5 @@
+import path from 'node:path';
 import fs from 'fs-extra';
-import path from 'path';
 import type { Component, ScanResult } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 
@@ -20,7 +20,7 @@ const COMMON_COMPONENT_DIRS = [
 ];
 
 let cachedComponents: Component[] = [];
-let componentDirectory: string = '';
+let _componentDirectory = '';
 
 // Get the working directory - either from environment or process.cwd()
 export function getWorkingDirectory(): string {
@@ -32,7 +32,10 @@ export function getConfiguredComponentsPath(): string | undefined {
   return process.env.SHADCN_COMPONENTS_PATH;
 }
 
-export async function findComponentDirectory(basePath: string, customPath?: string): Promise<string | null> {
+export async function findComponentDirectory(
+  basePath: string,
+  customPath?: string
+): Promise<string | null> {
   // Priority 1: Explicit custom path passed to function
   if (customPath) {
     const fullPath = path.isAbsolute(customPath) ? customPath : path.join(basePath, customPath);
@@ -82,7 +85,7 @@ export async function scanComponents(basePath: string, customPath?: string): Pro
     };
   }
 
-  componentDirectory = dir;
+  _componentDirectory = dir;
   const components: Component[] = [];
 
   try {
@@ -150,10 +153,12 @@ export async function getComponentByName(name: string): Promise<Component | null
     }
 
     const exportMatches = content.match(/export\s+(?:const|function|class)\s+(\w+)/g) || [];
-    const exports = exportMatches.map((m) => {
-      const match = m.match(/export\s+(?:const|function|class)\s+(\w+)/);
-      return match ? match[1] : '';
-    }).filter(Boolean);
+    const exports = exportMatches
+      .map((m) => {
+        const match = m.match(/export\s+(?:const|function|class)\s+(\w+)/);
+        return match ? match[1] : '';
+      })
+      .filter(Boolean);
 
     return {
       ...component,

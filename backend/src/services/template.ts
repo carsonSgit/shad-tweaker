@@ -1,5 +1,5 @@
+import path from 'node:path';
 import fs from 'fs-extra';
-import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import type { Template, TemplateRule } from '../types/index.js';
 import { logger } from '../utils/logger.js';
@@ -68,7 +68,10 @@ export async function createTemplate(name: string, rules: TemplateRule[]): Promi
   return template;
 }
 
-export async function updateTemplate(id: string, updates: Partial<Pick<Template, 'name' | 'rules'>>): Promise<Template | null> {
+export async function updateTemplate(
+  id: string,
+  updates: Partial<Pick<Template, 'name' | 'rules'>>
+): Promise<Template | null> {
   const store = await readTemplates();
   const index = store.templates.findIndex((t) => t.id === id);
 
@@ -117,25 +120,22 @@ export async function deleteTemplate(id: string): Promise<boolean> {
 const DEFAULT_TEMPLATES: Array<{ name: string; rules: TemplateRule[] }> = [
   {
     name: 'Remove cursor-pointer',
-    rules: [
-      { find: '\\s*cursor-pointer', replace: '', isRegex: true },
-    ],
+    rules: [{ find: '\\s*cursor-pointer', replace: '', isRegex: true }],
   },
   {
     name: 'Add focus rings',
     rules: [
       {
         find: 'focus:outline-none',
-        replace: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        replace:
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         isRegex: false,
       },
     ],
   },
   {
     name: 'Update to rounded-lg',
-    rules: [
-      { find: 'rounded-md', replace: 'rounded-lg', isRegex: false },
-    ],
+    rules: [{ find: 'rounded-md', replace: 'rounded-lg', isRegex: false }],
   },
 ];
 

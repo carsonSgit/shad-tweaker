@@ -55,8 +55,7 @@ coverage/
 # Cache
 .cache/
 .npm
-.eslintcache
-.stylelintcache
+.bun
 
 # Temporary files
 *.tmp

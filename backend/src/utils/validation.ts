@@ -1,5 +1,10 @@
-import path from 'path';
-import type { EditRequest, ApplyRequest, BatchActionRequest, TemplateRule } from '../types/index.js';
+import path from 'node:path';
+import type {
+  ApplyRequest,
+  BatchActionRequest,
+  EditRequest,
+  TemplateRule,
+} from '../types/index.js';
 
 // ============================================
 // Path Traversal Protection
@@ -72,7 +77,7 @@ export function validateComponentPaths(
     return {
       valid: false,
       invalidPaths,
-      error: `Path traversal detected in component paths: ${invalidPaths.join(', ')}`
+      error: `Path traversal detected in component paths: ${invalidPaths.join(', ')}`,
     };
   }
 
@@ -185,9 +190,7 @@ export function validateTemplateRules(rules: unknown): rules is TemplateRule[] {
     if (typeof rule !== 'object' || rule === null) return false;
     const r = rule as Record<string, unknown>;
     return (
-      typeof r.find === 'string' &&
-      typeof r.replace === 'string' &&
-      typeof r.isRegex === 'boolean'
+      typeof r.find === 'string' && typeof r.replace === 'string' && typeof r.isRegex === 'boolean'
     );
   });
 }
@@ -238,7 +241,7 @@ export function validateRegex(pattern: string): { valid: boolean; error?: string
   if (isRegexDangerous(pattern)) {
     return {
       valid: false,
-      error: 'Pattern may cause performance issues (ReDoS). Please simplify the pattern.'
+      error: 'Pattern may cause performance issues (ReDoS). Please simplify the pattern.',
     };
   }
 
@@ -248,7 +251,7 @@ export function validateRegex(pattern: string): { valid: boolean; error?: string
   } catch (e) {
     return {
       valid: false,
-      error: e instanceof Error ? e.message : 'Invalid regex pattern'
+      error: e instanceof Error ? e.message : 'Invalid regex pattern',
     };
   }
 }

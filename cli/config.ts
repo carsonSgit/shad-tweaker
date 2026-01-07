@@ -1,5 +1,5 @@
+import path from 'node:path';
 import fs from 'fs-extra';
-import path from 'path';
 
 export interface ShadcnTweakerConfig {
   componentsPath: string;
@@ -27,7 +27,7 @@ export async function configExists(cwd: string = process.cwd()): Promise<boolean
 
 export async function loadConfig(cwd: string = process.cwd()): Promise<ShadcnTweakerConfig | null> {
   const configPath = getConfigPath(cwd);
-  
+
   if (!(await fs.pathExists(configPath))) {
     return null;
   }
@@ -38,7 +38,7 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<ShadcnTwe
       ...DEFAULT_CONFIG,
       ...config,
     };
-  } catch (error) {
+  } catch (_error) {
     console.error(`Failed to read config file: ${configPath}`);
     return null;
   }

@@ -1,8 +1,7 @@
-import inquirer from 'inquirer';
+import path from 'node:path';
 import fs from 'fs-extra';
-import path from 'path';
-import chalk from 'chalk';
-import { saveConfig, configExists, getDefaultConfig, type ShadcnTweakerConfig } from './config.js';
+import inquirer from 'inquirer';
+import { type ShadcnTweakerConfig, configExists, getDefaultConfig, saveConfig } from './config.js';
 
 const COMMON_PATHS = [
   'src/components/ui',
@@ -15,14 +14,14 @@ const COMMON_PATHS = [
 
 async function detectExistingPaths(cwd: string): Promise<string[]> {
   const existing: string[] = [];
-  
+
   for (const p of COMMON_PATHS) {
     const fullPath = path.join(cwd, p);
     if (await fs.pathExists(fullPath)) {
       existing.push(p);
     }
   }
-  
+
   return existing;
 }
 
@@ -36,8 +35,6 @@ async function countComponentFiles(dirPath: string): Promise<number> {
 }
 
 export async function runInit(cwd: string): Promise<void> {
-  console.log(chalk.cyan('\n🔧 Shadcn Tweaker Setup\n'));
-
   // Check if config already exists
   if (await configExists(cwd)) {
     const { overwrite } = await inquirer.prompt([
@@ -50,7 +47,6 @@ export async function runInit(cwd: string): Promise<void> {
     ]);
 
     if (!overwrite) {
-      console.log(chalk.gray('Setup cancelled.'));
       return;
     }
   }
@@ -61,7 +57,7 @@ export async function runInit(cwd: string): Promise<void> {
 
   // Build choices for components path
   const pathChoices: Array<{ name: string; value: string }> = [];
-  
+
   for (const p of existingPaths) {
     const fullPath = path.join(cwd, p);
     const count = await countComponentFiles(fullPath);
@@ -70,7 +66,7 @@ export async function runInit(cwd: string): Promise<void> {
       value: p,
     });
   }
-  
+
   pathChoices.push({
     name: 'Enter custom path...',
     value: '__custom__',
@@ -190,14 +186,7 @@ export async function runInit(cwd: string): Promise<void> {
 
       if (addToGitignore) {
         await fs.appendFile(gitignorePath, '\n# Shadcn Tweaker\n.shadcn-tweaker/\n');
-        console.log(chalk.gray('Added .shadcn-tweaker/ to .gitignore'));
       }
     }
   }
-
-  console.log(chalk.green('\n✓ Configuration saved to .shadcn-tweaker.json'));
-  console.log(chalk.gray(`  Components path: ${config.componentsPath}`));
-  console.log(chalk.gray(`  Backups: ${config.backupsDir}`));
-  console.log(chalk.gray(`  Max backups: ${config.maxBackups}`));
-  console.log(chalk.cyan('\nRun `shadcn-tweaker` to start customizing your components!\n'));
 }

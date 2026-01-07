@@ -1,11 +1,11 @@
+import crypto from 'node:crypto';
+import os from 'node:os';
+import path from 'node:path';
 import fs from 'fs-extra';
-import path from 'path';
-import os from 'os';
-import crypto from 'crypto';
 import type { Preview } from '../types/index.js';
-import { createPreview } from './differ.js';
-import { createBackup } from './backup.js';
 import { logger } from '../utils/logger.js';
+import { createBackup } from './backup.js';
+import { createPreview } from './differ.js';
 
 /**
  * Generates a unique temporary file name using crypto.randomUUID
@@ -71,7 +71,7 @@ export async function applyChanges(
   find: string,
   replace: string,
   isRegex: boolean,
-  shouldBackup: boolean = true
+  shouldBackup = true
 ): Promise<ModifyResult> {
   const modified: string[] = [];
   const errors: Array<{ path: string; error: string }> = [];
@@ -156,7 +156,8 @@ const BATCH_ACTIONS: Record<string, (options?: Record<string, string>) => BatchA
   'add-focus-rings': () => ({
     name: 'Add focus rings',
     find: 'focus:outline-none',
-    replace: 'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+    replace:
+      'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
     isRegex: false,
   }),
   'update-border-radius': () => ({
@@ -179,7 +180,10 @@ const BATCH_ACTIONS: Record<string, (options?: Record<string, string>) => BatchA
   }),
 };
 
-export function getBatchAction(actionName: string, options?: Record<string, string>): BatchAction | null {
+export function getBatchAction(
+  actionName: string,
+  options?: Record<string, string>
+): BatchAction | null {
   const actionFn = BATCH_ACTIONS[actionName];
   if (!actionFn) return null;
   return actionFn(options);
@@ -201,11 +205,5 @@ export async function applyBatchAction(
     };
   }
 
-  return applyChanges(
-    componentPaths,
-    action.find,
-    action.replace,
-    action.isRegex,
-    true
-  );
+  return applyChanges(componentPaths, action.find, action.replace, action.isRegex, true);
 }

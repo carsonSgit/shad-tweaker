@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
-import type { Component, Screen } from './types/index.js';
-import { useComponents, useNavigation } from './hooks/useComponents.js';
-import { Dashboard } from './components/Dashboard.js';
+import { useEffect, useState } from 'react';
+import { BackupBrowser } from './components/BackupBrowser.js';
 import { ComponentList } from './components/ComponentList.js';
 import { ComponentView } from './components/ComponentView.js';
+import { Dashboard } from './components/Dashboard.js';
 import { Editor } from './components/Editor.js';
-import { PreviewView } from './components/Preview.js';
-import { TemplateManager } from './components/TemplateManager.js';
-import { BackupBrowser } from './components/BackupBrowser.js';
 import { HelpScreen } from './components/HelpScreen.js';
+import { PreviewView } from './components/Preview.js';
 import { StatusBar } from './components/StatusBar.js';
+import { TemplateManager } from './components/TemplateManager.js';
+import { useComponents, useNavigation } from './hooks/useComponents.js';
+import type { Component, Screen } from './types/index.js';
 
 // Visual constants for consistent theming
 export const THEME = {
@@ -59,7 +59,10 @@ export function App() {
 
   const [currentComponent, setCurrentComponent] = useState<Component | null>(null);
   const [editState, setEditState] = useState({ find: '', replace: '', isRegex: false });
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: 'success' | 'error';
+  } | null>(null);
 
   // Auto-scan once on first load
   useEffect(() => {
@@ -77,7 +80,7 @@ export function App() {
   }, [notification]);
 
   // Global keyboard shortcuts
-  useInput((input, key) => {
+  useInput((input, _key) => {
     // Don't handle input when in editor mode or loading
     if (loading) return;
 
@@ -152,10 +155,7 @@ export function App() {
 
       case 'component-view':
         return currentComponent ? (
-          <ComponentView
-            component={currentComponent}
-            onBack={() => goBack()}
-          />
+          <ComponentView component={currentComponent} onBack={() => goBack()} />
         ) : null;
 
       case 'editor':
@@ -233,10 +233,18 @@ export function App() {
         <Box>
           <Text color={THEME.primary}>│</Text>
           <Text> </Text>
-          <Text bold color={THEME.primary}>◆ </Text>
-          <Text bold color={THEME.highlight}>shadcn</Text>
-          <Text bold color={THEME.primary}>/</Text>
-          <Text bold color={THEME.secondary}>tweaker</Text>
+          <Text bold color={THEME.primary}>
+            ◆{' '}
+          </Text>
+          <Text bold color={THEME.highlight}>
+            shadcn
+          </Text>
+          <Text bold color={THEME.primary}>
+            /
+          </Text>
+          <Text bold color={THEME.secondary}>
+            tweaker
+          </Text>
           <Text color={THEME.muted}> ─ </Text>
           <Text color={THEME.muted}>v1.0.1</Text>
           <Text>{'   '.repeat(6)}</Text>

@@ -7,23 +7,25 @@
     "shadcn-tweaker": "./dist/cli/index.js"
   },
   "scripts": {
-    "build": "npm run build:cli && npm run build:backend && npm run build:frontend",
+    "build": "bun run build:cli && bun run build:backend && bun run build:frontend",
     "build:cli": "tsc -p cli/tsconfig.json",
-    "build:backend": "cd backend && npm run build",
-    "build:frontend": "cd frontend && npm run build",
-    "dev": "tsx cli/index.ts",
-    "start": "node dist/cli/index.js",
-    "prepublishOnly": "npm run build"
+    "build:backend": "cd backend && bun run build",
+    "build:frontend": "cd frontend && bun run build",
+    "dev": "bun run cli/index.ts",
+    "start": "bun dist/cli/index.js",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "typecheck": "tsc --noEmit -p cli/tsconfig.json",
+    "prepublishOnly": "bun run build",
+    "preversion": "bun run check && bun run typecheck",
+    "version": "bun run format && git add -A",
+    "postversion": "git push && git push --tags"
   },
-  "keywords": [
-    "shadcn",
-    "ui",
-    "cli",
-    "tui",
-    "components",
-    "tailwind",
-    "customization"
-  ],
+  "keywords": ["shadcn", "ui", "cli", "tui", "components", "tailwind", "customization"],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -44,16 +46,17 @@
     "cli-highlight": "^2.1.11"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "^1.1.14",
     "@types/cors": "^2.8.17",
     "@types/diff": "^7.0.0",
     "@types/express": "^4.17.21",
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^9.0.7",
-    "@types/node": "^20.11.0",
+    "@types/node": "^22.10.2",
     "@types/uuid": "^9.0.7",
     "@types/react": "^18.3.17",
-    "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.7.2"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -70,5 +73,6 @@
   "repository": {
     "type": "git",
     "url": ""
-  }
+  },
+  "packageManager": "bun@1.1.42"
 }

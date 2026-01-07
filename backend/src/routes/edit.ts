@@ -1,14 +1,14 @@
-import { Router, Request, Response } from 'express';
-import path from 'path';
-import { previewChanges, applyChanges, applyBatchAction } from '../services/modifier.js';
+import path from 'node:path';
+import { type Request, type Response, Router } from 'express';
+import { applyBatchAction, applyChanges, previewChanges } from '../services/modifier.js';
+import { logger } from '../utils/logger.js';
 import {
-  validateEditRequest,
   validateApplyRequest,
   validateBatchActionRequest,
-  validateRegex,
   validateComponentPaths,
+  validateEditRequest,
+  validateRegex,
 } from '../utils/validation.js';
-import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -22,7 +22,8 @@ router.post('/preview', async (req: Request, res: Response) => {
       res.status(400).json({
         success: false,
         error: {
-          message: 'Invalid request body. Required: componentPaths (string[]), find (string), replace (string), isRegex (boolean)',
+          message:
+            'Invalid request body. Required: componentPaths (string[]), find (string), replace (string), isRegex (boolean)',
           code: 'VALIDATION_ERROR',
         },
       });
@@ -83,7 +84,8 @@ router.post('/apply', async (req: Request, res: Response) => {
       res.status(400).json({
         success: false,
         error: {
-          message: 'Invalid request body. Required: componentPaths (string[]), find (string), replace (string), isRegex (boolean)',
+          message:
+            'Invalid request body. Required: componentPaths (string[]), find (string), replace (string), isRegex (boolean)',
           code: 'VALIDATION_ERROR',
         },
       });
@@ -159,7 +161,8 @@ router.post('/batch-action', async (req: Request, res: Response) => {
       res.status(400).json({
         success: false,
         error: {
-          message: 'Invalid request body. Required: action (string), componentPaths (string[]). Valid actions: remove-cursor-pointer, add-focus-rings, update-border-radius, remove-class, replace-class',
+          message:
+            'Invalid request body. Required: action (string), componentPaths (string[]). Valid actions: remove-cursor-pointer, add-focus-rings, update-border-radius, remove-class, replace-class',
           code: 'VALIDATION_ERROR',
         },
       });

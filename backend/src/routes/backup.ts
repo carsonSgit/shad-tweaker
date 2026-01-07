@@ -1,12 +1,12 @@
-import { Router, Request, Response } from 'express';
-import path from 'path';
+import path from 'node:path';
+import { type Request, type Response, Router } from 'express';
 import {
   createBackup,
-  listBackups,
-  restoreBackup,
   deleteBackup,
   getBackupDetails,
+  listBackups,
   previewBackupRestore,
+  restoreBackup,
 } from '../services/backup.js';
 import { getCachedComponents } from '../services/scanner.js';
 import { logger } from '../utils/logger.js';
@@ -44,7 +44,8 @@ router.post('/create', async (req: Request, res: Response) => {
         res.status(400).json({
           success: false,
           error: {
-            message: 'No components to backup. Either provide componentPaths or scan components first.',
+            message:
+              'No components to backup. Either provide componentPaths or scan components first.',
             code: 'NO_COMPONENTS',
           },
         });
@@ -164,14 +165,14 @@ router.get('/:id/preview', async (req: Request, res: Response) => {
     const previews = await previewBackupRestore(id);
 
     // Filter to only files with changes
-    const changedFiles = previews.filter(p => p.hasChanges);
+    const changedFiles = previews.filter((p) => p.hasChanges);
 
     res.json({
       success: true,
       backupId: id,
       totalFiles: previews.length,
       changedFiles: changedFiles.length,
-      previews: changedFiles.map(p => ({
+      previews: changedFiles.map((p) => ({
         path: p.path,
         fileName: p.fileName,
         currentContent: p.currentContent,

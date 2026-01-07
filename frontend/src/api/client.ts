@@ -1,10 +1,10 @@
 import type {
   ApiResponse,
+  Backup,
   Component,
   ComponentDetail,
   Preview,
   Template,
-  Backup,
 } from '../types/index.js';
 
 // Get backend URL from environment variable (set by CLI wrapper)
@@ -16,10 +16,7 @@ export function getBackendUrl(): string {
   return BASE_URL;
 }
 
-async function request<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<ApiResponse<T>> {
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
   try {
     const response = await fetch(`${BASE_URL}${endpoint}`, {
       ...options,
@@ -62,15 +59,11 @@ export async function scanComponents(): Promise<
   return request('/api/components/scan');
 }
 
-export async function getComponents(): Promise<
-  ApiResponse<{ components: Component[] }>
-> {
+export async function getComponents(): Promise<ApiResponse<{ components: Component[] }>> {
   return request('/api/components');
 }
 
-export async function getComponent(
-  name: string
-): Promise<ApiResponse<ComponentDetail>> {
+export async function getComponent(name: string): Promise<ApiResponse<ComponentDetail>> {
   return request(`/api/components/${encodeURIComponent(name)}`);
 }
 
@@ -79,7 +72,7 @@ export async function previewEdit(
   componentPaths: string[],
   find: string,
   replace: string,
-  isRegex: boolean = false
+  isRegex = false
 ): Promise<ApiResponse<{ previews: Preview[] }>> {
   return request('/api/edit/preview', {
     method: 'POST',
@@ -91,10 +84,8 @@ export async function applyEdit(
   componentPaths: string[],
   find: string,
   replace: string,
-  isRegex: boolean = false
-): Promise<
-  ApiResponse<{ success: boolean; modified: string[]; backup: string }>
-> {
+  isRegex = false
+): Promise<ApiResponse<{ success: boolean; modified: string[]; backup: string }>> {
   return request('/api/edit/apply', {
     method: 'POST',
     body: JSON.stringify({ componentPaths, find, replace, isRegex }),
@@ -112,9 +103,7 @@ export async function batchAction(
 }
 
 // Template Management
-export async function getTemplates(): Promise<
-  ApiResponse<{ templates: Template[] }>
-> {
+export async function getTemplates(): Promise<ApiResponse<{ templates: Template[] }>> {
   return request('/api/templates');
 }
 
@@ -128,9 +117,7 @@ export async function createTemplate(
   });
 }
 
-export async function deleteTemplate(
-  id: string
-): Promise<ApiResponse<{ success: boolean }>> {
+export async function deleteTemplate(id: string): Promise<ApiResponse<{ success: boolean }>> {
   return request(`/api/templates/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
@@ -139,7 +126,9 @@ export async function deleteTemplate(
 export async function applyTemplate(
   id: string,
   componentPaths: string[]
-): Promise<ApiResponse<{ success: boolean; modified: string[]; changes: number; backupId?: string }>> {
+): Promise<
+  ApiResponse<{ success: boolean; modified: string[]; changes: number; backupId?: string }>
+> {
   return request(`/api/templates/${encodeURIComponent(id)}/apply`, {
     method: 'POST',
     body: JSON.stringify({ componentPaths }),
@@ -153,9 +142,7 @@ export async function createBackup(): Promise<
   return request('/api/backup/create', { method: 'POST' });
 }
 
-export async function restoreBackup(
-  backupId: string
-): Promise<ApiResponse<{ success: boolean }>> {
+export async function restoreBackup(backupId: string): Promise<ApiResponse<{ success: boolean }>> {
   return request('/api/backup/restore', {
     method: 'POST',
     body: JSON.stringify({ backupId }),
@@ -173,9 +160,14 @@ export interface BackupFilePreview {
   backupContent: string;
 }
 
-export async function previewBackup(
-  backupId: string
-): Promise<ApiResponse<{ backupId: string; totalFiles: number; changedFiles: number; previews: BackupFilePreview[] }>> {
+export async function previewBackup(backupId: string): Promise<
+  ApiResponse<{
+    backupId: string;
+    totalFiles: number;
+    changedFiles: number;
+    previews: BackupFilePreview[];
+  }>
+> {
   return request(`/api/backup/${encodeURIComponent(backupId)}/preview`);
 }
 

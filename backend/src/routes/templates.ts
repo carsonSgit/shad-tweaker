@@ -1,15 +1,19 @@
-import { Router, Request, Response } from 'express';
-import path from 'path';
-import {
-  listTemplates,
-  getTemplate,
-  createTemplate,
-  updateTemplate,
-  deleteTemplate,
-} from '../services/template.js';
+import path from 'node:path';
+import { type Request, type Response, Router } from 'express';
 import { applyChanges } from '../services/modifier.js';
-import { validateTemplateRules, validateTemplateId, validateComponentPaths } from '../utils/validation.js';
+import {
+  createTemplate,
+  deleteTemplate,
+  getTemplate,
+  listTemplates,
+  updateTemplate,
+} from '../services/template.js';
 import { logger } from '../utils/logger.js';
+import {
+  validateComponentPaths,
+  validateTemplateId,
+  validateTemplateRules,
+} from '../utils/validation.js';
 
 const router = Router();
 
@@ -95,7 +99,8 @@ router.post('/', async (req: Request, res: Response) => {
       res.status(400).json({
         success: false,
         error: {
-          message: 'Invalid rules format. Each rule must have find (string), replace (string), and isRegex (boolean)',
+          message:
+            'Invalid rules format. Each rule must have find (string), replace (string), and isRegex (boolean)',
           code: 'VALIDATION_ERROR',
         },
       });

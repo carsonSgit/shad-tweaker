@@ -12,15 +12,12 @@ function formatTimestamp(): string {
   return new Date().toISOString();
 }
 
-function log(level: LogLevel, message: string, meta?: unknown): void {
+function log(level: LogLevel, _message: string, meta?: unknown): void {
   const color = colors[level];
-  const timestamp = formatTimestamp();
-  const prefix = `${color}[${level.toUpperCase()}]${colors.reset}`;
-
-  console.log(`${timestamp} ${prefix} ${message}`);
+  const _timestamp = formatTimestamp();
+  const _prefix = `${color}[${level.toUpperCase()}]${colors.reset}`;
 
   if (meta !== undefined) {
-    console.log(JSON.stringify(meta, null, 2));
   }
 }
 

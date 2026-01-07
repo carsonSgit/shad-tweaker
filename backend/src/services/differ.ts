@@ -57,11 +57,7 @@ export function generateDiff(oldContent: string, newContent: string): DiffResult
   };
 }
 
-export function createPreview(
-  path: string,
-  oldContent: string,
-  newContent: string
-): Preview {
+export function createPreview(path: string, oldContent: string, newContent: string): Preview {
   const diffResult = generateDiff(oldContent, newContent);
 
   return {

@@ -1,0 +1,89 @@
+version: 2
+
+updates:
+  # Root package (Bun)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+    labels:
+      - "dependencies"
+      - "automated"
+    groups:
+      typescript:
+        patterns:
+          - "typescript"
+          - "@types/*"
+      biome:
+        patterns:
+          - "@biomejs/*"
+      dev-dependencies:
+        dependency-type: "development"
+        exclude-patterns:
+          - "typescript"
+          - "@types/*"
+          - "@biomejs/*"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch"]
+
+  # Backend package
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(backend)"
+    labels:
+      - "dependencies"
+      - "backend"
+      - "automated"
+    groups:
+      express:
+        patterns:
+          - "express"
+          - "@types/express"
+          - "cors"
+          - "@types/cors"
+
+  # Frontend package
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(frontend)"
+    labels:
+      - "dependencies"
+      - "frontend"
+      - "automated"
+    groups:
+      ink:
+        patterns:
+          - "ink"
+          - "ink-*"
+      react:
+        patterns:
+          - "react"
+          - "@types/react"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "ci"
+      - "automated"

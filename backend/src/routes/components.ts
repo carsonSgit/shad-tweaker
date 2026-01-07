@@ -1,10 +1,10 @@
-import { Router, Request, Response } from 'express';
+import { type Request, type Response, Router } from 'express';
 import {
-  scanComponents,
   getCachedComponents,
   getComponentByName,
   getComponentsWithContent,
   getWorkingDirectory,
+  scanComponents,
 } from '../services/scanner.js';
 import { logger } from '../utils/logger.js';
 import { validateCustomPath } from '../utils/validation.js';
