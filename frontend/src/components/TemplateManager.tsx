@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput } from 'ink';
-import TextInput from 'ink-text-input';
-import Spinner from 'ink-spinner';
 import * as Diff from 'diff';
+import { Box, Text, useInput } from 'ink';
+import Spinner from 'ink-spinner';
+import TextInput from 'ink-text-input';
+import { useCallback, useEffect, useState } from 'react';
+import { SYMBOLS, THEME } from '../App.js';
 import * as api from '../api/client.js';
-import type { Template, TemplateRule, Preview } from '../types/index.js';
-import { THEME, SYMBOLS } from '../App.js';
+import type { Preview, Template, TemplateRule } from '../types/index.js';
 
 interface TemplateManagerProps {
   onApplyTemplate: (rules: TemplateRule[]) => void;
@@ -40,29 +40,53 @@ interface QuickTemplate {
 // Helper function to generate class patterns
 const createClassPattern = (prefix: string, values: string[]): Record<string, string> => {
   const pattern = `\\b${prefix}(-${values.join('|-')})?\\b`;
-  return Object.fromEntries(
-    values.map(value => [`${prefix}-${value}`, pattern])
-  );
+  return Object.fromEntries(values.map((value) => [`${prefix}-${value}`, pattern]));
 };
 
 // Regex patterns for matching existing classes
 const CLASS_PATTERNS: Record<string, string> = {
   ...createClassPattern('rounded', ['none', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', 'full']),
-  'rounded': '\\brounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full)?\\b',
+  rounded: '\\brounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full)?\\b',
   ...createClassPattern('ring', ['0', '1', '2', '4', '8']),
   ...createClassPattern('shadow', ['none', 'sm', 'md', 'lg', 'xl', '2xl']),
-  'shadow': '\\bshadow(-none|-sm|-md|-lg|-xl|-2xl)?\\b',
+  shadow: '\\bshadow(-none|-sm|-md|-lg|-xl|-2xl)?\\b',
   ...createClassPattern('text', ['xs', 'sm', 'base', 'lg', 'xl', '2xl']),
   ...createClassPattern('gap', ['0', '1', '2', '3', '4', '6', '8']),
   ...createClassPattern('p', ['0', '1', '2', '3', '4', '6', '8', '10', '12', '16', '20', '24']),
   ...createClassPattern('m', ['0', '1', '2', '3', '4', '6', '8', '10', '12', '16', '20', '24']),
-  ...createClassPattern('font', ['thin', 'extralight', 'light', 'normal', 'medium', 'semibold', 'bold', 'extrabold', 'black']),
+  ...createClassPattern('font', [
+    'thin',
+    'extralight',
+    'light',
+    'normal',
+    'medium',
+    'semibold',
+    'bold',
+    'extrabold',
+    'black',
+  ]),
   'border-0': '\\bborder(-0|-2|-4|-8)?\\b(?!-)',
-  'border': '\\bborder(-0|-2|-4|-8)?\\b(?!-)',
+  border: '\\bborder(-0|-2|-4|-8)?\\b(?!-)',
   'border-2': '\\bborder(-0|-2|-4|-8)?\\b(?!-)',
   'border-4': '\\bborder(-0|-2|-4|-8)?\\b(?!-)',
   'border-8': '\\bborder(-0|-2|-4|-8)?\\b(?!-)',
-  ...createClassPattern('opacity', ['0', '5', '10', '20', '25', '30', '40', '50', '60', '70', '75', '80', '90', '95', '100']),
+  ...createClassPattern('opacity', [
+    '0',
+    '5',
+    '10',
+    '20',
+    '25',
+    '30',
+    '40',
+    '50',
+    '60',
+    '70',
+    '75',
+    '80',
+    '90',
+    '95',
+    '100',
+  ]),
   ...createClassPattern('duration', ['75', '100', '150', '200', '300', '500', '700', '1000']),
 };
 
@@ -191,19 +215,28 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
 // Helper components
 const LoadingSpinner = ({ message }: { message: string }) => (
   <Box borderStyle="round" borderColor={THEME.secondary} paddingX={2} paddingY={1}>
-    <Text color={THEME.success}><Spinner type="dots" /></Text>
+    <Text color={THEME.success}>
+      <Spinner type="dots" />
+    </Text>
     <Text> {message}</Text>
   </Box>
 );
 
-const ErrorMessage = ({ message }: { message: string | null }) => 
+const ErrorMessage = ({ message }: { message: string | null }) =>
   message ? (
     <Box marginBottom={1} borderStyle="round" borderColor={THEME.error} paddingX={2}>
-      <Text color={THEME.error}>{SYMBOLS.cross} {message}</Text>
+      <Text color={THEME.error}>
+        {SYMBOLS.cross} {message}
+      </Text>
     </Box>
   ) : null;
 
-export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], onDirectApply }: TemplateManagerProps) {
+export function TemplateManager({
+  onApplyTemplate,
+  onBack,
+  selectedPaths = [],
+  onDirectApply,
+}: TemplateManagerProps) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
@@ -223,7 +256,9 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
   const [internalSelectedPaths, setInternalSelectedPaths] = useState<Set<string>>(new Set());
   const [componentCursor, setComponentCursor] = useState(0);
-  const [availableComponents, setAvailableComponents] = useState<Array<{ name: string; path: string }>>([]);
+  const [availableComponents, setAvailableComponents] = useState<
+    Array<{ name: string; path: string }>
+  >([]);
 
   const [newName, setNewName] = useState('');
   const [newFind, setNewFind] = useState('');
@@ -232,25 +267,27 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
   const canDirectApply = selectedPaths.length > 0 && onDirectApply;
   const totalQuickTemplates = QUICK_TEMPLATES.length;
-  const allItems = [...QUICK_TEMPLATES.map(qt => ({ type: 'quick' as const, item: qt })),
-                    ...templates.map(t => ({ type: 'user' as const, item: t }))];
+  const allItems = [
+    ...QUICK_TEMPLATES.map((qt) => ({ type: 'quick' as const, item: qt })),
+    ...templates.map((t) => ({ type: 'user' as const, item: t })),
+  ];
 
-  useEffect(() => {
-    fetchTemplates();
-    fetchComponents();
-  }, []);
-
-  const fetchComponents = async () => {
+  const fetchComponents = useCallback(async () => {
     const result = await api.getComponents();
     if (result.success && result.data) {
-      setAvailableComponents(result.data.components.map((c: any) => ({
-        name: c.name,
-        path: c.path
-      })));
+      setAvailableComponents(
+        result.data.components.map((c: unknown) => {
+          const comp = c as { name: string; path: string };
+          return {
+            name: comp.name,
+            path: comp.path,
+          };
+        })
+      );
     }
-  };
+  }, []);
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     setLoading(true);
     const result = await api.getTemplates();
     if (result.success && result.data) {
@@ -259,11 +296,18 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
       setError(result.error?.message || 'Failed to load templates');
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchTemplates();
+    fetchComponents();
+  }, [fetchTemplates, fetchComponents]);
 
   const fetchPreviewForRule = async (rule: TemplateRule) => {
-    const pathsToUse = Array.from(internalSelectedPaths.size > 0 ? internalSelectedPaths : new Set(selectedPaths));
-    
+    const pathsToUse = Array.from(
+      internalSelectedPaths.size > 0 ? internalSelectedPaths : new Set(selectedPaths)
+    );
+
     if (pathsToUse.length === 0) {
       setError('No components selected');
       return;
@@ -296,7 +340,7 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
       const result = await api.previewEdit(selectedPaths, rule.find, rule.replace, rule.isRegex);
       if (result.success && result.data) {
         for (const preview of result.data.previews) {
-          const existing = allPreviews.find(p => p.path === preview.path);
+          const existing = allPreviews.find((p) => p.path === preview.path);
           if (existing) {
             existing.after = preview.after;
             existing.changes += preview.changes;
@@ -316,21 +360,21 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
   };
 
   const handleQuickTemplateSelect = (qt: QuickTemplate) => {
-    if (qt.type === 'simple') {
+    if (qt.type === 'simple' && qt.find !== undefined && qt.replace !== undefined) {
       const rule: TemplateRule = {
-        find: qt.find!,
-        replace: qt.replace!,
+        find: qt.find,
+        replace: qt.replace,
         isRegex: qt.isRegex || false,
       };
       setSelectedQuickTemplate(qt);
       setPendingRule(rule);
       setMode('select-components');
       setComponentCursor(0);
-      
+
       if (selectedPaths.length > 0) {
         setInternalSelectedPaths(new Set(selectedPaths));
       }
-    } else {
+    } else if (qt.type !== 'simple') {
       setSelectedQuickTemplate(qt);
       setSubOptionCursor(0);
       setMode('suboptions');
@@ -360,7 +404,7 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
     setPendingRule(rule);
     setMode('select-components');
     setComponentCursor(0);
-    
+
     if (selectedPaths.length > 0) {
       setInternalSelectedPaths(new Set(selectedPaths));
     }
@@ -386,7 +430,7 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
       if (input === ' ') {
         const component = availableComponents[componentCursor];
         if (component) {
-          setInternalSelectedPaths(prev => {
+          setInternalSelectedPaths((prev) => {
             const next = new Set(prev);
             if (next.has(component.path)) {
               next.delete(component.path);
@@ -399,7 +443,7 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
         return;
       }
       if (input === 'a') {
-        setInternalSelectedPaths(new Set(availableComponents.map(c => c.path)));
+        setInternalSelectedPaths(new Set(availableComponents.map((c) => c.path)));
         return;
       }
       if (input === 'n') {
@@ -430,14 +474,16 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
         return;
       }
       if (key.downArrow) {
-        setSubOptionCursor((c) => Math.min(selectedQuickTemplate.options!.length - 1, c + 1));
+        setSubOptionCursor((c) =>
+          Math.min((selectedQuickTemplate.options?.length ?? 1) - 1, c + 1)
+        );
         return;
       }
       if (key.return) {
         handleSubOptionSelect(selectedQuickTemplate.options[subOptionCursor]);
         return;
       }
-      const num = parseInt(input);
+      const num = parseInt(input, 10);
       if (num >= 1 && num <= Math.min(9, selectedQuickTemplate.options.length)) {
         handleSubOptionSelect(selectedQuickTemplate.options[num - 1]);
         return;
@@ -531,7 +577,7 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
       setNewReplace('');
       setActiveField('name');
     }
-    const num = parseInt(input);
+    const num = parseInt(input, 10);
     if (num >= 1 && num <= Math.min(9, totalQuickTemplates)) {
       handleQuickTemplateSelect(QUICK_TEMPLATES[num - 1]);
     }
@@ -567,12 +613,19 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
   };
 
   const handleConfirmApply = async () => {
-    const pathsToUse = Array.from(internalSelectedPaths.size > 0 ? internalSelectedPaths : new Set(selectedPaths));
+    const pathsToUse = Array.from(
+      internalSelectedPaths.size > 0 ? internalSelectedPaths : new Set(selectedPaths)
+    );
 
     setApplying(true);
 
     if (pendingRule) {
-      const result = await api.applyEdit(pathsToUse, pendingRule.find, pendingRule.replace, pendingRule.isRegex);
+      const result = await api.applyEdit(
+        pathsToUse,
+        pendingRule.find,
+        pendingRule.replace,
+        pendingRule.isRegex
+      );
       setApplying(false);
 
       if (result.success && result.data) {
@@ -592,7 +645,9 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
       if (result.success && result.data) {
         if (onDirectApply) {
-          onDirectApply(`Applied "${selectedTemplate.name}" to ${result.data.modified.length} files`);
+          onDirectApply(
+            `Applied "${selectedTemplate.name}" to ${result.data.modified.length} files`
+          );
         } else {
           setMode('view');
         }
@@ -613,13 +668,15 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
       <Box flexDirection="column">
         <Box marginBottom={1}>
           <Text>{selectedQuickTemplate.icon} </Text>
-          <Text bold color={THEME.secondary}>{selectedQuickTemplate.label}</Text>
+          <Text bold color={THEME.secondary}>
+            {selectedQuickTemplate.label}
+          </Text>
           <Text color={THEME.muted}> ─ Select target value</Text>
         </Box>
 
-        <Box 
-          flexDirection="column" 
-          borderStyle="single" 
+        <Box
+          flexDirection="column"
+          borderStyle="single"
           borderColor={THEME.secondary}
           paddingX={1}
           marginBottom={1}
@@ -649,9 +706,8 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
         <Box justifyContent="center">
           <Text color={THEME.muted}>
-            <Text color={THEME.secondary}>1-9</Text> Quick │{' '}
-            <Text color={THEME.secondary}>↵</Text> Next: Select Components │{' '}
-            <Text color={THEME.secondary}>Esc</Text> Back
+            <Text color={THEME.secondary}>1-9</Text> Quick │ <Text color={THEME.secondary}>↵</Text>{' '}
+            Next: Select Components │ <Text color={THEME.secondary}>Esc</Text> Back
           </Text>
         </Box>
       </Box>
@@ -661,14 +717,19 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
   // Component selection mode
   if (mode === 'select-components') {
     const visibleCount = 8;
-    const startIdx = Math.max(0, Math.min(componentCursor - 3, availableComponents.length - visibleCount));
+    const startIdx = Math.max(
+      0,
+      Math.min(componentCursor - 3, availableComponents.length - visibleCount)
+    );
     const visibleComponents = availableComponents.slice(startIdx, startIdx + visibleCount);
 
     return (
       <Box flexDirection="column">
         <Box marginBottom={1}>
           <Text>{SYMBOLS.diamond} </Text>
-          <Text bold color={THEME.secondary}>{selectedQuickTemplate?.label || 'Action'}</Text>
+          <Text bold color={THEME.secondary}>
+            {selectedQuickTemplate?.label || 'Action'}
+          </Text>
           <Text color={THEME.muted}> ─ Select components</Text>
         </Box>
 
@@ -681,9 +742,9 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
         <ErrorMessage message={error} />
 
-        <Box 
-          flexDirection="column" 
-          borderStyle="single" 
+        <Box
+          flexDirection="column"
+          borderStyle="single"
           borderColor={THEME.muted}
           paddingX={1}
           marginBottom={1}
@@ -711,7 +772,10 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
                     {isSelected ? SYMBOLS.check : SYMBOLS.circle}
                   </Text>
                 </Box>
-                <Text color={isCursor ? THEME.secondary : (isSelected ? THEME.success : THEME.highlight)} bold={isCursor}>
+                <Text
+                  color={isCursor ? THEME.secondary : isSelected ? THEME.success : THEME.highlight}
+                  bold={isCursor}
+                >
                   {component.name}
                 </Text>
               </Box>
@@ -720,14 +784,16 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
           {startIdx + visibleCount < availableComponents.length && (
             <Box justifyContent="center">
-              <Text color={THEME.muted}>↓ {availableComponents.length - startIdx - visibleCount} more</Text>
+              <Text color={THEME.muted}>
+                ↓ {availableComponents.length - startIdx - visibleCount} more
+              </Text>
             </Box>
           )}
         </Box>
 
         {/* Confirm Button */}
-        <Box 
-          borderStyle="round" 
+        <Box
+          borderStyle="round"
           borderColor={internalSelectedPaths.size > 0 ? THEME.success : THEME.muted}
           paddingX={2}
           justifyContent="center"
@@ -735,7 +801,8 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
         >
           {internalSelectedPaths.size > 0 ? (
             <Text color={THEME.success}>
-              Press <Text bold>c</Text> or <Text bold>↵</Text> to preview ({internalSelectedPaths.size} selected)
+              Press <Text bold>c</Text> or <Text bold>↵</Text> to preview (
+              {internalSelectedPaths.size} selected)
             </Text>
           ) : (
             <Text color={THEME.muted}>Select at least 1 component</Text>
@@ -745,9 +812,8 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
         <Box justifyContent="center">
           <Text color={THEME.muted}>
             <Text color={THEME.secondary}>Space</Text> Toggle │{' '}
-            <Text color={THEME.secondary}>a</Text> All │{' '}
-            <Text color={THEME.secondary}>n</Text> None │{' '}
-            <Text color={THEME.secondary}>Esc</Text> Back
+            <Text color={THEME.secondary}>a</Text> All │ <Text color={THEME.secondary}>n</Text> None
+            │ <Text color={THEME.secondary}>Esc</Text> Back
           </Text>
         </Box>
       </Box>
@@ -767,11 +833,15 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
     if (previews.length === 0) {
       return (
         <Box flexDirection="column">
-      <Box marginBottom={1}>
-        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Preview Changes</Text>
-      </Box>
+          <Box marginBottom={1}>
+            <Text bold color={THEME.highlight}>
+              {SYMBOLS.diamond} Preview Changes
+            </Text>
+          </Box>
           <Box borderStyle="round" borderColor={THEME.accent} paddingX={2} paddingY={1}>
-            <Text color={THEME.accent}>{SYMBOLS.diamond} No changes found for the selected components</Text>
+            <Text color={THEME.accent}>
+              {SYMBOLS.diamond} No changes found for the selected components
+            </Text>
           </Box>
           <Box marginTop={1}>
             <Text color={THEME.muted}>Press </Text>
@@ -796,7 +866,7 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
         if (!currentGroup) {
           currentGroup = { removed: [], added: [], lineNum };
         }
-        const lines = part.value.split('\n').filter(l => l.length > 0);
+        const lines = part.value.split('\n').filter((l) => l.length > 0);
         if (part.removed) {
           currentGroup.removed.push(...lines);
         }
@@ -820,10 +890,14 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
     return (
       <Box flexDirection="column">
-      <Box marginBottom={1}>
-        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Apply: </Text>
-        <Text bold color={THEME.secondary}>{templateName}</Text>
-      </Box>
+        <Box marginBottom={1}>
+          <Text bold color={THEME.highlight}>
+            {SYMBOLS.diamond} Apply:{' '}
+          </Text>
+          <Text bold color={THEME.secondary}>
+            {templateName}
+          </Text>
+        </Box>
 
         <Box marginBottom={1} justifyContent="space-between">
           <Box>
@@ -837,7 +911,9 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
         </Box>
 
         <Box marginBottom={1}>
-          <Text color={THEME.accent}>{SYMBOLS.arrow} {preview.path.split(/[/\\]/).pop()}</Text>
+          <Text color={THEME.accent}>
+            {SYMBOLS.arrow} {preview.path.split(/[/\\]/).pop()}
+          </Text>
         </Box>
 
         <ErrorMessage message={error} />
@@ -873,26 +949,29 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
           {scrollOffset + visibleGroups < changedGroups.length && (
             <Box justifyContent="center">
-              <Text color={THEME.muted}>↓ {changedGroups.length - scrollOffset - visibleGroups} more</Text>
+              <Text color={THEME.muted}>
+                ↓ {changedGroups.length - scrollOffset - visibleGroups} more
+              </Text>
             </Box>
           )}
         </Box>
 
-        <Box 
-          marginTop={1} 
-          borderStyle="round" 
+        <Box
+          marginTop={1}
+          borderStyle="round"
           borderColor={THEME.success}
           paddingX={2}
           justifyContent="center"
         >
-          <Text color={THEME.success}>Press <Text bold>y</Text> or <Text bold>↵</Text> to apply</Text>
+          <Text color={THEME.success}>
+            Press <Text bold>y</Text> or <Text bold>↵</Text> to apply
+          </Text>
         </Box>
 
         <Box marginTop={1} justifyContent="center">
           <Text color={THEME.muted}>
-            <Text color={THEME.secondary}>←/→</Text> File │{' '}
-            <Text color={THEME.secondary}>↑/↓</Text> Scroll │{' '}
-            <Text color={THEME.secondary}>Esc</Text> Cancel
+            <Text color={THEME.secondary}>←/→</Text> File │ <Text color={THEME.secondary}>↑/↓</Text>{' '}
+            Scroll │ <Text color={THEME.secondary}>Esc</Text> Cancel
           </Text>
         </Box>
       </Box>
@@ -903,9 +982,11 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
   if (mode === 'create') {
     return (
       <Box flexDirection="column">
-      <Box marginBottom={1}>
-        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Create New Template</Text>
-      </Box>
+        <Box marginBottom={1}>
+          <Text bold color={THEME.highlight}>
+            {SYMBOLS.diamond} Create New Template
+          </Text>
+        </Box>
 
         <ErrorMessage message={error} />
 
@@ -914,14 +995,18 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
             <Box width={10}>
               <Text color={activeField === 'name' ? THEME.secondary : THEME.muted}>Name:</Text>
             </Box>
-            <Box 
-              borderStyle={activeField === 'name' ? 'round' : 'single'} 
+            <Box
+              borderStyle={activeField === 'name' ? 'round' : 'single'}
               borderColor={activeField === 'name' ? THEME.secondary : THEME.muted}
-              paddingX={1} 
+              paddingX={1}
               width={35}
             >
               {activeField === 'name' ? (
-                <TextInput value={newName} onChange={setNewName} onSubmit={() => setActiveField('find')} />
+                <TextInput
+                  value={newName}
+                  onChange={setNewName}
+                  onSubmit={() => setActiveField('find')}
+                />
               ) : (
                 <Text color={newName ? THEME.highlight : THEME.muted}>{newName || '(empty)'}</Text>
               )}
@@ -932,14 +1017,18 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
             <Box width={10}>
               <Text color={activeField === 'find' ? THEME.secondary : THEME.muted}>Find:</Text>
             </Box>
-            <Box 
-              borderStyle={activeField === 'find' ? 'round' : 'single'} 
+            <Box
+              borderStyle={activeField === 'find' ? 'round' : 'single'}
               borderColor={activeField === 'find' ? THEME.secondary : THEME.muted}
-              paddingX={1} 
+              paddingX={1}
               width={35}
             >
               {activeField === 'find' ? (
-                <TextInput value={newFind} onChange={setNewFind} onSubmit={() => setActiveField('replace')} />
+                <TextInput
+                  value={newFind}
+                  onChange={setNewFind}
+                  onSubmit={() => setActiveField('replace')}
+                />
               ) : (
                 <Text color={newFind ? THEME.highlight : THEME.muted}>{newFind || '(empty)'}</Text>
               )}
@@ -948,18 +1037,26 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
           <Box marginBottom={1}>
             <Box width={10}>
-              <Text color={activeField === 'replace' ? THEME.secondary : THEME.muted}>Replace:</Text>
+              <Text color={activeField === 'replace' ? THEME.secondary : THEME.muted}>
+                Replace:
+              </Text>
             </Box>
-            <Box 
-              borderStyle={activeField === 'replace' ? 'round' : 'single'} 
+            <Box
+              borderStyle={activeField === 'replace' ? 'round' : 'single'}
               borderColor={activeField === 'replace' ? THEME.secondary : THEME.muted}
-              paddingX={1} 
+              paddingX={1}
               width={35}
             >
               {activeField === 'replace' ? (
-                <TextInput value={newReplace} onChange={setNewReplace} onSubmit={handleCreateSubmit} />
+                <TextInput
+                  value={newReplace}
+                  onChange={setNewReplace}
+                  onSubmit={handleCreateSubmit}
+                />
               ) : (
-                <Text color={newReplace ? THEME.highlight : THEME.muted}>{newReplace || '(empty)'}</Text>
+                <Text color={newReplace ? THEME.highlight : THEME.muted}>
+                  {newReplace || '(empty)'}
+                </Text>
               )}
             </Box>
           </Box>
@@ -967,9 +1064,8 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
         <Box justifyContent="center">
           <Text color={THEME.muted}>
-            <Text color={THEME.secondary}>Tab</Text> Next │{' '}
-            <Text color={THEME.secondary}>↵</Text> Save │{' '}
-            <Text color={THEME.secondary}>Esc</Text> Cancel
+            <Text color={THEME.secondary}>Tab</Text> Next │ <Text color={THEME.secondary}>↵</Text>{' '}
+            Save │ <Text color={THEME.secondary}>Esc</Text> Cancel
           </Text>
         </Box>
       </Box>
@@ -984,13 +1080,19 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
     return (
       <Box flexDirection="column">
-      <Box marginBottom={1}>
-        <Text bold color={THEME.secondary}>{SYMBOLS.diamond} {selectedTemplate.name}</Text>
-      </Box>
-        <Text color={THEME.muted}>Created: {new Date(selectedTemplate.created).toLocaleString()}</Text>
+        <Box marginBottom={1}>
+          <Text bold color={THEME.secondary}>
+            {SYMBOLS.diamond} {selectedTemplate.name}
+          </Text>
+        </Box>
+        <Text color={THEME.muted}>
+          Created: {new Date(selectedTemplate.created).toLocaleString()}
+        </Text>
 
         <Box marginY={1} flexDirection="column">
-          <Text bold color={THEME.highlight}>Rules:</Text>
+          <Text bold color={THEME.highlight}>
+            Rules:
+          </Text>
           {selectedTemplate.rules.map((rule, idx) => (
             <Box key={idx} flexDirection="column" marginLeft={2} marginTop={0}>
               <Box>
@@ -1031,7 +1133,9 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Template Manager</Text>
+        <Text bold color={THEME.highlight}>
+          {SYMBOLS.diamond} Template Manager
+        </Text>
         {canDirectApply && (
           <Text color={THEME.success}> ({selectedPaths.length} components selected)</Text>
         )}
@@ -1044,12 +1148,7 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
         <Box marginBottom={0}>
           <Text color={THEME.accent}>{SYMBOLS.arrow} Quick Actions</Text>
         </Box>
-        <Box 
-          flexDirection="column" 
-          borderStyle="single" 
-          borderColor={THEME.muted}
-          paddingX={1}
-        >
+        <Box flexDirection="column" borderStyle="single" borderColor={THEME.muted} paddingX={1}>
           {QUICK_TEMPLATES.map((qt, idx) => {
             const isCurrent = idx === cursor;
             return (
@@ -1080,14 +1179,11 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
         <Box marginBottom={0}>
           <Text color={THEME.accent}>{SYMBOLS.arrow} Saved Templates</Text>
         </Box>
-        <Box 
-          flexDirection="column" 
-          borderStyle="single" 
-          borderColor={THEME.muted}
-          paddingX={1}
-        >
+        <Box flexDirection="column" borderStyle="single" borderColor={THEME.muted} paddingX={1}>
           {templates.length === 0 ? (
-            <Text color={THEME.muted}>No saved templates. Press <Text color={THEME.secondary}>n</Text> to create one.</Text>
+            <Text color={THEME.muted}>
+              No saved templates. Press <Text color={THEME.secondary}>n</Text> to create one.
+            </Text>
           ) : (
             templates.map((template, idx) => {
               const listIdx = totalQuickTemplates + idx;
@@ -1113,9 +1209,8 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
       <Box justifyContent="center">
         <Text color={THEME.muted}>
           <Text color={THEME.secondary}>1-{Math.min(9, totalQuickTemplates)}</Text> Quick │{' '}
-          <Text color={THEME.secondary}>↵</Text> Select │{' '}
-          <Text color={THEME.secondary}>n</Text> New │{' '}
-          <Text color={THEME.secondary}>Esc</Text> Back
+          <Text color={THEME.secondary}>↵</Text> Select │ <Text color={THEME.secondary}>n</Text> New
+          │ <Text color={THEME.secondary}>Esc</Text> Back
         </Text>
       </Box>
     </Box>

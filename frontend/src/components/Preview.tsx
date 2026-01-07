@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import * as Diff from 'diff';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
-import * as Diff from 'diff';
+import { useEffect, useState } from 'react';
+import { SYMBOLS, THEME } from '../App.js';
 import * as api from '../api/client.js';
 import type { Preview } from '../types/index.js';
-import { THEME, SYMBOLS } from '../App.js';
 
 interface PreviewViewProps {
   componentPaths: string[];
@@ -77,7 +77,9 @@ export function PreviewView({
     const result = await api.applyEdit(componentPaths, find, replace, isRegex);
 
     if (result.success && result.data) {
-      onApply(`Applied changes to ${result.data.modified.length} files. Backup: ${result.data.backup}`);
+      onApply(
+        `Applied changes to ${result.data.modified.length} files. Backup: ${result.data.backup}`
+      );
     } else {
       setError(result.error?.message || 'Failed to apply changes');
       setApplying(false);
@@ -101,7 +103,9 @@ export function PreviewView({
     return (
       <Box flexDirection="column">
         <Box borderStyle="round" borderColor={THEME.error} paddingX={2} paddingY={1}>
-          <Text color={THEME.error}>{SYMBOLS.cross} Error: {error}</Text>
+          <Text color={THEME.error}>
+            {SYMBOLS.cross} Error: {error}
+          </Text>
         </Box>
         <Box marginTop={1}>
           <Text color={THEME.muted}>Press </Text>
@@ -133,7 +137,7 @@ export function PreviewView({
 
   const preview = previews[currentIdx];
   const totalChanges = previews.reduce((sum, p) => sum + p.changes, 0);
-  
+
   // Parse diff for display
   const diffLines = Diff.createPatch(
     preview.path,
@@ -150,7 +154,9 @@ export function PreviewView({
     <Box flexDirection="column">
       {/* Header */}
       <Box marginBottom={1}>
-        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Preview Changes</Text>
+        <Text bold color={THEME.highlight}>
+          {SYMBOLS.diamond} Preview Changes
+        </Text>
       </Box>
 
       {/* Stats Bar */}
@@ -167,7 +173,9 @@ export function PreviewView({
 
       {/* File Name */}
       <Box marginBottom={1}>
-        <Text color={THEME.accent}>{SYMBOLS.arrow} {preview.path.split(/[/\\]/).pop()}</Text>
+        <Text color={THEME.accent}>
+          {SYMBOLS.arrow} {preview.path.split(/[/\\]/).pop()}
+        </Text>
         <Text color={THEME.muted}> ({preview.changes} changes)</Text>
       </Box>
 
@@ -196,17 +204,13 @@ export function PreviewView({
 
             {displayLines.map((line, idx) => {
               let color: string | undefined;
-              let prefix = ' ';
-              
+
               if (line.startsWith('+') && !line.startsWith('+++')) {
                 color = THEME.success;
-                prefix = '+';
               } else if (line.startsWith('-') && !line.startsWith('---')) {
                 color = THEME.error;
-                prefix = '-';
               } else if (line.startsWith('@@')) {
                 color = THEME.secondary;
-                prefix = '@';
               }
 
               const displayText = line.slice(0, 70);
@@ -214,7 +218,8 @@ export function PreviewView({
 
               return (
                 <Text key={idx} color={color}>
-                  {displayText}{isTruncated && <Text color={THEME.muted}>...</Text>}
+                  {displayText}
+                  {isTruncated && <Text color={THEME.muted}>...</Text>}
                 </Text>
               );
             })}
@@ -234,17 +239,21 @@ export function PreviewView({
           </Box>
 
           {/* Apply Button */}
-          <Box 
-            marginTop={1} 
-            borderStyle="round" 
+          <Box
+            marginTop={1}
+            borderStyle="round"
             borderColor={THEME.success}
             paddingX={2}
             justifyContent="center"
           >
             <Text color={THEME.success}>Press </Text>
-            <Text bold color={THEME.success}>y</Text>
+            <Text bold color={THEME.success}>
+              y
+            </Text>
             <Text color={THEME.success}> or </Text>
-            <Text bold color={THEME.success}>Enter</Text>
+            <Text bold color={THEME.success}>
+              Enter
+            </Text>
             <Text color={THEME.success}> to apply changes</Text>
           </Box>
 

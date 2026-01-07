@@ -25,7 +25,15 @@
     "version": "bun run format && git add -A",
     "postversion": "git push && git push --tags"
   },
-  "keywords": ["shadcn", "ui", "cli", "tui", "components", "tailwind", "customization"],
+  "keywords": [
+    "shadcn",
+    "ui",
+    "cli",
+    "tui",
+    "components",
+    "tailwind",
+    "customization"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {

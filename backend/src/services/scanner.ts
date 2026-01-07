@@ -146,10 +146,11 @@ export async function getComponentByName(name: string): Promise<Component | null
 
     const classRegex = /className\s*[=:]\s*["'`]([^"'`]+)["'`]/g;
     const classes: string[] = [];
-    let match;
-    while ((match = classRegex.exec(content)) !== null) {
+    let match: RegExpExecArray | null = classRegex.exec(content);
+    while (match !== null) {
       const classString = match[1];
       classes.push(...classString.split(/\s+/).filter(Boolean));
+      match = classRegex.exec(content);
     }
 
     const exportMatches = content.match(/export\s+(?:const|function|class)\s+(\w+)/g) || [];

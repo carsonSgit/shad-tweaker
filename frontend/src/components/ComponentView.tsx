@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { highlight } from 'cli-highlight';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
-import { highlight } from 'cli-highlight';
-import type { Component } from '../types/index.js';
+import { useEffect, useMemo, useState } from 'react';
+import { SYMBOLS, THEME } from '../App.js';
 import * as api from '../api/client.js';
-import { THEME, SYMBOLS } from '../App.js';
+import type { Component } from '../types/index.js';
 
 interface ComponentViewProps {
   component: Component;
@@ -33,10 +33,12 @@ export function ComponentView({ component, onBack }: ComponentViewProps) {
   const highlightedCode = useMemo(() => {
     if (!content) return '';
     try {
-      return highlight(content, {
-        language: 'typescript',
-        ignoreIllegals: true,
-      }) || content;
+      return (
+        highlight(content, {
+          language: 'typescript',
+          ignoreIllegals: true,
+        }) || content
+      );
     } catch {
       return content;
     }
@@ -46,7 +48,7 @@ export function ComponentView({ component, onBack }: ComponentViewProps) {
   const totalLines = lines.length;
   const visibleContent = lines.slice(scrollOffset, scrollOffset + visibleLines);
 
-  useInput((input, key) => {
+  useInput((_input, key) => {
     if (key.upArrow) {
       setScrollOffset((o) => Math.max(0, o - 1));
     } else if (key.downArrow) {
@@ -76,15 +78,17 @@ export function ComponentView({ component, onBack }: ComponentViewProps) {
   return (
     <Box flexDirection="column">
       {/* Header Card */}
-      <Box 
-        marginBottom={1} 
-        flexDirection="column" 
-        borderStyle="round" 
+      <Box
+        marginBottom={1}
+        flexDirection="column"
+        borderStyle="round"
         borderColor={THEME.secondary}
         paddingX={2}
       >
         <Box>
-          <Text bold color={THEME.secondary}>{SYMBOLS.diamond} {component.name}</Text>
+          <Text bold color={THEME.secondary}>
+            {SYMBOLS.diamond} {component.name}
+          </Text>
         </Box>
         <Box>
           <Text color={THEME.muted}>{component.path}</Text>
@@ -161,7 +165,9 @@ export function ComponentView({ component, onBack }: ComponentViewProps) {
 
           {scrollOffset + visibleLines < totalLines && (
             <Box justifyContent="center">
-              <Text color={THEME.muted}>↓ {totalLines - scrollOffset - visibleLines} lines below</Text>
+              <Text color={THEME.muted}>
+                ↓ {totalLines - scrollOffset - visibleLines} lines below
+              </Text>
             </Box>
           )}
         </Box>

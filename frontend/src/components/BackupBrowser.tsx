@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import * as Diff from 'diff';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
-import * as Diff from 'diff';
+import { useCallback, useEffect, useState } from 'react';
+import { SYMBOLS, THEME } from '../App.js';
+import type { BackupFilePreview } from '../api/client.js';
 import * as api from '../api/client.js';
 import type { Backup } from '../types/index.js';
-import type { BackupFilePreview } from '../api/client.js';
-import { THEME, SYMBOLS } from '../App.js';
 
 interface BackupBrowserProps {
   onRestore: (message: string) => void;
@@ -29,11 +29,7 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
   const [previewIdx, setPreviewIdx] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
 
-  useEffect(() => {
-    fetchBackups();
-  }, []);
-
-  const fetchBackups = async () => {
+  const fetchBackups = useCallback(async () => {
     setLoading(true);
     const result = await api.listBackups();
     if (result.success && result.data) {
@@ -42,7 +38,11 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
       setError(result.error?.message || 'Failed to load backups');
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchBackups();
+  }, [fetchBackups]);
 
   const fetchPreview = async (backupId: string) => {
     setLoadingPreview(true);
@@ -170,13 +170,17 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
       return (
         <Box flexDirection="column">
           <Box marginBottom={1}>
-            <Text bold color={THEME.highlight}>💾 Restore Backup</Text>
+            <Text bold color={THEME.highlight}>
+              💾 Restore Backup
+            </Text>
           </Box>
           <Box marginBottom={1}>
             <Text color={THEME.secondary}>{selectedBackupId}</Text>
           </Box>
           <Box borderStyle="round" borderColor={THEME.accent} paddingX={2} paddingY={1}>
-            <Text color={THEME.accent}>{SYMBOLS.diamond} No changes to restore - files are identical</Text>
+            <Text color={THEME.accent}>
+              {SYMBOLS.diamond} No changes to restore - files are identical
+            </Text>
           </Box>
           <Box marginTop={1}>
             <Text color={THEME.muted}>Press </Text>
@@ -202,7 +206,7 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
         if (!currentGroup) {
           currentGroup = { removed: [], added: [], lineNum };
         }
-        const lines = part.value.split('\n').filter(l => l.length > 0);
+        const lines = part.value.split('\n').filter((l) => l.length > 0);
         if (part.removed) {
           currentGroup.removed.push(...lines);
         }
@@ -228,7 +232,9 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
       <Box flexDirection="column">
         {/* Header */}
         <Box marginBottom={1}>
-          <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Restore Backup</Text>
+          <Text bold color={THEME.highlight}>
+            {SYMBOLS.diamond} Restore Backup
+          </Text>
         </Box>
 
         {/* Backup ID */}
@@ -246,13 +252,17 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
 
         {/* File Name */}
         <Box marginBottom={1}>
-          <Text color={THEME.accent}>{SYMBOLS.arrow} {preview.fileName}</Text>
+          <Text color={THEME.accent}>
+            {SYMBOLS.arrow} {preview.fileName}
+          </Text>
           <Text color={THEME.muted}> ({changedGroups.length} change locations)</Text>
         </Box>
 
         {error && (
           <Box marginBottom={1} borderStyle="round" borderColor={THEME.error} paddingX={2}>
-            <Text color={THEME.error}>{SYMBOLS.cross} {error}</Text>
+            <Text color={THEME.error}>
+              {SYMBOLS.cross} {error}
+            </Text>
           </Box>
         )}
 
@@ -290,7 +300,9 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
 
           {scrollOffset + visibleGroups < changedGroups.length && (
             <Box justifyContent="center">
-              <Text color={THEME.muted}>↓ {changedGroups.length - scrollOffset - visibleGroups} more below</Text>
+              <Text color={THEME.muted}>
+                ↓ {changedGroups.length - scrollOffset - visibleGroups} more below
+              </Text>
             </Box>
           )}
         </Box>
@@ -303,17 +315,21 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
         </Box>
 
         {/* Restore Button */}
-        <Box 
-          marginTop={1} 
-          borderStyle="round" 
+        <Box
+          marginTop={1}
+          borderStyle="round"
           borderColor={THEME.success}
           paddingX={2}
           justifyContent="center"
         >
           <Text color={THEME.success}>Press </Text>
-          <Text bold color={THEME.success}>y</Text>
+          <Text bold color={THEME.success}>
+            y
+          </Text>
           <Text color={THEME.success}> or </Text>
-          <Text bold color={THEME.success}>Enter</Text>
+          <Text bold color={THEME.success}>
+            Enter
+          </Text>
           <Text color={THEME.success}> to restore</Text>
         </Box>
 
@@ -334,12 +350,16 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
     <Box flexDirection="column">
       {/* Header */}
       <Box marginBottom={1}>
-        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Backup Browser</Text>
+        <Text bold color={THEME.highlight}>
+          {SYMBOLS.diamond} Backup Browser
+        </Text>
       </Box>
 
       {error && (
         <Box marginBottom={1} borderStyle="round" borderColor={THEME.error} paddingX={2}>
-          <Text color={THEME.error}>{SYMBOLS.cross} {error}</Text>
+          <Text color={THEME.error}>
+            {SYMBOLS.cross} {error}
+          </Text>
         </Box>
       )}
 
@@ -348,9 +368,9 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
           <Text color={THEME.muted}>{SYMBOLS.diamond} No backups found</Text>
         </Box>
       ) : (
-        <Box 
-          flexDirection="column" 
-          borderStyle="single" 
+        <Box
+          flexDirection="column"
+          borderStyle="single"
           borderColor={THEME.muted}
           paddingX={1}
           marginBottom={1}
@@ -360,7 +380,7 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
             const date = new Date(backup.timestamp);
             const dateStr = date.toLocaleDateString();
             const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            
+
             return (
               <Box key={backup.id} flexDirection="column">
                 <Box>
@@ -373,11 +393,15 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
                     {backup.id}
                   </Text>
                 </Box>
-              <Box marginLeft={3}>
-                <Text color={THEME.muted}>
-                  {dateStr} {timeStr} {SYMBOLS.line} {typeof backup.components === 'number' ? backup.components : backup.components?.length || 0} files
-                </Text>
-              </Box>
+                <Box marginLeft={3}>
+                  <Text color={THEME.muted}>
+                    {dateStr} {timeStr} {SYMBOLS.line}{' '}
+                    {typeof backup.components === 'number'
+                      ? backup.components
+                      : backup.components?.length || 0}{' '}
+                    files
+                  </Text>
+                </Box>
               </Box>
             );
           })}
@@ -385,24 +409,25 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
       )}
 
       {/* Create Backup Button */}
-      <Box 
-        borderStyle="round" 
+      <Box
+        borderStyle="round"
         borderColor={THEME.accent}
         paddingX={2}
         justifyContent="center"
         marginBottom={1}
       >
         <Text color={THEME.accent}>Press </Text>
-        <Text bold color={THEME.accent}>c</Text>
+        <Text bold color={THEME.accent}>
+          c
+        </Text>
         <Text color={THEME.accent}> to create a new backup</Text>
       </Box>
 
       {/* Controls */}
       <Box justifyContent="center">
         <Text color={THEME.muted}>
-          <Text color={THEME.secondary}>↑/↓</Text> Navigate │{' '}
-          <Text color={THEME.secondary}>↵</Text> Preview & Restore │{' '}
-          <Text color={THEME.secondary}>q/Esc</Text> Back
+          <Text color={THEME.secondary}>↑/↓</Text> Navigate │ <Text color={THEME.secondary}>↵</Text>{' '}
+          Preview & Restore │ <Text color={THEME.secondary}>q/Esc</Text> Back
         </Text>
       </Box>
     </Box>

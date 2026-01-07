@@ -12,7 +12,12 @@
     "start": "bun dist/index.js",
     "dev": "bun src/index.tsx"
   },
-  "keywords": ["shadcn", "tui", "cli", "components"],
+  "keywords": [
+    "shadcn",
+    "tui",
+    "cli",
+    "components"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
