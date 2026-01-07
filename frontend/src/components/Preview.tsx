@@ -204,17 +204,13 @@ export function PreviewView({
 
             {displayLines.map((line, idx) => {
               let color: string | undefined;
-              let _prefix = ' ';
 
               if (line.startsWith('+') && !line.startsWith('+++')) {
                 color = THEME.success;
-                _prefix = '+';
               } else if (line.startsWith('-') && !line.startsWith('---')) {
                 color = THEME.error;
-                _prefix = '-';
               } else if (line.startsWith('@@')) {
                 color = THEME.secondary;
-                _prefix = '@';
               }
 
               const displayText = line.slice(0, 70);
