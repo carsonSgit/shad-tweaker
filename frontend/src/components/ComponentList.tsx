@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import type { Component, Screen } from '../types/index.js';
+import { THEME, SYMBOLS } from '../App.js';
 
 interface ComponentListProps {
   components: Component[];
@@ -83,41 +84,66 @@ export function ComponentList({
   if (components.length === 0) {
     return (
       <Box flexDirection="column">
-        <Text color="yellow">No components found.</Text>
-        <Text color="gray">Make sure you have shadcn/ui components in your project.</Text>
+        <Box borderStyle="round" borderColor={THEME.accent} paddingX={2} paddingY={1}>
+          <Text color={THEME.accent}>{SYMBOLS.diamond} </Text>
+          <Text color={THEME.accent}>No components found</Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text color={THEME.muted}>Make sure you have shadcn/ui components in your project.</Text>
+        </Box>
       </Box>
     );
   }
 
   return (
     <Box flexDirection="column">
-      <Box marginBottom={1}>
-        <Text bold>
-          Components ({selectedPaths.size} selected / {filteredComponents.length} total)
-        </Text>
+      {/* Header */}
+      <Box marginBottom={1} justifyContent="space-between">
+        <Box>
+          <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Components</Text>
+        </Box>
+        <Box>
+          <Text color={selectedPaths.size > 0 ? THEME.success : THEME.muted}>
+            {SYMBOLS.check} {selectedPaths.size}
+          </Text>
+          <Text color={THEME.muted}> / {filteredComponents.length}</Text>
+        </Box>
       </Box>
 
+      {/* Search Bar */}
       {searchMode && (
-        <Box marginBottom={1}>
-          <Text color="cyan">Search: </Text>
+        <Box marginBottom={1} borderStyle="round" borderColor={THEME.secondary} paddingX={1}>
+          <Text color={THEME.secondary}>{SYMBOLS.arrow} </Text>
           <TextInput
             value={searchQuery}
             onChange={setSearchQuery}
             onSubmit={() => setSearchMode(false)}
+            placeholder="Type to filter..."
           />
         </Box>
       )}
 
       {searchQuery && !searchMode && (
         <Box marginBottom={1}>
-          <Text color="gray">Filter: "{searchQuery}" </Text>
-          <Text color="gray">(press / to search)</Text>
+          <Text color={THEME.muted}>{SYMBOLS.arrow} Filtered: </Text>
+          <Text color={THEME.secondary}>"{searchQuery}"</Text>
+          <Text color={THEME.muted}> ─ press </Text>
+          <Text color={THEME.secondary}>/</Text>
+          <Text color={THEME.muted}> to search</Text>
         </Box>
       )}
 
-      <Box flexDirection="column">
+      {/* Component List */}
+      <Box 
+        flexDirection="column" 
+        borderStyle="single" 
+        borderColor={THEME.muted}
+        paddingX={1}
+      >
         {startIdx > 0 && (
-          <Text color="gray">  ↑ {startIdx} more...</Text>
+          <Box justifyContent="center">
+            <Text color={THEME.muted}>↑ {startIdx} more above</Text>
+          </Box>
         )}
 
         {visibleComponents.map((component, idx) => {
@@ -127,36 +153,87 @@ export function ComponentList({
 
           return (
             <Box key={component.path}>
-              <Text color={isCursor ? 'cyan' : undefined}>
-                {isCursor ? '>' : ' '}
+              {/* Cursor Indicator */}
+              <Box width={2}>
+                <Text color={isCursor ? THEME.primary : THEME.muted}>
+                  {isCursor ? SYMBOLS.arrow : ' '}
+                </Text>
+              </Box>
+              
+              {/* Selection Checkbox */}
+              <Box width={4}>
+                <Text color={isSelected ? THEME.success : THEME.muted}>
+                  {isSelected ? `${SYMBOLS.check} ` : `${SYMBOLS.circle} `}
+                </Text>
+              </Box>
+              
+              {/* Component Name */}
+              <Box width={20}>
+                <Text 
+                  color={isCursor ? THEME.secondary : (isSelected ? THEME.success : THEME.highlight)}
+                  bold={isCursor}
+                >
+                  {component.name}
+                </Text>
+              </Box>
+              
+              {/* Metadata */}
+              <Text color={THEME.muted}>
+                {component.metadata.lines} ln
               </Text>
-              <Text color={isSelected ? 'green' : 'gray'}>
-                [{isSelected ? 'x' : ' '}]
-              </Text>
-              <Text color={isCursor ? 'cyan' : undefined}>
-                {' '}{component.name}
-              </Text>
-              <Text color="gray">
-                {' '}({component.metadata.lines} lines)
-              </Text>
+              
+              {/* File indicator for selected */}
+              {isSelected && (
+                <Text color={THEME.success}> {SYMBOLS.dot}</Text>
+              )}
             </Box>
           );
         })}
 
         {startIdx + visibleCount < filteredComponents.length && (
-          <Text color="gray">
-            {'  '}↓ {filteredComponents.length - startIdx - visibleCount} more...
-          </Text>
+          <Box justifyContent="center">
+            <Text color={THEME.muted}>
+              ↓ {filteredComponents.length - startIdx - visibleCount} more below
+            </Text>
+          </Box>
         )}
       </Box>
 
+      {/* Actions Bar */}
       <Box marginTop={1} flexDirection="column">
-        <Text color="gray">
-          [Space] Toggle | [Enter] View | [e] Edit Selected | [a] All | [n] None
-        </Text>
-        <Text color="gray">
-          [/] Search | [t] Templates | [b] Backups | [q] Back
-        </Text>
+        {/* Primary Actions */}
+        <Box 
+          borderStyle="round" 
+          borderColor={selectedPaths.size > 0 ? THEME.success : THEME.muted}
+          paddingX={2}
+          justifyContent="center"
+        >
+          {selectedPaths.size > 0 ? (
+            <Text>
+              <Text color={THEME.success}>e</Text>
+              <Text color={THEME.muted}> Edit {selectedPaths.size} selected</Text>
+              <Text color={THEME.muted}> │ </Text>
+              <Text color={THEME.secondary}>t</Text>
+              <Text color={THEME.muted}> Templates</Text>
+            </Text>
+          ) : (
+            <Text color={THEME.muted}>
+              Select components with <Text color={THEME.secondary}>Space</Text> to enable editing
+            </Text>
+          )}
+        </Box>
+        
+        {/* Secondary Actions */}
+        <Box marginTop={1} justifyContent="center">
+          <Text color={THEME.muted}>
+            <Text color={THEME.secondary}>Space</Text> Toggle │{' '}
+            <Text color={THEME.secondary}>↵</Text> View │{' '}
+            <Text color={THEME.secondary}>a</Text> All │{' '}
+            <Text color={THEME.secondary}>n</Text> None │{' '}
+            <Text color={THEME.secondary}>/</Text> Search │{' '}
+            <Text color={THEME.secondary}>b</Text> Backups
+          </Text>
+        </Box>
       </Box>
     </Box>
   );

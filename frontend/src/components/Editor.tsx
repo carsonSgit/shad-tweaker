@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
+import { THEME, SYMBOLS } from '../App.js';
 
 interface EditorProps {
   selectedCount: number;
@@ -19,6 +20,7 @@ interface SubOption {
 interface QuickActionCategory {
   label: string;
   description: string;
+  icon: string;
   type: 'select-from' | 'select-to' | 'simple';
   options?: SubOption[];
   // For simple actions (no sub-options)
@@ -29,78 +31,84 @@ interface QuickActionCategory {
 
 const QUICK_ACTION_CATEGORIES: QuickActionCategory[] = [
   {
-    label: 'Change Border Radius',
+    label: 'Border Radius',
     description: 'Update rounded-* classes',
+    icon: '',
     type: 'select-to',
     options: [
-      { label: 'none (sharp corners)', value: 'rounded-none' },
-      { label: 'sm (small)', value: 'rounded-sm' },
-      { label: 'default', value: 'rounded' },
-      { label: 'md (medium)', value: 'rounded-md' },
-      { label: 'lg (large)', value: 'rounded-lg' },
-      { label: 'xl (extra large)', value: 'rounded-xl' },
-      { label: '2xl', value: 'rounded-2xl' },
-      { label: '3xl', value: 'rounded-3xl' },
+      { label: 'none (sharp)', value: 'rounded-none' },
+      { label: 'sm (2px)', value: 'rounded-sm' },
+      { label: 'default (4px)', value: 'rounded' },
+      { label: 'md (6px)', value: 'rounded-md' },
+      { label: 'lg (8px)', value: 'rounded-lg' },
+      { label: 'xl (12px)', value: 'rounded-xl' },
+      { label: '2xl (16px)', value: 'rounded-2xl' },
+      { label: '3xl (24px)', value: 'rounded-3xl' },
       { label: 'full (pill)', value: 'rounded-full' },
     ],
   },
   {
-    label: 'Change Ring Size',
-    description: 'Update ring-* classes',
+    label: 'Ring Size',
+    description: 'Focus ring width',
+    icon: '',
     type: 'select-to',
     options: [
       { label: '0 (none)', value: 'ring-0' },
-      { label: '1', value: 'ring-1' },
-      { label: '2 (default)', value: 'ring-2' },
-      { label: '4', value: 'ring-4' },
-      { label: '8', value: 'ring-8' },
+      { label: '1 (1px)', value: 'ring-1' },
+      { label: '2 (2px)', value: 'ring-2' },
+      { label: '4 (4px)', value: 'ring-4' },
+      { label: '8 (8px)', value: 'ring-8' },
     ],
   },
   {
-    label: 'Change Shadow',
-    description: 'Update shadow-* classes',
+    label: 'Shadow',
+    description: 'Update shadow depth',
+    icon: '',
     type: 'select-to',
     options: [
       { label: 'none', value: 'shadow-none' },
-      { label: 'sm (small)', value: 'shadow-sm' },
+      { label: 'sm (subtle)', value: 'shadow-sm' },
       { label: 'default', value: 'shadow' },
       { label: 'md (medium)', value: 'shadow-md' },
       { label: 'lg (large)', value: 'shadow-lg' },
-      { label: 'xl (extra large)', value: 'shadow-xl' },
+      { label: 'xl (huge)', value: 'shadow-xl' },
       { label: '2xl', value: 'shadow-2xl' },
     ],
   },
   {
-    label: 'Change Text Size',
-    description: 'Update text-* size classes',
+    label: 'Text Size',
+    description: 'Typography scale',
+    icon: '',
     type: 'select-to',
     options: [
-      { label: 'xs (extra small)', value: 'text-xs' },
-      { label: 'sm (small)', value: 'text-sm' },
-      { label: 'base (default)', value: 'text-base' },
-      { label: 'lg (large)', value: 'text-lg' },
-      { label: 'xl', value: 'text-xl' },
-      { label: '2xl', value: 'text-2xl' },
+      { label: 'xs (12px)', value: 'text-xs' },
+      { label: 'sm (14px)', value: 'text-sm' },
+      { label: 'base (16px)', value: 'text-base' },
+      { label: 'lg (18px)', value: 'text-lg' },
+      { label: 'xl (20px)', value: 'text-xl' },
+      { label: '2xl (24px)', value: 'text-2xl' },
     ],
   },
   {
-    label: 'Change Padding',
-    description: 'Update p-* classes',
+    label: 'Padding',
+    description: 'Internal spacing',
+    icon: '',
     type: 'select-to',
     options: [
       { label: '0 (none)', value: 'p-0' },
-      { label: '1', value: 'p-1' },
-      { label: '2', value: 'p-2' },
-      { label: '3', value: 'p-3' },
-      { label: '4', value: 'p-4' },
-      { label: '5', value: 'p-5' },
-      { label: '6', value: 'p-6' },
-      { label: '8', value: 'p-8' },
+      { label: '1 (4px)', value: 'p-1' },
+      { label: '2 (8px)', value: 'p-2' },
+      { label: '3 (12px)', value: 'p-3' },
+      { label: '4 (16px)', value: 'p-4' },
+      { label: '5 (20px)', value: 'p-5' },
+      { label: '6 (24px)', value: 'p-6' },
+      { label: '8 (32px)', value: 'p-8' },
     ],
   },
   {
     label: 'Remove Class',
-    description: 'Remove specific classes',
+    description: 'Delete specific classes',
+    icon: '',
     type: 'select-from',
     options: [
       { label: 'cursor-pointer', value: 'cursor-pointer' },
@@ -114,15 +122,17 @@ const QUICK_ACTION_CATEGORIES: QuickActionCategory[] = [
     ],
   },
   {
-    label: 'Focus Behavior',
-    description: 'Change focus style triggers',
+    label: 'Focus to Focus-Visible',
+    description: 'Better keyboard UX',
+    icon: '',
     type: 'simple',
     find: 'focus:',
     replace: 'focus-visible:',
   },
   {
-    label: 'Hover Behavior',
-    description: 'Change hover style triggers',
+    label: 'Hover to Group-Hover',
+    description: 'Parent-based hover',
+    icon: '',
     type: 'simple',
     find: 'hover:',
     replace: 'group-hover:',
@@ -318,28 +328,50 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
   const renderQuickMode = () => (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">Quick Actions</Text>
-        <Text color="gray"> - Select a category</Text>
+        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Quick Actions</Text>
+        <Text color={THEME.muted}> ─ Select a modification</Text>
       </Box>
 
-      <Box flexDirection="column" marginBottom={1}>
+      <Box 
+        flexDirection="column" 
+        borderStyle="single" 
+        borderColor={THEME.muted}
+        paddingX={1}
+        marginBottom={1}
+      >
         {QUICK_ACTION_CATEGORIES.map((category, idx) => {
           const isCurrent = idx === categoryIndex;
           return (
             <Box key={idx}>
-              <Text color={isCurrent ? 'cyan' : 'gray'}>{isCurrent ? '> ' : '  '}</Text>
-              <Text color={isCurrent ? 'cyan' : 'white'} bold={isCurrent}>
-                {idx + 1}. {category.label}
-              </Text>
-              <Text color="gray"> - {category.description}</Text>
-              {category.type !== 'simple' && <Text color="yellow"> [...]</Text>}
+              <Box width={3}>
+                <Text color={isCurrent ? THEME.primary : THEME.muted}>
+                  {isCurrent ? SYMBOLS.arrow : ' '}
+                </Text>
+              </Box>
+              <Box width={3}>
+                <Text color={THEME.muted}>{idx + 1}.</Text>
+              </Box>
+              <Box width={24}>
+                <Text color={isCurrent ? THEME.secondary : THEME.highlight} bold={isCurrent}>
+                  {category.label}
+                </Text>
+              </Box>
+              <Text color={THEME.muted}>{category.description}</Text>
+              {category.type !== 'simple' && (
+                <Text color={THEME.accent}> {SYMBOLS.arrow}</Text>
+              )}
             </Box>
           );
         })}
       </Box>
 
-      <Box marginTop={1} flexDirection="column">
-        <Text color="gray">[1-{Math.min(9, QUICK_ACTION_CATEGORIES.length)}] Quick select | [Enter] Select | [m] Manual mode | [Esc] Cancel</Text>
+      <Box justifyContent="center">
+        <Text color={THEME.muted}>
+          <Text color={THEME.secondary}>1-{Math.min(9, QUICK_ACTION_CATEGORIES.length)}</Text> Quick │{' '}
+          <Text color={THEME.secondary}>↵</Text> Select │{' '}
+          <Text color={THEME.secondary}>m</Text> Manual mode │{' '}
+          <Text color={THEME.secondary}>Esc</Text> Cancel
+        </Text>
       </Box>
     </Box>
   );
@@ -351,27 +383,47 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
     return (
       <Box flexDirection="column">
         <Box marginBottom={1}>
-          <Text bold color="cyan">{selectedCategory.label}</Text>
-          <Text color="gray"> - {selectedCategory.type === 'select-from' ? 'Select class to remove' : 'Select target value'}</Text>
+          <Text>{selectedCategory.icon} </Text>
+          <Text bold color={THEME.secondary}>{selectedCategory.label}</Text>
+          <Text color={THEME.muted}> ─ {selectedCategory.type === 'select-from' ? 'Select to remove' : 'Select target value'}</Text>
         </Box>
 
-        <Box flexDirection="column" marginBottom={1}>
+        <Box 
+          flexDirection="column" 
+          borderStyle="single" 
+          borderColor={THEME.secondary}
+          paddingX={1}
+          marginBottom={1}
+        >
           {selectedCategory.options.map((option, idx) => {
             const isCurrent = idx === subOptionIndex;
             return (
               <Box key={idx}>
-                <Text color={isCurrent ? 'cyan' : 'gray'}>{isCurrent ? '> ' : '  '}</Text>
-                <Text color={isCurrent ? 'cyan' : 'white'} bold={isCurrent}>
-                  {idx + 1}. {option.value}
-                </Text>
-                <Text color="gray"> ({option.label})</Text>
+                <Box width={3}>
+                  <Text color={isCurrent ? THEME.primary : THEME.muted}>
+                    {isCurrent ? SYMBOLS.arrow : ' '}
+                  </Text>
+                </Box>
+                <Box width={3}>
+                  <Text color={THEME.muted}>{idx + 1}.</Text>
+                </Box>
+                <Box width={18}>
+                  <Text color={isCurrent ? THEME.accent : THEME.highlight} bold={isCurrent}>
+                    {option.value}
+                  </Text>
+                </Box>
+                <Text color={THEME.muted}>({option.label})</Text>
               </Box>
             );
           })}
         </Box>
 
-        <Box marginTop={1}>
-          <Text color="gray">[Enter] Apply | [1-9] Quick select | [Esc] Back</Text>
+        <Box justifyContent="center">
+          <Text color={THEME.muted}>
+            <Text color={THEME.secondary}>↵</Text> Apply │{' '}
+            <Text color={THEME.secondary}>1-9</Text> Quick │{' '}
+            <Text color={THEME.secondary}>Esc</Text> Back
+          </Text>
         </Box>
       </Box>
     );
@@ -381,21 +433,28 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
   const renderManualMode = () => (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold color="cyan">Manual Find & Replace</Text>
+        <Text bold color={THEME.highlight}>{SYMBOLS.arrow} Manual Find & Replace</Text>
       </Box>
 
       {error && (
-        <Box marginBottom={1}>
-          <Text color="red">Error: {error}</Text>
+        <Box marginBottom={1} borderStyle="round" borderColor={THEME.error} paddingX={2}>
+          <Text color={THEME.error}>{SYMBOLS.cross} {error}</Text>
         </Box>
       )}
 
       <Box flexDirection="column" marginBottom={1}>
         <Box marginBottom={1}>
-          <Box width={12}>
-            <Text color={activeField === 'find' ? 'cyan' : 'gray'}>Find:</Text>
+          <Box width={10}>
+            <Text color={activeField === 'find' ? THEME.secondary : THEME.muted}>
+              Find:
+            </Text>
           </Box>
-          <Box borderStyle="single" paddingX={1} width={50}>
+          <Box 
+            borderStyle={activeField === 'find' ? 'round' : 'single'} 
+            borderColor={activeField === 'find' ? THEME.secondary : THEME.muted}
+            paddingX={1} 
+            width={40}
+          >
             {activeField === 'find' ? (
               <TextInput
                 value={find}
@@ -403,16 +462,23 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
                 onSubmit={() => setActiveField('replace')}
               />
             ) : (
-              <Text color="gray">{find || '(empty)'}</Text>
+              <Text color={find ? THEME.highlight : THEME.muted}>{find || '(empty)'}</Text>
             )}
           </Box>
         </Box>
 
         <Box marginBottom={1}>
-          <Box width={12}>
-            <Text color={activeField === 'replace' ? 'cyan' : 'gray'}>Replace:</Text>
+          <Box width={10}>
+            <Text color={activeField === 'replace' ? THEME.secondary : THEME.muted}>
+              Replace:
+            </Text>
           </Box>
-          <Box borderStyle="single" paddingX={1} width={50}>
+          <Box 
+            borderStyle={activeField === 'replace' ? 'round' : 'single'} 
+            borderColor={activeField === 'replace' ? THEME.secondary : THEME.muted}
+            paddingX={1} 
+            width={40}
+          >
             {activeField === 'replace' ? (
               <TextInput
                 value={replace}
@@ -420,22 +486,28 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
                 onSubmit={handleSubmit}
               />
             ) : (
-              <Text color="gray">{replace || '(empty - will delete matches)'}</Text>
+              <Text color={replace ? THEME.highlight : THEME.muted}>
+                {replace || '(empty - will delete)'}
+              </Text>
             )}
           </Box>
         </Box>
 
         <Box>
-          <Box width={12} />
-          <Text color={isRegex ? 'green' : 'gray'}>
-            [{isRegex ? 'x' : ' '}] Regex mode (Ctrl+R to toggle)
+          <Box width={10} />
+          <Text color={isRegex ? THEME.success : THEME.muted}>
+            {isRegex ? SYMBOLS.check : SYMBOLS.circle} Regex mode
           </Text>
+          <Text color={THEME.muted}> (Ctrl+R)</Text>
         </Box>
       </Box>
 
-      <Box marginTop={1}>
-        <Text color="gray">
-          [Tab] Switch field | [Enter] Preview | [Ctrl+R] Toggle regex | [Esc] Back to quick actions
+      <Box justifyContent="center">
+        <Text color={THEME.muted}>
+          <Text color={THEME.secondary}>Tab</Text> Switch │{' '}
+          <Text color={THEME.secondary}>↵</Text> Preview │{' '}
+          <Text color={THEME.secondary}>Ctrl+R</Text> Regex │{' '}
+          <Text color={THEME.secondary}>Esc</Text> Back
         </Text>
       </Box>
     </Box>
@@ -443,9 +515,12 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
 
   return (
     <Box flexDirection="column">
-      <Box marginBottom={1}>
-        <Text bold>Edit Mode</Text>
-        <Text color="gray"> - {selectedCount} components selected</Text>
+      {/* Header */}
+      <Box marginBottom={1} borderStyle="round" borderColor={THEME.primary} paddingX={2}>
+        <Text color={THEME.primary}>{SYMBOLS.diamond} Edit Mode</Text>
+        <Text color={THEME.muted}> │ </Text>
+        <Text color={THEME.accent}>{selectedCount}</Text>
+        <Text color={THEME.muted}> components selected</Text>
       </Box>
 
       {mode === 'quick' && renderQuickMode()}

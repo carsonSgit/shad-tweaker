@@ -12,6 +12,34 @@ import { BackupBrowser } from './components/BackupBrowser.js';
 import { HelpScreen } from './components/HelpScreen.js';
 import { StatusBar } from './components/StatusBar.js';
 
+// Visual constants for consistent theming
+export const THEME = {
+  primary: 'magenta',
+  secondary: 'cyan',
+  accent: 'yellow',
+  success: 'green',
+  error: 'red',
+  muted: 'gray',
+  highlight: 'white',
+} as const;
+
+export const SYMBOLS = {
+  dot: '●',
+  circle: '○',
+  arrow: '▸',
+  arrowDown: '▾',
+  check: '✓',
+  cross: '✗',
+  star: '★',
+  diamond: '◆',
+  box: '■',
+  line: '─',
+  corner: '╭',
+  cornerEnd: '╰',
+  vertical: '│',
+  horizontalLine: '═',
+} as const;
+
 export function App() {
   const { exit } = useApp();
   const { screen, navigate, goBack, canGoBack } = useNavigation('dashboard');
@@ -194,16 +222,39 @@ export function App() {
   };
 
   return (
-    <Box flexDirection="column" padding={1}>
-      <Box marginBottom={1}>
-        <Text bold color="cyan">
-          Shadcn Component Tweaker
-        </Text>
-        <Text color="gray"> v1.0.0</Text>
+    <Box flexDirection="column" paddingX={1}>
+      {/* Header */}
+      <Box flexDirection="column" marginBottom={1}>
+        <Box>
+          <Text color={THEME.primary}>╭</Text>
+          <Text color={THEME.primary}>{'─'.repeat(40)}</Text>
+          <Text color={THEME.primary}>╮</Text>
+        </Box>
+        <Box>
+          <Text color={THEME.primary}>│</Text>
+          <Text> </Text>
+          <Text bold color={THEME.primary}>◆ </Text>
+          <Text bold color={THEME.highlight}>shadcn</Text>
+          <Text bold color={THEME.primary}>/</Text>
+          <Text bold color={THEME.secondary}>tweaker</Text>
+          <Text color={THEME.muted}> ─ </Text>
+          <Text color={THEME.muted}>v1.0.1</Text>
+          <Text>{'   '.repeat(6)}</Text>
+          <Text color={THEME.primary}>│</Text>
+        </Box>
+        <Box>
+          <Text color={THEME.primary}>╰</Text>
+          <Text color={THEME.primary}>{'─'.repeat(40)}</Text>
+          <Text color={THEME.primary}>╯</Text>
+        </Box>
       </Box>
 
-      {renderScreen()}
+      {/* Main Content */}
+      <Box flexDirection="column" minHeight={15}>
+        {renderScreen()}
+      </Box>
 
+      {/* Status Bar */}
       <StatusBar
         screen={screen}
         selectedCount={selectedPaths.size}
