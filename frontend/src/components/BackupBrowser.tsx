@@ -5,6 +5,7 @@ import * as Diff from 'diff';
 import * as api from '../api/client.js';
 import type { Backup } from '../types/index.js';
 import type { BackupFilePreview } from '../api/client.js';
+import { THEME, SYMBOLS } from '../App.js';
 
 interface BackupBrowserProps {
   onRestore: (message: string) => void;
@@ -127,33 +128,39 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
 
   if (loading) {
     return (
-      <Box>
-        <Text color="green">
-          <Spinner type="dots" />
-        </Text>
-        <Text> Loading backups...</Text>
+      <Box flexDirection="column">
+        <Box borderStyle="round" borderColor={THEME.secondary} paddingX={2} paddingY={1}>
+          <Text color={THEME.success}>
+            <Spinner type="dots" />
+          </Text>
+          <Text> Loading backups...</Text>
+        </Box>
       </Box>
     );
   }
 
   if (loadingPreview) {
     return (
-      <Box>
-        <Text color="green">
-          <Spinner type="dots" />
-        </Text>
-        <Text> Loading preview...</Text>
+      <Box flexDirection="column">
+        <Box borderStyle="round" borderColor={THEME.secondary} paddingX={2} paddingY={1}>
+          <Text color={THEME.success}>
+            <Spinner type="dots" />
+          </Text>
+          <Text> Loading backup preview...</Text>
+        </Box>
       </Box>
     );
   }
 
   if (restoring) {
     return (
-      <Box>
-        <Text color="green">
-          <Spinner type="dots" />
-        </Text>
-        <Text> Restoring backup...</Text>
+      <Box flexDirection="column">
+        <Box borderStyle="round" borderColor={THEME.success} paddingX={2} paddingY={1}>
+          <Text color={THEME.success}>
+            <Spinner type="dots" />
+          </Text>
+          <Text> Restoring backup...</Text>
+        </Box>
       </Box>
     );
   }
@@ -163,13 +170,19 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
       return (
         <Box flexDirection="column">
           <Box marginBottom={1}>
-            <Text bold>Restore Backup: </Text>
-            <Text bold color="cyan">{selectedBackupId}</Text>
+            <Text bold color={THEME.highlight}>💾 Restore Backup</Text>
           </Box>
-          <Box marginY={1}>
-            <Text color="yellow">No changes to restore - files are identical to backup.</Text>
+          <Box marginBottom={1}>
+            <Text color={THEME.secondary}>{selectedBackupId}</Text>
           </Box>
-          <Text color="gray">[q/Esc] Go back</Text>
+          <Box borderStyle="round" borderColor={THEME.accent} paddingX={2} paddingY={1}>
+            <Text color={THEME.accent}>{SYMBOLS.diamond} No changes to restore - files are identical</Text>
+          </Box>
+          <Box marginTop={1}>
+            <Text color={THEME.muted}>Press </Text>
+            <Text color={THEME.secondary}>q/Esc</Text>
+            <Text color={THEME.muted}> to go back</Text>
+          </Box>
         </Box>
       );
     }
@@ -213,51 +226,62 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
 
     return (
       <Box flexDirection="column">
+        {/* Header */}
         <Box marginBottom={1}>
-          <Text bold>Restore Backup: </Text>
-          <Text bold color="cyan">{selectedBackupId}</Text>
+          <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Restore Backup</Text>
         </Box>
 
+        {/* Backup ID */}
         <Box marginBottom={1}>
-          <Text color="gray">
-            {previewIdx + 1}/{previews.length} files with changes
-          </Text>
+          <Text color={THEME.secondary}>{selectedBackupId}</Text>
         </Box>
 
+        {/* Stats */}
+        <Box marginBottom={1} justifyContent="space-between">
+          <Box>
+            <Text color={THEME.secondary}>{previewIdx + 1}</Text>
+            <Text color={THEME.muted}>/{previews.length} files with changes</Text>
+          </Box>
+        </Box>
+
+        {/* File Name */}
         <Box marginBottom={1}>
-          <Text color="cyan">{preview.fileName}</Text>
-          <Text color="gray"> ({changedGroups.length} change locations)</Text>
+          <Text color={THEME.accent}>{SYMBOLS.arrow} {preview.fileName}</Text>
+          <Text color={THEME.muted}> ({changedGroups.length} change locations)</Text>
         </Box>
 
         {error && (
-          <Box marginBottom={1}>
-            <Text color="red">{error}</Text>
+          <Box marginBottom={1} borderStyle="round" borderColor={THEME.error} paddingX={2}>
+            <Text color={THEME.error}>{SYMBOLS.cross} {error}</Text>
           </Box>
         )}
 
-        <Box flexDirection="column" borderStyle="single" paddingX={1}>
+        {/* Diff View */}
+        <Box flexDirection="column" borderStyle="single" borderColor={THEME.muted} paddingX={1}>
           {scrollOffset > 0 && (
-            <Text color="gray">↑ {scrollOffset} more above</Text>
+            <Box justifyContent="center">
+              <Text color={THEME.muted}>↑ {scrollOffset} more above</Text>
+            </Box>
           )}
 
           {displayGroups.length === 0 ? (
-            <Text color="yellow">No visible changes in this file</Text>
+            <Text color={THEME.accent}>No visible changes in this file</Text>
           ) : (
             displayGroups.map((group, idx) => (
               <Box key={idx} flexDirection="column" marginBottom={1}>
-                <Text color="gray">Line {group.lineNum}:</Text>
+                <Text color={THEME.muted}>Line {group.lineNum}:</Text>
                 {group.removed.map((line, i) => (
                   <Box key={`r${i}`}>
-                    <Text color="red">- </Text>
-                    <Text color="red">{line.trim().slice(0, 70)}</Text>
-                    {line.trim().length > 70 && <Text color="gray">...</Text>}
+                    <Text color={THEME.error}>- </Text>
+                    <Text color={THEME.error}>{line.trim().slice(0, 60)}</Text>
+                    {line.trim().length > 60 && <Text color={THEME.muted}>...</Text>}
                   </Box>
                 ))}
                 {group.added.map((line, i) => (
                   <Box key={`a${i}`}>
-                    <Text color="green">+ </Text>
-                    <Text color="green">{line.trim().slice(0, 70)}</Text>
-                    {line.trim().length > 70 && <Text color="gray">...</Text>}
+                    <Text color={THEME.success}>+ </Text>
+                    <Text color={THEME.success}>{line.trim().slice(0, 60)}</Text>
+                    {line.trim().length > 60 && <Text color={THEME.muted}>...</Text>}
                   </Box>
                 ))}
               </Box>
@@ -265,62 +289,120 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
           )}
 
           {scrollOffset + visibleGroups < changedGroups.length && (
-            <Text color="gray">↓ {changedGroups.length - scrollOffset - visibleGroups} more below</Text>
+            <Box justifyContent="center">
+              <Text color={THEME.muted}>↓ {changedGroups.length - scrollOffset - visibleGroups} more below</Text>
+            </Box>
           )}
         </Box>
 
-        <Box marginTop={1} flexDirection="column">
-          <Box>
-            <Text color="red">- current (will be replaced) </Text>
-            <Text color="green">+ backup (will be restored)</Text>
-          </Box>
+        {/* Legend */}
+        <Box marginTop={1} justifyContent="center">
+          <Text color={THEME.error}>{SYMBOLS.box} current (will be replaced)</Text>
+          <Text color={THEME.muted}> │ </Text>
+          <Text color={THEME.success}>{SYMBOLS.box} backup (will be restored)</Text>
+        </Box>
 
-          <Box marginTop={1}>
-            <Text color="gray">
-              [←/→] Switch file | [↑/↓] Scroll | [y/Enter] Restore | [q/Esc] Cancel
-            </Text>
-          </Box>
+        {/* Restore Button */}
+        <Box 
+          marginTop={1} 
+          borderStyle="round" 
+          borderColor={THEME.success}
+          paddingX={2}
+          justifyContent="center"
+        >
+          <Text color={THEME.success}>Press </Text>
+          <Text bold color={THEME.success}>y</Text>
+          <Text color={THEME.success}> or </Text>
+          <Text bold color={THEME.success}>Enter</Text>
+          <Text color={THEME.success}> to restore</Text>
+        </Box>
+
+        {/* Controls */}
+        <Box marginTop={1} justifyContent="center">
+          <Text color={THEME.muted}>
+            <Text color={THEME.secondary}>←/→</Text> Switch file │{' '}
+            <Text color={THEME.secondary}>↑/↓</Text> Scroll │{' '}
+            <Text color={THEME.secondary}>q/Esc</Text> Cancel
+          </Text>
         </Box>
       </Box>
     );
   }
 
+  // List mode
   return (
     <Box flexDirection="column">
-      <Text bold>Backup Browser</Text>
+      {/* Header */}
+      <Box marginBottom={1}>
+        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Backup Browser</Text>
+      </Box>
 
       {error && (
-        <Box marginY={1}>
-          <Text color="red">{error}</Text>
+        <Box marginBottom={1} borderStyle="round" borderColor={THEME.error} paddingX={2}>
+          <Text color={THEME.error}>{SYMBOLS.cross} {error}</Text>
         </Box>
       )}
 
       {backups.length === 0 ? (
-        <Box marginY={1}>
-          <Text color="gray">No backups found.</Text>
+        <Box borderStyle="round" borderColor={THEME.muted} paddingX={2} paddingY={1}>
+          <Text color={THEME.muted}>{SYMBOLS.diamond} No backups found</Text>
         </Box>
       ) : (
-        <Box marginY={1} flexDirection="column">
-          {backups.map((backup, idx) => (
-            <Box key={backup.id} flexDirection="column">
-              <Box>
-                <Text color={idx === cursor ? 'cyan' : undefined}>
-                  {idx === cursor ? '>' : ' '} {backup.id}
-                </Text>
-              </Box>
+        <Box 
+          flexDirection="column" 
+          borderStyle="single" 
+          borderColor={THEME.muted}
+          paddingX={1}
+          marginBottom={1}
+        >
+          {backups.map((backup, idx) => {
+            const isCurrent = idx === cursor;
+            const date = new Date(backup.timestamp);
+            const dateStr = date.toLocaleDateString();
+            const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            return (
+              <Box key={backup.id} flexDirection="column">
+                <Box>
+                  <Box width={3}>
+                    <Text color={isCurrent ? THEME.primary : THEME.muted}>
+                      {isCurrent ? SYMBOLS.arrow : ' '}
+                    </Text>
+                  </Box>
+                  <Text color={isCurrent ? THEME.secondary : THEME.highlight} bold={isCurrent}>
+                    {backup.id}
+                  </Text>
+                </Box>
               <Box marginLeft={3}>
-                <Text color="gray">
-                  {new Date(backup.timestamp).toLocaleString()} | {backup.components} files
+                <Text color={THEME.muted}>
+                  {dateStr} {timeStr} {SYMBOLS.line} {typeof backup.components === 'number' ? backup.components : backup.components?.length || 0} files
                 </Text>
               </Box>
-            </Box>
-          ))}
+              </Box>
+            );
+          })}
         </Box>
       )}
 
-      <Box marginTop={1}>
-        <Text color="gray">
-          [↑/↓] Navigate | [Enter] Preview & Restore | [c] Create backup | [q/Esc] Back
+      {/* Create Backup Button */}
+      <Box 
+        borderStyle="round" 
+        borderColor={THEME.accent}
+        paddingX={2}
+        justifyContent="center"
+        marginBottom={1}
+      >
+        <Text color={THEME.accent}>Press </Text>
+        <Text bold color={THEME.accent}>c</Text>
+        <Text color={THEME.accent}> to create a new backup</Text>
+      </Box>
+
+      {/* Controls */}
+      <Box justifyContent="center">
+        <Text color={THEME.muted}>
+          <Text color={THEME.secondary}>↑/↓</Text> Navigate │{' '}
+          <Text color={THEME.secondary}>↵</Text> Preview & Restore │{' '}
+          <Text color={THEME.secondary}>q/Esc</Text> Back
         </Text>
       </Box>
     </Box>

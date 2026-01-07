@@ -4,6 +4,7 @@ import Spinner from 'ink-spinner';
 import { highlight } from 'cli-highlight';
 import type { Component } from '../types/index.js';
 import * as api from '../api/client.js';
+import { THEME, SYMBOLS } from '../App.js';
 
 interface ComponentViewProps {
   component: Component;
@@ -14,7 +15,7 @@ export function ComponentView({ component, onBack }: ComponentViewProps) {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [content, setContent] = useState(component.content || '');
   const [loading, setLoading] = useState(!component.content);
-  const visibleLines = 20;
+  const visibleLines = 18;
 
   // Fetch content if not already loaded
   useEffect(() => {
@@ -66,21 +67,42 @@ export function ComponentView({ component, onBack }: ComponentViewProps) {
     .map((m) => m.replace(/className=["']/, '').replace(/["']$/, ''))
     .flatMap((c) => c.split(/\s+/))
     .filter((c, i, arr) => arr.indexOf(c) === i)
-    .slice(0, 10); // Show first 10 unique classes
+    .slice(0, 12); // Show first 12 unique classes
+
+  // Calculate file size display
+  const sizeKB = Math.round((component.metadata?.size || 0) / 1024);
+  const sizeDisplay = sizeKB > 0 ? `${sizeKB}KB` : `${component.metadata?.size || 0}B`;
 
   return (
     <Box flexDirection="column">
-      <Box marginBottom={1} flexDirection="column">
-        <Text bold color="cyan">{component.name}</Text>
-        <Text color="gray">{component.path}</Text>
-        <Text color="gray">
-          {component.metadata?.lines || 0} lines | {Math.round((component.metadata?.size || 0) / 1024)}KB
-        </Text>
+      {/* Header Card */}
+      <Box 
+        marginBottom={1} 
+        flexDirection="column" 
+        borderStyle="round" 
+        borderColor={THEME.secondary}
+        paddingX={2}
+      >
+        <Box>
+          <Text bold color={THEME.secondary}>{SYMBOLS.diamond} {component.name}</Text>
+        </Box>
+        <Box>
+          <Text color={THEME.muted}>{component.path}</Text>
+        </Box>
+        <Box marginTop={0}>
+          <Text color={THEME.muted}>{SYMBOLS.line} </Text>
+          <Text color={THEME.accent}>{component.metadata?.lines || 0}</Text>
+          <Text color={THEME.muted}> lines │ </Text>
+          <Text color={THEME.accent}>{sizeDisplay}</Text>
+          <Text color={THEME.muted}> │ </Text>
+          <Text color={THEME.accent}>{classes.length}</Text>
+          <Text color={THEME.muted}> classes</Text>
+        </Box>
       </Box>
 
       {loading && (
-        <Box marginBottom={1}>
-          <Text color="green">
+        <Box borderStyle="round" borderColor={THEME.muted} paddingX={2} paddingY={1}>
+          <Text color={THEME.success}>
             <Spinner type="dots" />
           </Text>
           <Text> Loading component content...</Text>
@@ -88,48 +110,69 @@ export function ComponentView({ component, onBack }: ComponentViewProps) {
       )}
 
       {!loading && !content && (
-        <Box marginBottom={1}>
-          <Text color="yellow">No content available.</Text>
+        <Box borderStyle="round" borderColor={THEME.accent} paddingX={2} paddingY={1}>
+          <Text color={THEME.accent}>{SYMBOLS.diamond} No content available</Text>
         </Box>
       )}
 
+      {/* Tailwind Classes */}
       {classes.length > 0 && (
         <Box marginBottom={1} flexDirection="column">
-          <Text bold>Tailwind Classes:</Text>
-          <Text color="yellow" wrap="wrap">
-            {classes.join(' ')}
-            {classMatches.length > 10 && <Text color="gray"> ...and more</Text>}
-          </Text>
+          <Box marginBottom={0}>
+            <Text color={THEME.muted}>{SYMBOLS.arrow} Tailwind Classes:</Text>
+          </Box>
+          <Box flexWrap="wrap">
+            {classes.map((cls, idx) => (
+              <Box key={idx} marginRight={1}>
+                <Text color={THEME.accent}>{cls}</Text>
+              </Box>
+            ))}
+            {classMatches.length > 12 && (
+              <Text color={THEME.muted}>+{classMatches.length - 12} more</Text>
+            )}
+          </Box>
         </Box>
       )}
 
-      <Box
-        flexDirection="column"
-        borderStyle="single"
-        paddingX={1}
-        height={visibleLines + 2}
-      >
-        {scrollOffset > 0 && (
-          <Text color="gray">↑ {scrollOffset} lines above</Text>
-        )}
-
-        {visibleContent.map((line, idx) => (
-          <Box key={idx}>
-            <Box width={4}>
-              <Text color="gray">{scrollOffset + idx + 1}</Text>
+      {/* Code View */}
+      {!loading && content && (
+        <Box
+          flexDirection="column"
+          borderStyle="single"
+          borderColor={THEME.muted}
+          paddingX={1}
+          height={visibleLines + 2}
+        >
+          {scrollOffset > 0 && (
+            <Box justifyContent="center">
+              <Text color={THEME.muted}>↑ {scrollOffset} lines above</Text>
             </Box>
-            <Text>{line}</Text>
-          </Box>
-        ))}
+          )}
 
-        {scrollOffset + visibleLines < totalLines && (
-          <Text color="gray">↓ {totalLines - scrollOffset - visibleLines} lines below</Text>
-        )}
-      </Box>
+          {visibleContent.map((line, idx) => (
+            <Box key={idx}>
+              <Box width={5} justifyContent="flex-end" marginRight={1}>
+                <Text color={THEME.muted}>{scrollOffset + idx + 1}</Text>
+              </Box>
+              <Text color={THEME.muted}>│</Text>
+              <Text> {line}</Text>
+            </Box>
+          ))}
 
-      <Box marginTop={1}>
-        <Text color="gray">
-          [↑/↓] Scroll | [PgUp/PgDn] Page | [q/Esc] Back
+          {scrollOffset + visibleLines < totalLines && (
+            <Box justifyContent="center">
+              <Text color={THEME.muted}>↓ {totalLines - scrollOffset - visibleLines} lines below</Text>
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* Controls */}
+      <Box marginTop={1} justifyContent="center">
+        <Text color={THEME.muted}>
+          <Text color={THEME.secondary}>↑/↓</Text> Scroll │{' '}
+          <Text color={THEME.secondary}>PgUp/PgDn</Text> Page │{' '}
+          <Text color={THEME.secondary}>q/Esc</Text> Back
         </Text>
       </Box>
     </Box>

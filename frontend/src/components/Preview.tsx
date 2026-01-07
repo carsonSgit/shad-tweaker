@@ -4,6 +4,7 @@ import Spinner from 'ink-spinner';
 import * as Diff from 'diff';
 import * as api from '../api/client.js';
 import type { Preview } from '../types/index.js';
+import { THEME, SYMBOLS } from '../App.js';
 
 interface PreviewViewProps {
   componentPaths: string[];
@@ -85,11 +86,13 @@ export function PreviewView({
 
   if (loading) {
     return (
-      <Box>
-        <Text color="green">
-          <Spinner type="dots" />
-        </Text>
-        <Text> Generating preview...</Text>
+      <Box flexDirection="column">
+        <Box borderStyle="round" borderColor={THEME.secondary} paddingX={2} paddingY={1}>
+          <Text color={THEME.success}>
+            <Spinner type="dots" />
+          </Text>
+          <Text> Generating preview...</Text>
+        </Box>
       </Box>
     );
   }
@@ -97,9 +100,13 @@ export function PreviewView({
   if (error) {
     return (
       <Box flexDirection="column">
-        <Text color="red">Error: {error}</Text>
+        <Box borderStyle="round" borderColor={THEME.error} paddingX={2} paddingY={1}>
+          <Text color={THEME.error}>{SYMBOLS.cross} Error: {error}</Text>
+        </Box>
         <Box marginTop={1}>
-          <Text color="gray">[q/Esc] Go back</Text>
+          <Text color={THEME.muted}>Press </Text>
+          <Text color={THEME.secondary}>q/Esc</Text>
+          <Text color={THEME.muted}> to go back</Text>
         </Box>
       </Box>
     );
@@ -108,15 +115,26 @@ export function PreviewView({
   if (previews.length === 0) {
     return (
       <Box flexDirection="column">
-        <Text color="yellow">No changes found matching pattern "{find}"</Text>
+        <Box borderStyle="round" borderColor={THEME.accent} paddingX={2} paddingY={1}>
+          <Text color={THEME.accent}>{SYMBOLS.diamond} No changes found matching pattern</Text>
+        </Box>
         <Box marginTop={1}>
-          <Text color="gray">[q/Esc] Go back</Text>
+          <Text color={THEME.muted}>Pattern: </Text>
+          <Text color={THEME.secondary}>"{find}"</Text>
+        </Box>
+        <Box marginTop={1}>
+          <Text color={THEME.muted}>Press </Text>
+          <Text color={THEME.secondary}>q/Esc</Text>
+          <Text color={THEME.muted}> to go back</Text>
         </Box>
       </Box>
     );
   }
 
   const preview = previews[currentIdx];
+  const totalChanges = previews.reduce((sum, p) => sum + p.changes, 0);
+  
+  // Parse diff for display
   const diffLines = Diff.createPatch(
     preview.path,
     preview.before,
@@ -125,74 +143,118 @@ export function PreviewView({
     'Modified'
   ).split('\n');
 
-  const visibleLines = 15;
+  const visibleLines = 12;
   const displayLines = diffLines.slice(scrollOffset, scrollOffset + visibleLines);
 
   return (
     <Box flexDirection="column">
+      {/* Header */}
       <Box marginBottom={1}>
-        <Text bold>Preview Changes</Text>
-        <Text color="gray">
-          {' '}({currentIdx + 1}/{previews.length} files | {preview.changes} changes)
-        </Text>
+        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Preview Changes</Text>
       </Box>
 
+      {/* Stats Bar */}
+      <Box marginBottom={1} justifyContent="space-between">
+        <Box>
+          <Text color={THEME.secondary}>{currentIdx + 1}</Text>
+          <Text color={THEME.muted}>/{previews.length} files</Text>
+        </Box>
+        <Box>
+          <Text color={THEME.success}>+{totalChanges}</Text>
+          <Text color={THEME.muted}> total changes</Text>
+        </Box>
+      </Box>
+
+      {/* File Name */}
       <Box marginBottom={1}>
-        <Text color="cyan">{preview.path}</Text>
+        <Text color={THEME.accent}>{SYMBOLS.arrow} {preview.path.split(/[/\\]/).pop()}</Text>
+        <Text color={THEME.muted}> ({preview.changes} changes)</Text>
       </Box>
 
       {applying ? (
-        <Box>
-          <Text color="green">
+        <Box borderStyle="round" borderColor={THEME.success} paddingX={2} paddingY={1}>
+          <Text color={THEME.success}>
             <Spinner type="dots" />
           </Text>
-          <Text> Applying changes...</Text>
+          <Text> Applying changes and creating backup...</Text>
         </Box>
       ) : (
         <>
+          {/* Diff View */}
           <Box
             flexDirection="column"
             borderStyle="single"
+            borderColor={THEME.muted}
             paddingX={1}
             height={visibleLines + 2}
           >
             {scrollOffset > 0 && (
-              <Text color="gray">↑ more above</Text>
+              <Box justifyContent="center">
+                <Text color={THEME.muted}>↑ scroll up for more</Text>
+              </Box>
             )}
 
             {displayLines.map((line, idx) => {
               let color: string | undefined;
+              let prefix = ' ';
+              
               if (line.startsWith('+') && !line.startsWith('+++')) {
-                color = 'green';
+                color = THEME.success;
+                prefix = '+';
               } else if (line.startsWith('-') && !line.startsWith('---')) {
-                color = 'red';
+                color = THEME.error;
+                prefix = '-';
               } else if (line.startsWith('@@')) {
-                color = 'cyan';
+                color = THEME.secondary;
+                prefix = '@';
               }
+
+              const displayText = line.slice(0, 70);
+              const isTruncated = line.length > 70;
 
               return (
                 <Text key={idx} color={color}>
-                  {line.slice(0, 80)}
+                  {displayText}{isTruncated && <Text color={THEME.muted}>...</Text>}
                 </Text>
               );
             })}
 
             {scrollOffset + visibleLines < diffLines.length && (
-              <Text color="gray">↓ more below</Text>
+              <Box justifyContent="center">
+                <Text color={THEME.muted}>↓ scroll down for more</Text>
+              </Box>
             )}
           </Box>
 
-          <Box marginTop={1} flexDirection="column">
-            <Box>
-              <Text color="green">+ additions </Text>
-              <Text color="red">- deletions</Text>
-            </Box>
+          {/* Legend */}
+          <Box marginTop={1} justifyContent="center">
+            <Text color={THEME.success}>{SYMBOLS.box} additions</Text>
+            <Text color={THEME.muted}> │ </Text>
+            <Text color={THEME.error}>{SYMBOLS.box} deletions</Text>
+          </Box>
 
-            <Box marginTop={1}>
-              <Text color="gray">
-                [←/→] Switch file | [↑/↓] Scroll | [y/Enter] Apply | [q/Esc] Cancel
-              </Text>
-            </Box>
+          {/* Apply Button */}
+          <Box 
+            marginTop={1} 
+            borderStyle="round" 
+            borderColor={THEME.success}
+            paddingX={2}
+            justifyContent="center"
+          >
+            <Text color={THEME.success}>Press </Text>
+            <Text bold color={THEME.success}>y</Text>
+            <Text color={THEME.success}> or </Text>
+            <Text bold color={THEME.success}>Enter</Text>
+            <Text color={THEME.success}> to apply changes</Text>
+          </Box>
+
+          {/* Controls */}
+          <Box marginTop={1} justifyContent="center">
+            <Text color={THEME.muted}>
+              <Text color={THEME.secondary}>←/→</Text> Switch file │{' '}
+              <Text color={THEME.secondary}>↑/↓</Text> Scroll │{' '}
+              <Text color={THEME.secondary}>q/Esc</Text> Cancel
+            </Text>
           </Box>
         </>
       )}

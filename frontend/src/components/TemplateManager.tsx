@@ -5,6 +5,7 @@ import Spinner from 'ink-spinner';
 import * as Diff from 'diff';
 import * as api from '../api/client.js';
 import type { Template, TemplateRule, Preview } from '../types/index.js';
+import { THEME, SYMBOLS } from '../App.js';
 
 interface TemplateManagerProps {
   onApplyTemplate: (rules: TemplateRule[]) => void;
@@ -28,9 +29,9 @@ interface QuickTemplate {
   id: string;
   label: string;
   description: string;
+  icon: string;
   type: 'select-to' | 'select-from' | 'simple';
   options?: SubOption[];
-  // For simple templates
   find?: string;
   replace?: string;
   isRegex?: boolean;
@@ -44,61 +45,36 @@ const createClassPattern = (prefix: string, values: string[]): Record<string, st
   );
 };
 
-// Helper for classes without suffix variants
-const createSimplePattern = (prefix: string, suffix: string): string => {
-  return `\\b${prefix}${suffix}\\b`;
-};
-
 // Regex patterns for matching existing classes
 const CLASS_PATTERNS: Record<string, string> = {
-  // Border Radius
   ...createClassPattern('rounded', ['none', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', 'full']),
   'rounded': '\\brounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full)?\\b',
-  
-  // Ring
   ...createClassPattern('ring', ['0', '1', '2', '4', '8']),
-  
-  // Shadow
   ...createClassPattern('shadow', ['none', 'sm', 'md', 'lg', 'xl', '2xl']),
   'shadow': '\\bshadow(-none|-sm|-md|-lg|-xl|-2xl)?\\b',
-  
-  // Text Size
   ...createClassPattern('text', ['xs', 'sm', 'base', 'lg', 'xl', '2xl']),
-  
-  // Gap
   ...createClassPattern('gap', ['0', '1', '2', '3', '4', '6', '8']),
-  
-  // Padding
   ...createClassPattern('p', ['0', '1', '2', '3', '4', '6', '8', '10', '12', '16', '20', '24']),
-  
-  // Margin
   ...createClassPattern('m', ['0', '1', '2', '3', '4', '6', '8', '10', '12', '16', '20', '24']),
-  
-  // Font Weight
   ...createClassPattern('font', ['thin', 'extralight', 'light', 'normal', 'medium', 'semibold', 'bold', 'extrabold', 'black']),
-  
-  // Border Width
   'border-0': '\\bborder(-0|-2|-4|-8)?\\b(?!-)',
   'border': '\\bborder(-0|-2|-4|-8)?\\b(?!-)',
   'border-2': '\\bborder(-0|-2|-4|-8)?\\b(?!-)',
   'border-4': '\\bborder(-0|-2|-4|-8)?\\b(?!-)',
   'border-8': '\\bborder(-0|-2|-4|-8)?\\b(?!-)',
-  
-  // Opacity
   ...createClassPattern('opacity', ['0', '5', '10', '20', '25', '30', '40', '50', '60', '70', '75', '80', '90', '95', '100']),
-  
-  // Duration
   ...createClassPattern('duration', ['75', '100', '150', '200', '300', '500', '700', '1000']),
 };
 
 const QUICK_TEMPLATES: QuickTemplate[] = [
   {
     id: 'quick-border-radius',
-    label: 'Change Border Radius',
+    label: 'Border Radius',
     description: 'Update rounded-* classes',
+    icon: '',
     type: 'select-to',
     options: [
-      { label: 'none (sharp corners)', value: 'rounded-none' },
+      { label: 'none (sharp)', value: 'rounded-none' },
       { label: 'sm (2px)', value: 'rounded-sm' },
       { label: 'default (4px)', value: 'rounded' },
       { label: 'md (6px)', value: 'rounded-md' },
@@ -106,26 +82,28 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
       { label: 'xl (12px)', value: 'rounded-xl' },
       { label: '2xl (16px)', value: 'rounded-2xl' },
       { label: '3xl (24px)', value: 'rounded-3xl' },
-      { label: 'full (pill/circle)', value: 'rounded-full' },
+      { label: 'full (pill)', value: 'rounded-full' },
     ],
   },
   {
     id: 'quick-ring-size',
-    label: 'Change Ring Size',
-    description: 'Update focus ring width',
+    label: 'Ring Size',
+    description: 'Focus ring width',
+    icon: '',
     type: 'select-to',
     options: [
       { label: '0 (none)', value: 'ring-0' },
       { label: '1 (1px)', value: 'ring-1' },
-      { label: '2 (2px, default)', value: 'ring-2' },
+      { label: '2 (2px)', value: 'ring-2' },
       { label: '4 (4px)', value: 'ring-4' },
       { label: '8 (8px)', value: 'ring-8' },
     ],
   },
   {
     id: 'quick-shadow',
-    label: 'Change Shadow',
-    description: 'Update shadow-* classes',
+    label: 'Shadow',
+    description: 'Update shadow depth',
+    icon: '',
     type: 'select-to',
     options: [
       { label: 'none', value: 'shadow-none' },
@@ -133,14 +111,15 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
       { label: 'default', value: 'shadow' },
       { label: 'md (medium)', value: 'shadow-md' },
       { label: 'lg (large)', value: 'shadow-lg' },
-      { label: 'xl (extra large)', value: 'shadow-xl' },
-      { label: '2xl (huge)', value: 'shadow-2xl' },
+      { label: 'xl (huge)', value: 'shadow-xl' },
+      { label: '2xl', value: 'shadow-2xl' },
     ],
   },
   {
     id: 'quick-text-size',
-    label: 'Change Text Size',
-    description: 'Update text size classes',
+    label: 'Text Size',
+    description: 'Typography scale',
+    icon: '',
     type: 'select-to',
     options: [
       { label: 'xs (12px)', value: 'text-xs' },
@@ -152,24 +131,10 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
     ],
   },
   {
-    id: 'quick-gap',
-    label: 'Change Gap/Spacing',
-    description: 'Update gap-* classes',
-    type: 'select-to',
-    options: [
-      { label: '0 (none)', value: 'gap-0' },
-      { label: '1 (4px)', value: 'gap-1' },
-      { label: '2 (8px)', value: 'gap-2' },
-      { label: '3 (12px)', value: 'gap-3' },
-      { label: '4 (16px)', value: 'gap-4' },
-      { label: '6 (24px)', value: 'gap-6' },
-      { label: '8 (32px)', value: 'gap-8' },
-    ],
-  },
-  {
     id: 'quick-padding',
-    label: 'Change Padding',
-    description: 'Update p-*/px-*/py-* classes',
+    label: 'Padding',
+    description: 'Internal spacing',
+    icon: '',
     type: 'select-to',
     options: [
       { label: '0 (none)', value: 'p-0' },
@@ -179,183 +144,66 @@ const QUICK_TEMPLATES: QuickTemplate[] = [
       { label: '4 (16px)', value: 'p-4' },
       { label: '6 (24px)', value: 'p-6' },
       { label: '8 (32px)', value: 'p-8' },
-      { label: '10 (40px)', value: 'p-10' },
-      { label: '12 (48px)', value: 'p-12' },
-    ],
-  },
-  {
-    id: 'quick-margin',
-    label: 'Change Margin',
-    description: 'Update m-*/mx-*/my-* classes',
-    type: 'select-to',
-    options: [
-      { label: '0 (none)', value: 'm-0' },
-      { label: '1 (4px)', value: 'm-1' },
-      { label: '2 (8px)', value: 'm-2' },
-      { label: '3 (12px)', value: 'm-3' },
-      { label: '4 (16px)', value: 'm-4' },
-      { label: '6 (24px)', value: 'm-6' },
-      { label: '8 (32px)', value: 'm-8' },
-      { label: '10 (40px)', value: 'm-10' },
-      { label: '12 (48px)', value: 'm-12' },
     ],
   },
   {
     id: 'quick-font-weight',
-    label: 'Change Font Weight',
-    description: 'Update font weight classes',
+    label: 'Font Weight',
+    description: 'Text boldness',
+    icon: '',
     type: 'select-to',
     options: [
       { label: 'thin (100)', value: 'font-thin' },
-      { label: 'extralight (200)', value: 'font-extralight' },
       { label: 'light (300)', value: 'font-light' },
       { label: 'normal (400)', value: 'font-normal' },
       { label: 'medium (500)', value: 'font-medium' },
       { label: 'semibold (600)', value: 'font-semibold' },
       { label: 'bold (700)', value: 'font-bold' },
       { label: 'extrabold (800)', value: 'font-extrabold' },
-      { label: 'black (900)', value: 'font-black' },
-    ],
-  },
-  {
-    id: 'quick-border-width',
-    label: 'Change Border Width',
-    description: 'Update border-* width classes',
-    type: 'select-to',
-    options: [
-      { label: '0 (none)', value: 'border-0' },
-      { label: 'default (1px)', value: 'border' },
-      { label: '2 (2px)', value: 'border-2' },
-      { label: '4 (4px)', value: 'border-4' },
-      { label: '8 (8px)', value: 'border-8' },
-    ],
-  },
-  {
-    id: 'quick-opacity',
-    label: 'Change Opacity',
-    description: 'Update opacity-* classes',
-    type: 'select-to',
-    options: [
-      { label: '0 (invisible)', value: 'opacity-0' },
-      { label: '5', value: 'opacity-5' },
-      { label: '10', value: 'opacity-10' },
-      { label: '20', value: 'opacity-20' },
-      { label: '25', value: 'opacity-25' },
-      { label: '50 (half)', value: 'opacity-50' },
-      { label: '75', value: 'opacity-75' },
-      { label: '90', value: 'opacity-90' },
-      { label: '100 (full)', value: 'opacity-100' },
-    ],
-  },
-  {
-    id: 'quick-transition-duration',
-    label: 'Change Transition Duration',
-    description: 'Update duration-* classes',
-    type: 'select-to',
-    options: [
-      { label: '75ms', value: 'duration-75' },
-      { label: '100ms', value: 'duration-100' },
-      { label: '150ms (default)', value: 'duration-150' },
-      { label: '200ms', value: 'duration-200' },
-      { label: '300ms', value: 'duration-300' },
-      { label: '500ms', value: 'duration-500' },
-      { label: '700ms', value: 'duration-700' },
-      { label: '1000ms', value: 'duration-1000' },
     ],
   },
   {
     id: 'quick-remove-class',
     label: 'Remove Class',
-    description: 'Remove specific Tailwind classes',
+    description: 'Delete specific classes',
+    icon: '',
     type: 'select-from',
     options: [
       { label: 'Remove pointer cursor', value: 'cursor-pointer' },
       { label: 'Remove default cursor', value: 'cursor-default' },
       { label: 'Remove transition', value: 'transition' },
       { label: 'Remove transition-all', value: 'transition-all' },
-      { label: 'Remove transition-colors', value: 'transition-colors' },
       { label: 'Remove animate-pulse', value: 'animate-pulse' },
-      { label: 'Remove animate-spin', value: 'animate-spin' },
       { label: 'Remove outline-none', value: 'outline-none' },
-      { label: 'Remove pointer-events-none', value: 'pointer-events-none' },
-      { label: 'Remove select-none', value: 'select-none' },
-      { label: 'Remove all shadows', value: 'shadow(-none|-sm|-md|-lg|-xl|-2xl)?' },
     ],
   },
   {
     id: 'quick-focus-visible',
-    label: 'Use focus-visible',
-    description: 'Change focus: to focus-visible:',
+    label: 'Focus to Focus-Visible',
+    description: 'Better keyboard UX',
+    icon: '',
     type: 'simple',
     find: 'focus:',
     replace: 'focus-visible:',
   },
-  {
-    id: 'quick-group-hover',
-    label: 'Use group-hover',
-    description: 'Change hover: to group-hover:',
-    type: 'simple',
-    find: 'hover:',
-    replace: 'group-hover:',
-  },
-  {
-    id: 'quick-peer-focus',
-    label: 'Use peer-focus',
-    description: 'Change focus: to peer-focus:',
-    type: 'simple',
-    find: 'focus:',
-    replace: 'peer-focus:',
-  },
-  {
-    id: 'quick-add-dark-mode',
-    label: 'Add Dark Mode Classes',
-    description: 'Duplicate classes with dark: prefix',
-    type: 'simple',
-    find: 'bg-',
-    replace: 'bg- dark:bg-',
-  },
-  {
-    id: 'quick-add-transition',
-    label: 'Add Transitions',
-    description: 'Add transition-colors to elements',
-    type: 'simple',
-    find: 'className="',
-    replace: 'className="transition-colors ',
-  },
-  {
-    id: 'quick-disable-animations',
-    label: 'Disable Animations',
-    description: 'Remove all animation classes',
-    type: 'simple',
-    find: '\\s*animate-\\w+',
-    replace: '',
-    isRegex: true,
-  },
 ];
 
-// Helper components for common UI patterns
+// Helper components
 const LoadingSpinner = ({ message }: { message: string }) => (
-  <Box>
-    <Text color="green"><Spinner type="dots" /></Text>
+  <Box borderStyle="round" borderColor={THEME.secondary} paddingX={2} paddingY={1}>
+    <Text color={THEME.success}><Spinner type="dots" /></Text>
     <Text> {message}</Text>
   </Box>
 );
 
 const ErrorMessage = ({ message }: { message: string | null }) => 
   message ? (
-    <Box marginBottom={1}>
-      <Text color="red">{message}</Text>
+    <Box marginBottom={1} borderStyle="round" borderColor={THEME.error} paddingX={2}>
+      <Text color={THEME.error}>{SYMBOLS.cross} {message}</Text>
     </Box>
   ) : null;
 
-const HelpText = ({ text }: { text: string }) => (
-  <Box marginTop={1}>
-    <Text color="gray">{text}</Text>
-  </Box>
-);
-
 export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], onDirectApply }: TemplateManagerProps) {
-  // Template and UI state
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
@@ -365,30 +213,24 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
   const [cursor, setCursor] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
 
-  // Quick template state
   const [selectedQuickTemplate, setSelectedQuickTemplate] = useState<QuickTemplate | null>(null);
   const [subOptionCursor, setSubOptionCursor] = useState(0);
 
-  // Preview/confirm state
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [previewIdx, setPreviewIdx] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [pendingRule, setPendingRule] = useState<TemplateRule | null>(null);
 
-  // Component selection state
   const [internalSelectedPaths, setInternalSelectedPaths] = useState<Set<string>>(new Set());
   const [componentCursor, setComponentCursor] = useState(0);
   const [availableComponents, setAvailableComponents] = useState<Array<{ name: string; path: string }>>([]);
 
-  // Create form state
   const [newName, setNewName] = useState('');
   const [newFind, setNewFind] = useState('');
   const [newReplace, setNewReplace] = useState('');
   const [activeField, setActiveField] = useState<'name' | 'find' | 'replace'>('name');
 
   const canDirectApply = selectedPaths.length > 0 && onDirectApply;
-
-  // Combined list: Quick Templates + User Templates
   const totalQuickTemplates = QUICK_TEMPLATES.length;
   const allItems = [...QUICK_TEMPLATES.map(qt => ({ type: 'quick' as const, item: qt })),
                     ...templates.map(t => ({ type: 'user' as const, item: t }))];
@@ -475,7 +317,6 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
   const handleQuickTemplateSelect = (qt: QuickTemplate) => {
     if (qt.type === 'simple') {
-      // Simple action - go directly to component selection
       const rule: TemplateRule = {
         find: qt.find!,
         replace: qt.replace!,
@@ -486,12 +327,10 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
       setMode('select-components');
       setComponentCursor(0);
       
-      // If components were pre-selected, use those
       if (selectedPaths.length > 0) {
         setInternalSelectedPaths(new Set(selectedPaths));
       }
     } else {
-      // Has sub-options - show them
       setSelectedQuickTemplate(qt);
       setSubOptionCursor(0);
       setMode('suboptions');
@@ -504,14 +343,12 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
     let rule: TemplateRule;
 
     if (selectedQuickTemplate.type === 'select-from') {
-      // Remove class
       rule = {
         find: `\\s*${option.value}`,
         replace: '',
         isRegex: true,
       };
     } else {
-      // select-to - replace existing class with new one
       const pattern = CLASS_PATTERNS[option.value];
       rule = {
         find: pattern || option.value,
@@ -520,19 +357,16 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
       };
     }
 
-    // Store the rule and move to component selection
     setPendingRule(rule);
     setMode('select-components');
     setComponentCursor(0);
     
-    // If components were pre-selected, use those
     if (selectedPaths.length > 0) {
       setInternalSelectedPaths(new Set(selectedPaths));
     }
   };
 
   useInput((input, key) => {
-    // Component selection mode
     if (mode === 'select-components') {
       if (key.escape || input === 'q') {
         setMode('list');
@@ -550,7 +384,6 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
         return;
       }
       if (input === ' ') {
-        // Toggle selection
         const component = availableComponents[componentCursor];
         if (component) {
           setInternalSelectedPaths(prev => {
@@ -566,17 +399,14 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
         return;
       }
       if (input === 'a') {
-        // Select all
         setInternalSelectedPaths(new Set(availableComponents.map(c => c.path)));
         return;
       }
       if (input === 'n') {
-        // Deselect all
         setInternalSelectedPaths(new Set());
         return;
       }
       if (key.return || input === 'c') {
-        // Confirm and proceed to preview
         if (internalSelectedPaths.size === 0) {
           setError('Please select at least one component');
           return;
@@ -589,7 +419,6 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
       return;
     }
 
-    // Sub-options mode
     if (mode === 'suboptions' && selectedQuickTemplate?.options) {
       if (key.escape || input === 'q') {
         setMode('list');
@@ -608,7 +437,6 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
         handleSubOptionSelect(selectedQuickTemplate.options[subOptionCursor]);
         return;
       }
-      // Number shortcuts
       const num = parseInt(input);
       if (num >= 1 && num <= Math.min(9, selectedQuickTemplate.options.length)) {
         handleSubOptionSelect(selectedQuickTemplate.options[num - 1]);
@@ -703,7 +531,6 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
       setNewReplace('');
       setActiveField('name');
     }
-    // Number shortcuts for quick templates
     const num = parseInt(input);
     if (num >= 1 && num <= Math.min(9, totalQuickTemplates)) {
       handleQuickTemplateSelect(QUICK_TEMPLATES[num - 1]);
@@ -744,7 +571,6 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
     setApplying(true);
 
-    // If we have a pending rule (from quick template), apply it directly
     if (pendingRule) {
       const result = await api.applyEdit(pathsToUse, pendingRule.find, pendingRule.replace, pendingRule.isRegex);
       setApplying(false);
@@ -781,61 +607,91 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
     return <LoadingSpinner message="Loading templates..." />;
   }
 
-  // Sub-options mode for Quick Templates
+  // Sub-options mode
   if (mode === 'suboptions' && selectedQuickTemplate?.options) {
     return (
       <Box flexDirection="column">
         <Box marginBottom={1}>
-          <Text bold color="cyan">{selectedQuickTemplate.label}</Text>
-          <Text color="gray"> - Select an option</Text>
+          <Text>{selectedQuickTemplate.icon} </Text>
+          <Text bold color={THEME.secondary}>{selectedQuickTemplate.label}</Text>
+          <Text color={THEME.muted}> ─ Select target value</Text>
         </Box>
 
-        <Box flexDirection="column" marginBottom={1}>
+        <Box 
+          flexDirection="column" 
+          borderStyle="single" 
+          borderColor={THEME.secondary}
+          paddingX={1}
+          marginBottom={1}
+        >
           {selectedQuickTemplate.options.map((option, idx) => {
             const isCurrent = idx === subOptionCursor;
             return (
               <Box key={idx}>
-                <Text color={isCurrent ? 'cyan' : 'gray'}>{isCurrent ? '> ' : '  '}</Text>
-                <Text color={isCurrent ? 'cyan' : 'white'} bold={isCurrent}>
-                  {idx + 1}. {option.value}
-                </Text>
-                <Text color="gray"> - {option.label}</Text>
+                <Box width={3}>
+                  <Text color={isCurrent ? THEME.primary : THEME.muted}>
+                    {isCurrent ? SYMBOLS.arrow : ' '}
+                  </Text>
+                </Box>
+                <Box width={3}>
+                  <Text color={THEME.muted}>{idx + 1}.</Text>
+                </Box>
+                <Box width={18}>
+                  <Text color={isCurrent ? THEME.accent : THEME.highlight} bold={isCurrent}>
+                    {option.value}
+                  </Text>
+                </Box>
+                <Text color={THEME.muted}>({option.label})</Text>
               </Box>
             );
           })}
         </Box>
 
-        <HelpText text="[1-9] Quick select | [Enter] Next: Select Components | [Esc] Back" />
+        <Box justifyContent="center">
+          <Text color={THEME.muted}>
+            <Text color={THEME.secondary}>1-9</Text> Quick │{' '}
+            <Text color={THEME.secondary}>↵</Text> Next: Select Components │{' '}
+            <Text color={THEME.secondary}>Esc</Text> Back
+          </Text>
+        </Box>
       </Box>
     );
   }
 
   // Component selection mode
   if (mode === 'select-components') {
-    const visibleCount = 10;
-    const startIdx = Math.max(0, Math.min(componentCursor - 4, availableComponents.length - visibleCount));
+    const visibleCount = 8;
+    const startIdx = Math.max(0, Math.min(componentCursor - 3, availableComponents.length - visibleCount));
     const visibleComponents = availableComponents.slice(startIdx, startIdx + visibleCount);
 
     return (
       <Box flexDirection="column">
         <Box marginBottom={1}>
-          <Text bold color="cyan">
-            {selectedQuickTemplate?.label || 'Action'}
-          </Text>
-          <Text color="gray"> - Select components to modify</Text>
+          <Text>{SYMBOLS.diamond} </Text>
+          <Text bold color={THEME.secondary}>{selectedQuickTemplate?.label || 'Action'}</Text>
+          <Text color={THEME.muted}> ─ Select components</Text>
         </Box>
 
         <Box marginBottom={1}>
-          <Text color="gray">
-            {internalSelectedPaths.size} / {availableComponents.length} components selected
+          <Text color={internalSelectedPaths.size > 0 ? THEME.success : THEME.muted}>
+            {SYMBOLS.check} {internalSelectedPaths.size}
           </Text>
+          <Text color={THEME.muted}> / {availableComponents.length} selected</Text>
         </Box>
 
         <ErrorMessage message={error} />
 
-        <Box flexDirection="column" marginBottom={1}>
+        <Box 
+          flexDirection="column" 
+          borderStyle="single" 
+          borderColor={THEME.muted}
+          paddingX={1}
+          marginBottom={1}
+        >
           {startIdx > 0 && (
-            <Text color="gray">  ↑ {startIdx} more...</Text>
+            <Box justifyContent="center">
+              <Text color={THEME.muted}>↑ {startIdx} more</Text>
+            </Box>
           )}
 
           {visibleComponents.map((component, idx) => {
@@ -845,41 +701,60 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
             return (
               <Box key={component.path}>
-                <Text color={isCursor ? 'cyan' : undefined}>
-                  {isCursor ? '>' : ' '}
-                </Text>
-                <Text color={isSelected ? 'green' : 'gray'}>
-                  [{isSelected ? 'x' : ' '}]
-                </Text>
-                <Text color={isCursor ? 'cyan' : 'white'} bold={isCursor}>
-                  {' '}{component.name}
+                <Box width={3}>
+                  <Text color={isCursor ? THEME.primary : THEME.muted}>
+                    {isCursor ? SYMBOLS.arrow : ' '}
+                  </Text>
+                </Box>
+                <Box width={4}>
+                  <Text color={isSelected ? THEME.success : THEME.muted}>
+                    {isSelected ? SYMBOLS.check : SYMBOLS.circle}
+                  </Text>
+                </Box>
+                <Text color={isCursor ? THEME.secondary : (isSelected ? THEME.success : THEME.highlight)} bold={isCursor}>
+                  {component.name}
                 </Text>
               </Box>
             );
           })}
 
           {startIdx + visibleCount < availableComponents.length && (
-            <Text color="gray">
-              {'  '}↓ {availableComponents.length - startIdx - visibleCount} more...
-            </Text>
+            <Box justifyContent="center">
+              <Text color={THEME.muted}>↓ {availableComponents.length - startIdx - visibleCount} more</Text>
+            </Box>
           )}
         </Box>
 
-        <Box marginTop={1} flexDirection="column">
-          <Box borderStyle="single" paddingX={2} paddingY={0} marginBottom={1}>
-            <Text bold color={internalSelectedPaths.size > 0 ? 'green' : 'gray'}>
-              {internalSelectedPaths.size > 0 
-                ? `[c/Enter] Confirm & Preview (${internalSelectedPaths.size} selected)`
-                : '[c/Enter] Confirm & Preview (select at least 1)'}
+        {/* Confirm Button */}
+        <Box 
+          borderStyle="round" 
+          borderColor={internalSelectedPaths.size > 0 ? THEME.success : THEME.muted}
+          paddingX={2}
+          justifyContent="center"
+          marginBottom={1}
+        >
+          {internalSelectedPaths.size > 0 ? (
+            <Text color={THEME.success}>
+              Press <Text bold>c</Text> or <Text bold>↵</Text> to preview ({internalSelectedPaths.size} selected)
             </Text>
-          </Box>
-          
-          <HelpText text="[Space] Toggle | [a] Select All | [n] Deselect All | [Esc/q] Back" />
+          ) : (
+            <Text color={THEME.muted}>Select at least 1 component</Text>
+          )}
+        </Box>
+
+        <Box justifyContent="center">
+          <Text color={THEME.muted}>
+            <Text color={THEME.secondary}>Space</Text> Toggle │{' '}
+            <Text color={THEME.secondary}>a</Text> All │{' '}
+            <Text color={THEME.secondary}>n</Text> None │{' '}
+            <Text color={THEME.secondary}>Esc</Text> Back
+          </Text>
         </Box>
       </Box>
     );
   }
 
+  // Confirm mode
   if (mode === 'confirm') {
     if (loadingPreview) {
       return <LoadingSpinner message="Generating preview..." />;
@@ -892,11 +767,17 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
     if (previews.length === 0) {
       return (
         <Box flexDirection="column">
-          <Text bold>Preview Changes</Text>
-          <Box marginY={1}>
-            <Text color="yellow">No changes found for the selected components.</Text>
+      <Box marginBottom={1}>
+        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Preview Changes</Text>
+      </Box>
+          <Box borderStyle="round" borderColor={THEME.accent} paddingX={2} paddingY={1}>
+            <Text color={THEME.accent}>{SYMBOLS.diamond} No changes found for the selected components</Text>
           </Box>
-          <HelpText text="[q/Esc] Go back" />
+          <Box marginTop={1}>
+            <Text color={THEME.muted}>Press </Text>
+            <Text color={THEME.secondary}>q/Esc</Text>
+            <Text color={THEME.muted}> to go back</Text>
+          </Box>
         </Box>
       );
     }
@@ -939,47 +820,51 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
     return (
       <Box flexDirection="column">
-        <Box marginBottom={1}>
-          <Text bold>Apply: </Text>
-          <Text bold color="cyan">{templateName}</Text>
+      <Box marginBottom={1}>
+        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Apply: </Text>
+        <Text bold color={THEME.secondary}>{templateName}</Text>
+      </Box>
+
+        <Box marginBottom={1} justifyContent="space-between">
+          <Box>
+            <Text color={THEME.secondary}>{previewIdx + 1}</Text>
+            <Text color={THEME.muted}>/{previews.length} files</Text>
+          </Box>
+          <Box>
+            <Text color={THEME.success}>+{totalChanges}</Text>
+            <Text color={THEME.muted}> changes</Text>
+          </Box>
         </Box>
 
         <Box marginBottom={1}>
-          <Text color="gray">
-            {previewIdx + 1}/{previews.length} files | {totalChanges} total changes
-          </Text>
-        </Box>
-
-        <Box marginBottom={1}>
-          <Text color="cyan">{preview.path.split(/[/\\]/).pop()}</Text>
-          <Text color="gray"> ({changedGroups.length} change locations)</Text>
+          <Text color={THEME.accent}>{SYMBOLS.arrow} {preview.path.split(/[/\\]/).pop()}</Text>
         </Box>
 
         <ErrorMessage message={error} />
 
-        <Box flexDirection="column" borderStyle="single" paddingX={1}>
+        <Box flexDirection="column" borderStyle="single" borderColor={THEME.muted} paddingX={1}>
           {scrollOffset > 0 && (
-            <Text color="gray">... {scrollOffset} more above</Text>
+            <Box justifyContent="center">
+              <Text color={THEME.muted}>↑ {scrollOffset} more</Text>
+            </Box>
           )}
 
           {displayGroups.length === 0 ? (
-            <Text color="yellow">No visible changes in this file</Text>
+            <Text color={THEME.accent}>No visible changes</Text>
           ) : (
             displayGroups.map((group, idx) => (
               <Box key={idx} flexDirection="column" marginBottom={1}>
-                <Text color="gray">Line {group.lineNum}:</Text>
+                <Text color={THEME.muted}>Line {group.lineNum}:</Text>
                 {group.removed.map((line, i) => (
                   <Box key={`r${i}`}>
-                    <Text color="red">- </Text>
-                    <Text color="red">{line.trim().slice(0, 70)}</Text>
-                    {line.trim().length > 70 && <Text color="gray">...</Text>}
+                    <Text color={THEME.error}>- {line.trim().slice(0, 55)}</Text>
+                    {line.trim().length > 55 && <Text color={THEME.muted}>...</Text>}
                   </Box>
                 ))}
                 {group.added.map((line, i) => (
                   <Box key={`a${i}`}>
-                    <Text color="green">+ </Text>
-                    <Text color="green">{line.trim().slice(0, 70)}</Text>
-                    {line.trim().length > 70 && <Text color="gray">...</Text>}
+                    <Text color={THEME.success}>+ {line.trim().slice(0, 55)}</Text>
+                    {line.trim().length > 55 && <Text color={THEME.muted}>...</Text>}
                   </Box>
                 ))}
               </Box>
@@ -987,78 +872,111 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
           )}
 
           {scrollOffset + visibleGroups < changedGroups.length && (
-            <Text color="gray">... {changedGroups.length - scrollOffset - visibleGroups} more below</Text>
+            <Box justifyContent="center">
+              <Text color={THEME.muted}>↓ {changedGroups.length - scrollOffset - visibleGroups} more</Text>
+            </Box>
           )}
         </Box>
 
-        <HelpText text="[Left/Right] Switch file | [Up/Down] Scroll | [y/Enter] Apply | [q/Esc] Cancel" />
+        <Box 
+          marginTop={1} 
+          borderStyle="round" 
+          borderColor={THEME.success}
+          paddingX={2}
+          justifyContent="center"
+        >
+          <Text color={THEME.success}>Press <Text bold>y</Text> or <Text bold>↵</Text> to apply</Text>
+        </Box>
+
+        <Box marginTop={1} justifyContent="center">
+          <Text color={THEME.muted}>
+            <Text color={THEME.secondary}>←/→</Text> File │{' '}
+            <Text color={THEME.secondary}>↑/↓</Text> Scroll │{' '}
+            <Text color={THEME.secondary}>Esc</Text> Cancel
+          </Text>
+        </Box>
       </Box>
     );
   }
 
+  // Create mode
   if (mode === 'create') {
     return (
       <Box flexDirection="column">
-        <Text bold>Create New Template</Text>
+      <Box marginBottom={1}>
+        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Create New Template</Text>
+      </Box>
 
-        {error && (
-          <Box marginY={1}>
-            <Text color="red">{error}</Text>
-          </Box>
-        )}
+        <ErrorMessage message={error} />
 
-        <Box marginY={1} flexDirection="column">
+        <Box flexDirection="column" marginBottom={1}>
           <Box marginBottom={1}>
             <Box width={10}>
-              <Text color={activeField === 'name' ? 'cyan' : 'gray'}>Name:</Text>
+              <Text color={activeField === 'name' ? THEME.secondary : THEME.muted}>Name:</Text>
             </Box>
-            {activeField === 'name' ? (
-              <TextInput
-                value={newName}
-                onChange={setNewName}
-                onSubmit={() => setActiveField('find')}
-              />
-            ) : (
-              <Text>{newName || '(empty)'}</Text>
-            )}
-          </Box>
-
-          <Box marginBottom={1}>
-            <Box width={10}>
-              <Text color={activeField === 'find' ? 'cyan' : 'gray'}>Find:</Text>
+            <Box 
+              borderStyle={activeField === 'name' ? 'round' : 'single'} 
+              borderColor={activeField === 'name' ? THEME.secondary : THEME.muted}
+              paddingX={1} 
+              width={35}
+            >
+              {activeField === 'name' ? (
+                <TextInput value={newName} onChange={setNewName} onSubmit={() => setActiveField('find')} />
+              ) : (
+                <Text color={newName ? THEME.highlight : THEME.muted}>{newName || '(empty)'}</Text>
+              )}
             </Box>
-            {activeField === 'find' ? (
-              <TextInput
-                value={newFind}
-                onChange={setNewFind}
-                onSubmit={() => setActiveField('replace')}
-              />
-            ) : (
-              <Text>{newFind || '(empty)'}</Text>
-            )}
           </Box>
 
           <Box marginBottom={1}>
             <Box width={10}>
-              <Text color={activeField === 'replace' ? 'cyan' : 'gray'}>Replace:</Text>
+              <Text color={activeField === 'find' ? THEME.secondary : THEME.muted}>Find:</Text>
             </Box>
-            {activeField === 'replace' ? (
-              <TextInput
-                value={newReplace}
-                onChange={setNewReplace}
-                onSubmit={handleCreateSubmit}
-              />
-            ) : (
-              <Text>{newReplace || '(empty)'}</Text>
-            )}
+            <Box 
+              borderStyle={activeField === 'find' ? 'round' : 'single'} 
+              borderColor={activeField === 'find' ? THEME.secondary : THEME.muted}
+              paddingX={1} 
+              width={35}
+            >
+              {activeField === 'find' ? (
+                <TextInput value={newFind} onChange={setNewFind} onSubmit={() => setActiveField('replace')} />
+              ) : (
+                <Text color={newFind ? THEME.highlight : THEME.muted}>{newFind || '(empty)'}</Text>
+              )}
+            </Box>
+          </Box>
+
+          <Box marginBottom={1}>
+            <Box width={10}>
+              <Text color={activeField === 'replace' ? THEME.secondary : THEME.muted}>Replace:</Text>
+            </Box>
+            <Box 
+              borderStyle={activeField === 'replace' ? 'round' : 'single'} 
+              borderColor={activeField === 'replace' ? THEME.secondary : THEME.muted}
+              paddingX={1} 
+              width={35}
+            >
+              {activeField === 'replace' ? (
+                <TextInput value={newReplace} onChange={setNewReplace} onSubmit={handleCreateSubmit} />
+              ) : (
+                <Text color={newReplace ? THEME.highlight : THEME.muted}>{newReplace || '(empty)'}</Text>
+              )}
+            </Box>
           </Box>
         </Box>
 
-        <HelpText text="[Tab] Next field | [Enter] Save | [Esc] Cancel" />
+        <Box justifyContent="center">
+          <Text color={THEME.muted}>
+            <Text color={THEME.secondary}>Tab</Text> Next │{' '}
+            <Text color={THEME.secondary}>↵</Text> Save │{' '}
+            <Text color={THEME.secondary}>Esc</Text> Cancel
+          </Text>
+        </Box>
       </Box>
     );
   }
 
+  // View mode
   if (mode === 'view' && selectedTemplate) {
     if (loadingPreview) {
       return <LoadingSpinner message="Generating preview..." />;
@@ -1066,31 +984,45 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
 
     return (
       <Box flexDirection="column">
-        <Text bold color="cyan">{selectedTemplate.name}</Text>
-        <Text color="gray">Created: {new Date(selectedTemplate.created).toLocaleString()}</Text>
+      <Box marginBottom={1}>
+        <Text bold color={THEME.secondary}>{SYMBOLS.diamond} {selectedTemplate.name}</Text>
+      </Box>
+        <Text color={THEME.muted}>Created: {new Date(selectedTemplate.created).toLocaleString()}</Text>
 
         <Box marginY={1} flexDirection="column">
-          <Text bold>Rules:</Text>
+          <Text bold color={THEME.highlight}>Rules:</Text>
           {selectedTemplate.rules.map((rule, idx) => (
-            <Box key={idx} flexDirection="column" marginLeft={2}>
-              <Text>Find: <Text color="yellow">{rule.find}</Text></Text>
-              <Text>Replace: <Text color="green">{rule.replace || '(delete)'}</Text></Text>
-              {rule.isRegex && <Text color="gray">(regex)</Text>}
+            <Box key={idx} flexDirection="column" marginLeft={2} marginTop={0}>
+              <Box>
+                <Text color={THEME.muted}>Find: </Text>
+                <Text color={THEME.accent}>{rule.find}</Text>
+              </Box>
+              <Box>
+                <Text color={THEME.muted}>Replace: </Text>
+                <Text color={THEME.success}>{rule.replace || '(delete)'}</Text>
+              </Box>
+              {rule.isRegex && <Text color={THEME.muted}>(regex)</Text>}
             </Box>
           ))}
         </Box>
 
-        {error && (
-          <Box marginY={1}>
-            <Text color="red">{error}</Text>
-          </Box>
-        )}
+        <ErrorMessage message={error} />
 
-        <HelpText text={
-          canDirectApply 
-            ? `[a] Preview & apply (${selectedPaths.length} files) | [d] Delete | [q/Esc] Back`
-            : '[a] Load into editor | [d] Delete | [q/Esc] Back'
-        } />
+        <Box justifyContent="center">
+          <Text color={THEME.muted}>
+            {canDirectApply ? (
+              <>
+                <Text color={THEME.secondary}>a</Text> Apply ({selectedPaths.length} files) │{' '}
+              </>
+            ) : (
+              <>
+                <Text color={THEME.secondary}>a</Text> Load │{' '}
+              </>
+            )}
+            <Text color={THEME.secondary}>d</Text> Delete │{' '}
+            <Text color={THEME.secondary}>q/Esc</Text> Back
+          </Text>
+        </Box>
       </Box>
     );
   }
@@ -1099,60 +1031,92 @@ export function TemplateManager({ onApplyTemplate, onBack, selectedPaths = [], o
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold>Template Manager</Text>
+        <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Template Manager</Text>
         {canDirectApply && (
-          <Text color="green"> ({selectedPaths.length} components selected)</Text>
+          <Text color={THEME.success}> ({selectedPaths.length} components selected)</Text>
         )}
       </Box>
 
-      {error && (
-        <Box marginBottom={1}>
-          <Text color="red">{error}</Text>
-        </Box>
-      )}
+      <ErrorMessage message={error} />
 
       {/* Quick Templates Section */}
       <Box marginBottom={1} flexDirection="column">
-        <Text bold color="yellow">Quick Actions:</Text>
-        {QUICK_TEMPLATES.map((qt, idx) => {
-          const isCurrent = idx === cursor;
-          return (
-            <Box key={qt.id}>
-              <Text color={isCurrent ? 'cyan' : 'gray'}>{isCurrent ? '> ' : '  '}</Text>
-              <Text color={isCurrent ? 'cyan' : 'white'} bold={isCurrent}>
-                {idx + 1}. {qt.label}
-              </Text>
-              <Text color="gray"> - {qt.description}</Text>
-              {qt.type !== 'simple' && <Text color="yellow"> [...]</Text>}
-            </Box>
-          );
-        })}
+        <Box marginBottom={0}>
+          <Text color={THEME.accent}>{SYMBOLS.arrow} Quick Actions</Text>
+        </Box>
+        <Box 
+          flexDirection="column" 
+          borderStyle="single" 
+          borderColor={THEME.muted}
+          paddingX={1}
+        >
+          {QUICK_TEMPLATES.map((qt, idx) => {
+            const isCurrent = idx === cursor;
+            return (
+              <Box key={qt.id}>
+                <Box width={3}>
+                  <Text color={isCurrent ? THEME.primary : THEME.muted}>
+                    {isCurrent ? SYMBOLS.arrow : ' '}
+                  </Text>
+                </Box>
+                <Box width={3}>
+                  <Text color={THEME.muted}>{idx + 1}.</Text>
+                </Box>
+                <Box width={22}>
+                  <Text color={isCurrent ? THEME.secondary : THEME.highlight} bold={isCurrent}>
+                    {qt.label}
+                  </Text>
+                </Box>
+                <Text color={THEME.muted}>{qt.description}</Text>
+                {qt.type !== 'simple' && <Text color={THEME.accent}> {SYMBOLS.arrow}</Text>}
+              </Box>
+            );
+          })}
+        </Box>
       </Box>
 
       {/* User Templates Section */}
       <Box marginBottom={1} flexDirection="column">
-        <Text bold color="yellow">Saved Templates:</Text>
-        {templates.length === 0 ? (
-          <Text color="gray" dimColor>  No saved templates. Press [n] to create one.</Text>
-        ) : (
-          templates.map((template, idx) => {
-            const listIdx = totalQuickTemplates + idx;
-            const isCurrent = listIdx === cursor;
-            return (
-              <Box key={template.id}>
-                <Text color={isCurrent ? 'cyan' : 'gray'}>{isCurrent ? '> ' : '  '}</Text>
-                <Text color={isCurrent ? 'cyan' : 'white'} bold={isCurrent}>
-                  {template.name}
-                </Text>
-                <Text color="gray"> ({template.rules.length} rules)</Text>
-              </Box>
-            );
-          })
-        )}
+        <Box marginBottom={0}>
+          <Text color={THEME.accent}>{SYMBOLS.arrow} Saved Templates</Text>
+        </Box>
+        <Box 
+          flexDirection="column" 
+          borderStyle="single" 
+          borderColor={THEME.muted}
+          paddingX={1}
+        >
+          {templates.length === 0 ? (
+            <Text color={THEME.muted}>No saved templates. Press <Text color={THEME.secondary}>n</Text> to create one.</Text>
+          ) : (
+            templates.map((template, idx) => {
+              const listIdx = totalQuickTemplates + idx;
+              const isCurrent = listIdx === cursor;
+              return (
+                <Box key={template.id}>
+                  <Box width={3}>
+                    <Text color={isCurrent ? THEME.primary : THEME.muted}>
+                      {isCurrent ? SYMBOLS.arrow : ' '}
+                    </Text>
+                  </Box>
+                  <Text color={isCurrent ? THEME.secondary : THEME.highlight} bold={isCurrent}>
+                    {template.name}
+                  </Text>
+                  <Text color={THEME.muted}> ({template.rules.length} rules)</Text>
+                </Box>
+              );
+            })
+          )}
+        </Box>
       </Box>
 
-      <Box marginTop={1}>
-        <HelpText text={`[1-${Math.min(9, totalQuickTemplates)}] Quick select | [Enter] Select | [n] New template | [Esc] Back`} />
+      <Box justifyContent="center">
+        <Text color={THEME.muted}>
+          <Text color={THEME.secondary}>1-{Math.min(9, totalQuickTemplates)}</Text> Quick │{' '}
+          <Text color={THEME.secondary}>↵</Text> Select │{' '}
+          <Text color={THEME.secondary}>n</Text> New │{' '}
+          <Text color={THEME.secondary}>Esc</Text> Back
+        </Text>
       </Box>
     </Box>
   );

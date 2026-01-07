@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Text, useInput } from 'ink';
+import { THEME, SYMBOLS } from '../App.js';
 
 interface HelpScreenProps {
   onBack: () => void;
@@ -13,48 +14,114 @@ export function HelpScreen({ onBack }: HelpScreenProps) {
     // 'q' handled by global App handler
   });
 
-  const shortcuts = [
-    { key: '↑/↓', desc: 'Navigate lists' },
-    { key: 'Space', desc: 'Toggle component selection' },
-    { key: 'Enter', desc: 'Select menu item / View component' },
-    { key: 'e', desc: 'Enter edit mode (from component list)' },
-    { key: 'a', desc: 'Select all components' },
-    { key: 'n', desc: 'Deselect all components' },
-    { key: 't', desc: 'Open template manager' },
-    { key: 'b', desc: 'Open backup browser' },
-    { key: '/', desc: 'Search/filter components' },
-    { key: 'q', desc: 'Go back / Quit' },
-    { key: 'Esc', desc: 'Cancel current action' },
-    { key: '?', desc: 'Show this help' },
+  const sections = [
+    {
+      title: 'Navigation',
+      icon: '>',
+      shortcuts: [
+        { key: '↑ / ↓', desc: 'Navigate through lists' },
+        { key: '← / →', desc: 'Switch between items (previews)' },
+        { key: 'Enter', desc: 'Select / confirm action' },
+        { key: 'q / Esc', desc: 'Go back / cancel' },
+        { key: '?', desc: 'Show this help screen' },
+      ],
+    },
+    {
+      title: 'Component Selection',
+      icon: '*',
+      shortcuts: [
+        { key: 'Space', desc: 'Toggle component selection' },
+        { key: 'a', desc: 'Select all components' },
+        { key: 'n', desc: 'Deselect all (none)' },
+        { key: '/', desc: 'Search / filter components' },
+      ],
+    },
+    {
+      title: 'Actions',
+      icon: '#',
+      shortcuts: [
+        { key: 'e', desc: 'Enter edit mode (with selection)' },
+        { key: 't', desc: 'Open template manager' },
+        { key: 'b', desc: 'Open backup browser' },
+        { key: 'y', desc: 'Confirm and apply changes' },
+      ],
+    },
+  ];
+
+  const workflowSteps = [
+    { step: '1', text: 'Browse and select components to modify', icon: '*' },
+    { step: '2', text: 'Press "e" to enter edit mode or "t" for templates', icon: '#' },
+    { step: '3', text: 'Choose quick actions or enter custom find/replace', icon: '@' },
+    { step: '4', text: 'Preview all changes before applying', icon: '%' },
+    { step: '5', text: 'Press "y" to apply (automatic backup created)', icon: '+' },
   ];
 
   return (
     <Box flexDirection="column">
-      <Text bold underline>Keyboard Shortcuts</Text>
-      <Box marginY={1} flexDirection="column">
-        {shortcuts.map(({ key, desc }) => (
-          <Box key={key}>
-            <Box width={12}>
-              <Text color="cyan">{key}</Text>
+      {/* Header */}
+      <Box marginBottom={1}>
+        <Text bold color={THEME.highlight}>[?] Help & Keyboard Shortcuts</Text>
+      </Box>
+
+      {/* Shortcuts Sections */}
+      <Box flexDirection="column" marginBottom={1}>
+        {sections.map((section, sectionIdx) => (
+          <Box key={section.title} flexDirection="column" marginBottom={1}>
+            <Box marginBottom={0}>
+              <Text>{section.icon} </Text>
+              <Text bold color={THEME.secondary}>{section.title}</Text>
             </Box>
-            <Text>{desc}</Text>
+            
+            <Box 
+              flexDirection="column" 
+              borderStyle="single" 
+              borderColor={THEME.muted}
+              paddingX={2}
+            >
+              {section.shortcuts.map(({ key, desc }) => (
+                <Box key={key}>
+                  <Box width={12}>
+                    <Text color={THEME.accent}>{key}</Text>
+                  </Box>
+                  <Text color={THEME.muted}>{SYMBOLS.arrow} </Text>
+                  <Text>{desc}</Text>
+                </Box>
+              ))}
+            </Box>
           </Box>
         ))}
       </Box>
 
-      <Box marginTop={1} flexDirection="column">
-        <Text bold underline>Workflow</Text>
-        <Box marginY={1} flexDirection="column">
-          <Text>1. Browse components and select ones to edit</Text>
-          <Text>2. Press 'e' to enter edit mode</Text>
-          <Text>3. Enter find/replace patterns</Text>
-          <Text>4. Preview changes before applying</Text>
-          <Text>5. Confirm to apply (automatic backup created)</Text>
+      {/* Workflow */}
+      <Box flexDirection="column" marginBottom={1}>
+        <Box marginBottom={0}>
+          <Text>{SYMBOLS.arrow} </Text>
+          <Text bold color={THEME.secondary}>Workflow</Text>
+        </Box>
+        
+        <Box 
+          flexDirection="column" 
+          borderStyle="round" 
+          borderColor={THEME.primary}
+          paddingX={2}
+        >
+          {workflowSteps.map(({ step, text, icon }) => (
+            <Box key={step}>
+              <Text color={THEME.primary}>{step}. </Text>
+              <Text>{icon} </Text>
+              <Text color={THEME.highlight}>{text}</Text>
+            </Box>
+          ))}
         </Box>
       </Box>
 
-      <Box marginTop={1}>
-        <Text color="gray">Press [q] or [Esc] to go back</Text>
+      {/* Footer */}
+      <Box>
+        <Text color={THEME.muted}>Press </Text>
+        <Text color={THEME.secondary}>q</Text>
+        <Text color={THEME.muted}> or </Text>
+        <Text color={THEME.secondary}>Esc</Text>
+        <Text color={THEME.muted}> to go back</Text>
       </Box>
     </Box>
   );
