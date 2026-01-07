@@ -474,7 +474,7 @@ export function TemplateManager({
         return;
       }
       if (key.downArrow) {
-        setSubOptionCursor((c) => Math.min(selectedQuickTemplate.options?.length - 1, c + 1));
+        setSubOptionCursor((c) => Math.min((selectedQuickTemplate.options?.length ?? 1) - 1, c + 1));
         return;
       }
       if (key.return) {

@@ -256,7 +256,7 @@ export function Editor({ selectedCount, onPreview, onCancel }: EditorProps) {
         return;
       }
       if (key.downArrow) {
-        setSubOptionIndex((prev) => Math.min(selectedCategory.options?.length - 1, prev + 1));
+        setSubOptionIndex((prev) => Math.min((selectedCategory.options?.length ?? 1) - 1, prev + 1));
         return;
       }
       if (key.return) {
