@@ -284,14 +284,15 @@ function isRegexSafe(pattern: string): boolean {
 
   // Limit repetition ranges to small bounds to avoid catastrophic backtracking
   const rangeRegex = /\{(\d+)(,(\d+))?\}/g;
-  let rangeMatch: RegExpExecArray | null;
-  while ((rangeMatch = rangeRegex.exec(pattern)) !== null) {
+  let rangeMatch: RegExpExecArray | null = rangeRegex.exec(pattern);
+  while (rangeMatch !== null) {
     const min = parseInt(rangeMatch[1], 10);
     const max = rangeMatch[3] ? parseInt(rangeMatch[3], 10) : min;
     // Reject very large or inverted ranges
-    if (isNaN(min) || isNaN(max) || min > max || max > 100) {
+    if (Number.isNaN(min) || Number.isNaN(max) || min > max || max > 100) {
       return false;
     }
+    rangeMatch = rangeRegex.exec(pattern);
   }
 
   return true;
