@@ -99,37 +99,44 @@ jobs:
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.version }}"
 
-          # Update root package.json
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
-            pkg.version = '$NEW_VERSION';
-            fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
+          # Function to update package.json
+          update_package_json() {
+            local file=$1
+            if [ -f "$file" ]; then
+              node -e "
+                const fs = require('fs');
+                const pkg = JSON.parse(fs.readFileSync('$file', 'utf8'));
+                pkg.version = '$NEW_VERSION';
+                fs.writeFileSync('$file', JSON.stringify(pkg, null, 2) + '\n');
+              "
+              echo "Updated $file to version $NEW_VERSION"
+            else
+              echo "Skipping $file (not found)"
+            fi
+          }
 
-          # Update backend package.json
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('./backend/package.json', 'utf8'));
-            pkg.version = '$NEW_VERSION';
-            fs.writeFileSync('./backend/package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
+          # Update all package.json files
+          update_package_json "./package.json"
+          update_package_json "./backend/package.json"
+          update_package_json "./frontend/package.json"
 
-          # Update frontend package.json
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('./frontend/package.json', 'utf8'));
-            pkg.version = '$NEW_VERSION';
-            fs.writeFileSync('./frontend/package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-
-          echo "Updated all package.json files to version $NEW_VERSION"
+          echo "Package version update complete"
 
       - name: Commit version bump
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.version }}"
           BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-          git add package.json backend/package.json frontend/package.json
+
+          # Add only files that were modified
+          git add -u package.json backend/package.json frontend/package.json 2>/dev/null || true
+          git add package.json
+
+          # Check if there are changes to commit
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
           git push origin HEAD:$BASE_BRANCH
 
