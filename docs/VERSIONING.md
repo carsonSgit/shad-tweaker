@@ -85,6 +85,17 @@ If you need to manually create a release:
 3. Push the tag: `git push origin v1.2.3`
 4. The release workflow will trigger automatically
 
+## Branch Protection Considerations
+
+The auto-versioning workflow needs to push commits to the main branch. If you have branch protection rules enabled:
+
+1. The workflow uses `GITHUB_TOKEN` which has write permissions
+2. GitHub Actions can bypass branch protection rules if configured
+3. Alternatively, you can create a Personal Access Token (PAT) with `repo` scope and add it as a secret named `AUTO_VERSION_TOKEN`
+4. Update the checkout step to use `token: ${{ secrets.AUTO_VERSION_TOKEN }}`
+
+Note: The `[skip ci]` flag in the commit message prevents infinite loops by skipping CI on the version bump commit.
+
 ## Skipping Auto-Versioning
 
 If you need to merge a PR without triggering auto-versioning, you can:

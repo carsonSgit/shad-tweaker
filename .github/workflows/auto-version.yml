@@ -22,6 +22,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event.pull_request.base.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -127,9 +128,10 @@ jobs:
       - name: Commit version bump
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.version }}"
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
           git add package.json backend/package.json frontend/package.json
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-          git push origin main || git push origin master
+          git push origin HEAD:$BASE_BRANCH
 
       - name: Create and push tag
         run: |
