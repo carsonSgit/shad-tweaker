@@ -6,6 +6,7 @@ import {
   getComponentsWithContent,
 } from '../services/scanner.js';
 import { logger } from '../utils/logger.js';
+import { validateCustomPath } from '../utils/validation.js';
 
 const router = Router();
 
@@ -13,6 +14,21 @@ router.get('/scan', async (req: Request, res: Response) => {
   try {
     const customPath = req.query.path as string | undefined;
     const basePath = process.cwd();
+
+    // Validate custom path to prevent path traversal attacks
+    if (customPath) {
+      const pathValidation = validateCustomPath(customPath);
+      if (!pathValidation.valid) {
+        res.status(400).json({
+          success: false,
+          error: {
+            message: pathValidation.error || 'Invalid path',
+            code: 'PATH_TRAVERSAL_ERROR',
+          },
+        });
+        return;
+      }
+    }
 
     const result = await scanComponents(basePath, customPath);
 

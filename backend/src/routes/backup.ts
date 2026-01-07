@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import path from 'path';
 import {
   createBackup,
   listBackups,
@@ -9,8 +10,13 @@ import {
 } from '../services/backup.js';
 import { getCachedComponents } from '../services/scanner.js';
 import { logger } from '../utils/logger.js';
+import { validateBackupId, validateComponentPaths } from '../utils/validation.js';
 
 const router = Router();
+
+// Get the project directory for path validation
+// Backend runs from the backend/ directory, so we need to go up one level to the project root
+const PROJECT_DIR = path.resolve(process.cwd(), '..');
 
 router.post('/create', async (req: Request, res: Response) => {
   try {
@@ -19,6 +25,18 @@ router.post('/create', async (req: Request, res: Response) => {
     let pathsToBackup: string[];
 
     if (componentPaths && Array.isArray(componentPaths) && componentPaths.length > 0) {
+      // Validate component paths to prevent path traversal attacks
+      const pathValidation = validateComponentPaths(componentPaths, PROJECT_DIR);
+      if (!pathValidation.valid) {
+        res.status(400).json({
+          success: false,
+          error: {
+            message: pathValidation.error || 'Invalid component paths',
+            code: 'PATH_TRAVERSAL_ERROR',
+          },
+        });
+        return;
+      }
       pathsToBackup = componentPaths;
     } else {
       const cached = getCachedComponents();
@@ -83,6 +101,20 @@ router.get('/list', async (_req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Validate backup ID to prevent path traversal attacks
+    const idValidation = validateBackupId(id);
+    if (!idValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: idValidation.error || 'Invalid backup ID',
+          code: 'INVALID_BACKUP_ID',
+        },
+      });
+      return;
+    }
+
     const details = await getBackupDetails(id);
 
     if (!details) {
@@ -115,6 +147,20 @@ router.get('/:id', async (req: Request, res: Response) => {
 router.get('/:id/preview', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Validate backup ID to prevent path traversal attacks
+    const idValidation = validateBackupId(id);
+    if (!idValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: idValidation.error || 'Invalid backup ID',
+          code: 'INVALID_BACKUP_ID',
+        },
+      });
+      return;
+    }
+
     const previews = await previewBackupRestore(id);
 
     // Filter to only files with changes
@@ -160,6 +206,19 @@ router.post('/restore', async (req: Request, res: Response) => {
       return;
     }
 
+    // Validate backup ID to prevent path traversal attacks
+    const idValidation = validateBackupId(backupId);
+    if (!idValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: idValidation.error || 'Invalid backup ID',
+          code: 'INVALID_BACKUP_ID',
+        },
+      });
+      return;
+    }
+
     const result = await restoreBackup(backupId);
 
     res.json({
@@ -183,6 +242,20 @@ router.post('/restore', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Validate backup ID to prevent path traversal attacks
+    const idValidation = validateBackupId(id);
+    if (!idValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: idValidation.error || 'Invalid backup ID',
+          code: 'INVALID_BACKUP_ID',
+        },
+      });
+      return;
+    }
+
     const deleted = await deleteBackup(id);
 
     if (!deleted) {

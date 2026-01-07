@@ -1,14 +1,20 @@
 import { Router, Request, Response } from 'express';
+import path from 'path';
 import { previewChanges, applyChanges, applyBatchAction } from '../services/modifier.js';
 import {
   validateEditRequest,
   validateApplyRequest,
   validateBatchActionRequest,
   validateRegex,
+  validateComponentPaths,
 } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
+
+// Get the project directory for path validation
+// Backend runs from the backend/ directory, so we need to go up one level to the project root
+const PROJECT_DIR = path.resolve(process.cwd(), '..');
 
 router.post('/preview', async (req: Request, res: Response) => {
   try {
@@ -24,6 +30,19 @@ router.post('/preview', async (req: Request, res: Response) => {
     }
 
     const { componentPaths, find, replace, isRegex } = req.body;
+
+    // Validate component paths to prevent path traversal attacks
+    const pathValidation = validateComponentPaths(componentPaths, PROJECT_DIR);
+    if (!pathValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: pathValidation.error || 'Invalid component paths',
+          code: 'PATH_TRAVERSAL_ERROR',
+        },
+      });
+      return;
+    }
 
     if (isRegex) {
       const validation = validateRegex(find);
@@ -72,6 +91,19 @@ router.post('/apply', async (req: Request, res: Response) => {
     }
 
     const { componentPaths, find, replace, isRegex, createBackup = true } = req.body;
+
+    // Validate component paths to prevent path traversal attacks
+    const pathValidation = validateComponentPaths(componentPaths, PROJECT_DIR);
+    if (!pathValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: pathValidation.error || 'Invalid component paths',
+          code: 'PATH_TRAVERSAL_ERROR',
+        },
+      });
+      return;
+    }
 
     if (isRegex) {
       const validation = validateRegex(find);
@@ -135,6 +167,19 @@ router.post('/batch-action', async (req: Request, res: Response) => {
     }
 
     const { action, componentPaths, options } = req.body;
+
+    // Validate component paths to prevent path traversal attacks
+    const pathValidation = validateComponentPaths(componentPaths, PROJECT_DIR);
+    if (!pathValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: pathValidation.error || 'Invalid component paths',
+          code: 'PATH_TRAVERSAL_ERROR',
+        },
+      });
+      return;
+    }
 
     const result = await applyBatchAction(action, componentPaths, options);
 

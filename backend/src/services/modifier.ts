@@ -1,10 +1,21 @@
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import type { Preview } from '../types/index.js';
 import { createPreview } from './differ.js';
 import { createBackup } from './backup.js';
 import { logger } from '../utils/logger.js';
+
+/**
+ * Generates a unique temporary file name using crypto.randomUUID
+ * to prevent race conditions when multiple requests modify files concurrently.
+ */
+function generateTempFileName(originalPath: string): string {
+  const uuid = crypto.randomUUID();
+  const baseName = path.basename(originalPath);
+  return path.join(os.tmpdir(), `shadcn-tweaker-${uuid}-${baseName}`);
+}
 
 export interface ModifyResult {
   success: boolean;
@@ -103,7 +114,8 @@ export async function applyChanges(
       }
 
       if (matchCount > 0) {
-        const tempPath = path.join(os.tmpdir(), `shadcn-tweaker-${Date.now()}-${path.basename(filePath)}`);
+        // Use UUID-based temp file name to prevent race conditions
+        const tempPath = generateTempFileName(filePath);
         await fs.writeFile(tempPath, newContent, 'utf-8');
         await fs.move(tempPath, filePath, { overwrite: true });
 

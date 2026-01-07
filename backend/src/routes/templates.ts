@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import path from 'path';
 import {
   listTemplates,
   getTemplate,
@@ -7,10 +8,14 @@ import {
   deleteTemplate,
 } from '../services/template.js';
 import { applyChanges } from '../services/modifier.js';
-import { validateTemplateRules } from '../utils/validation.js';
+import { validateTemplateRules, validateTemplateId, validateComponentPaths } from '../utils/validation.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
+
+// Get the project directory for path validation
+// Backend runs from the backend/ directory, so we need to go up one level to the project root
+const PROJECT_DIR = path.resolve(process.cwd(), '..');
 
 router.get('/', async (_req: Request, res: Response) => {
   try {
@@ -31,6 +36,20 @@ router.get('/', async (_req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Validate template ID to prevent path traversal attacks
+    const idValidation = validateTemplateId(id);
+    if (!idValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: idValidation.error || 'Invalid template ID',
+          code: 'INVALID_TEMPLATE_ID',
+        },
+      });
+      return;
+    }
+
     const template = await getTemplate(id);
 
     if (!template) {
@@ -104,6 +123,20 @@ router.post('/', async (req: Request, res: Response) => {
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Validate template ID to prevent path traversal attacks
+    const idValidation = validateTemplateId(id);
+    if (!idValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: idValidation.error || 'Invalid template ID',
+          code: 'INVALID_TEMPLATE_ID',
+        },
+      });
+      return;
+    }
+
     const { name, rules } = req.body;
 
     const updates: { name?: string; rules?: typeof rules } = {};
@@ -168,6 +201,20 @@ router.put('/:id', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Validate template ID to prevent path traversal attacks
+    const idValidation = validateTemplateId(id);
+    if (!idValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: idValidation.error || 'Invalid template ID',
+          code: 'INVALID_TEMPLATE_ID',
+        },
+      });
+      return;
+    }
+
     const deleted = await deleteTemplate(id);
 
     if (!deleted) {
@@ -201,6 +248,20 @@ router.delete('/:id', async (req: Request, res: Response) => {
 router.post('/:id/apply', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Validate template ID to prevent path traversal attacks
+    const idValidation = validateTemplateId(id);
+    if (!idValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: idValidation.error || 'Invalid template ID',
+          code: 'INVALID_TEMPLATE_ID',
+        },
+      });
+      return;
+    }
+
     const { componentPaths } = req.body;
 
     if (!Array.isArray(componentPaths) || componentPaths.length === 0) {
@@ -209,6 +270,19 @@ router.post('/:id/apply', async (req: Request, res: Response) => {
         error: {
           message: 'componentPaths array is required',
           code: 'VALIDATION_ERROR',
+        },
+      });
+      return;
+    }
+
+    // Validate component paths to prevent path traversal attacks
+    const pathValidation = validateComponentPaths(componentPaths, PROJECT_DIR);
+    if (!pathValidation.valid) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: pathValidation.error || 'Invalid component paths',
+          code: 'PATH_TRAVERSAL_ERROR',
         },
       });
       return;
