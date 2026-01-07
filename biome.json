@@ -1,7 +1,11 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "organizeImports": {
-    "enabled": true
+  "$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   },
   "linter": {
     "enabled": true,
@@ -23,7 +27,7 @@
       },
       "suspicious": {
         "noExplicitAny": "warn",
-        "noConsoleLog": "warn"
+        "noArrayIndexKey": "off"
       },
       "security": {
         "noDangerouslySetInnerHtml": "error"
@@ -51,22 +55,23 @@
     }
   },
   "files": {
-    "ignore": [
-      "node_modules",
-      "**/node_modules",
-      "dist",
-      "**/dist",
-      "*.tgz",
-      "**/*.d.ts",
-      "**/*.js.map",
-      "**/*.d.ts.map",
-      ".shadcn-tweaker",
-      "**/.shadcn-tweaker",
-      "**/backups",
-      "components",
-      "package-lock.json",
-      "pnpm-lock.yaml",
-      "bun.lockb"
+    "includes": [
+      "**",
+      "!node_modules",
+      "!**/node_modules",
+      "!dist",
+      "!**/dist",
+      "!*.tgz",
+      "!**/*.d.ts",
+      "!**/*.js.map",
+      "!**/*.d.ts.map",
+      "!.shadcn-tweaker",
+      "!**/.shadcn-tweaker",
+      "!**/backups",
+      "!components",
+      "!package-lock.json",
+      "!pnpm-lock.yaml",
+      "!bun.lockb"
     ]
   },
   "vcs": {

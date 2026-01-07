@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
+import { useMemo, useState } from 'react';
+import { SYMBOLS, THEME } from '../App.js';
 import type { Component, Screen } from '../types/index.js';
-import { THEME, SYMBOLS } from '../App.js';
 
 interface ComponentListProps {
   components: Component[];
@@ -33,9 +33,7 @@ export function ComponentList({
     if (!searchQuery) return components;
     const query = searchQuery.toLowerCase();
     return components.filter(
-      (c) =>
-        c.name.toLowerCase().includes(query) ||
-        c.path.toLowerCase().includes(query)
+      (c) => c.name.toLowerCase().includes(query) || c.path.toLowerCase().includes(query)
     );
   }, [components, searchQuery]);
 
@@ -100,7 +98,9 @@ export function ComponentList({
       {/* Header */}
       <Box marginBottom={1} justifyContent="space-between">
         <Box>
-          <Text bold color={THEME.highlight}>{SYMBOLS.diamond} Components</Text>
+          <Text bold color={THEME.highlight}>
+            {SYMBOLS.diamond} Components
+          </Text>
         </Box>
         <Box>
           <Text color={selectedPaths.size > 0 ? THEME.success : THEME.muted}>
@@ -134,12 +134,7 @@ export function ComponentList({
       )}
 
       {/* Component List */}
-      <Box 
-        flexDirection="column" 
-        borderStyle="single" 
-        borderColor={THEME.muted}
-        paddingX={1}
-      >
+      <Box flexDirection="column" borderStyle="single" borderColor={THEME.muted} paddingX={1}>
         {startIdx > 0 && (
           <Box justifyContent="center">
             <Text color={THEME.muted}>↑ {startIdx} more above</Text>
@@ -159,33 +154,29 @@ export function ComponentList({
                   {isCursor ? SYMBOLS.arrow : ' '}
                 </Text>
               </Box>
-              
+
               {/* Selection Checkbox */}
               <Box width={4}>
                 <Text color={isSelected ? THEME.success : THEME.muted}>
                   {isSelected ? `${SYMBOLS.check} ` : `${SYMBOLS.circle} `}
                 </Text>
               </Box>
-              
+
               {/* Component Name */}
               <Box width={20}>
-                <Text 
-                  color={isCursor ? THEME.secondary : (isSelected ? THEME.success : THEME.highlight)}
+                <Text
+                  color={isCursor ? THEME.secondary : isSelected ? THEME.success : THEME.highlight}
                   bold={isCursor}
                 >
                   {component.name}
                 </Text>
               </Box>
-              
+
               {/* Metadata */}
-              <Text color={THEME.muted}>
-                {component.metadata.lines} ln
-              </Text>
-              
+              <Text color={THEME.muted}>{component.metadata.lines} ln</Text>
+
               {/* File indicator for selected */}
-              {isSelected && (
-                <Text color={THEME.success}> {SYMBOLS.dot}</Text>
-              )}
+              {isSelected && <Text color={THEME.success}> {SYMBOLS.dot}</Text>}
             </Box>
           );
         })}
@@ -202,8 +193,8 @@ export function ComponentList({
       {/* Actions Bar */}
       <Box marginTop={1} flexDirection="column">
         {/* Primary Actions */}
-        <Box 
-          borderStyle="round" 
+        <Box
+          borderStyle="round"
           borderColor={selectedPaths.size > 0 ? THEME.success : THEME.muted}
           paddingX={2}
           justifyContent="center"
@@ -222,16 +213,14 @@ export function ComponentList({
             </Text>
           )}
         </Box>
-        
+
         {/* Secondary Actions */}
         <Box marginTop={1} justifyContent="center">
           <Text color={THEME.muted}>
             <Text color={THEME.secondary}>Space</Text> Toggle │{' '}
-            <Text color={THEME.secondary}>↵</Text> View │{' '}
-            <Text color={THEME.secondary}>a</Text> All │{' '}
-            <Text color={THEME.secondary}>n</Text> None │{' '}
-            <Text color={THEME.secondary}>/</Text> Search │{' '}
-            <Text color={THEME.secondary}>b</Text> Backups
+            <Text color={THEME.secondary}>↵</Text> View │ <Text color={THEME.secondary}>a</Text> All
+            │ <Text color={THEME.secondary}>n</Text> None │ <Text color={THEME.secondary}>/</Text>{' '}
+            Search │ <Text color={THEME.secondary}>b</Text> Backups
           </Text>
         </Box>
       </Box>

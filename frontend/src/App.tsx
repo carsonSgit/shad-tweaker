@@ -42,7 +42,7 @@ export const SYMBOLS = {
 
 export function App() {
   const { exit } = useApp();
-  const { screen, navigate, goBack, canGoBack } = useNavigation('dashboard');
+  const { screen, navigate, goBack } = useNavigation('dashboard');
   const {
     components,
     selectedPaths,
@@ -53,7 +53,6 @@ export function App() {
     toggleSelection,
     selectAll,
     deselectAll,
-    getSelectedComponents,
     setError,
   } = useComponents();
 

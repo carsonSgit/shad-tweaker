@@ -1,8 +1,8 @@
-import React from 'react';
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
+import React from 'react';
+import { SYMBOLS, THEME } from '../App.js';
 import type { Component, Screen } from '../types/index.js';
-import { THEME, SYMBOLS } from '../App.js';
 
 interface DashboardProps {
   components: Component[];
@@ -20,56 +20,50 @@ interface MenuItem {
   color: string;
 }
 
-export function Dashboard({
-  components,
-  loading,
-  error,
-  onNavigate,
-  onScan,
-}: DashboardProps) {
+export function Dashboard({ components, loading, error, onNavigate, onScan }: DashboardProps) {
   const [selectedIndex, setSelectedIndex] = React.useState(0);
 
   const menuItems: MenuItem[] = [
-    { 
-      label: 'Browse Components', 
-      value: 'components' as Screen, 
+    {
+      label: 'Browse Components',
+      value: 'components' as Screen,
       icon: '',
       description: 'View and select components to modify',
-      color: 'cyan'
+      color: 'cyan',
     },
-    { 
-      label: 'Template Manager', 
-      value: 'templates' as Screen, 
+    {
+      label: 'Template Manager',
+      value: 'templates' as Screen,
       icon: '',
       description: 'Quick actions & saved templates',
-      color: 'magenta'
+      color: 'magenta',
     },
-    { 
-      label: 'Backup Browser', 
-      value: 'backups' as Screen, 
+    {
+      label: 'Backup Browser',
+      value: 'backups' as Screen,
       icon: '',
       description: 'Restore previous component versions',
-      color: 'yellow'
+      color: 'yellow',
     },
-    { 
-      label: 'Rescan Project', 
-      value: 'rescan' as const, 
+    {
+      label: 'Rescan Project',
+      value: 'rescan' as const,
       icon: '',
       description: 'Refresh the component list',
-      color: 'green'
+      color: 'green',
     },
-    { 
-      label: 'Help & Shortcuts', 
-      value: 'help' as Screen, 
+    {
+      label: 'Help & Shortcuts',
+      value: 'help' as Screen,
       icon: '',
       description: 'View keyboard shortcuts and workflow',
-      color: 'blue'
+      color: 'blue',
     },
   ];
 
   useInput((input, key) => {
     if (loading) return;
-    
+
     if (key.upArrow) {
       setSelectedIndex((i) => Math.max(0, i - 1));
     } else if (key.downArrow) {
@@ -82,9 +76,9 @@ export function Dashboard({
         onNavigate(item.value);
       }
     }
-    
+
     // Number shortcuts
-    const num = parseInt(input);
+    const num = parseInt(input, 10);
     if (num >= 1 && num <= menuItems.length) {
       const item = menuItems[num - 1];
       if (item.value === 'rescan') {
@@ -99,12 +93,18 @@ export function Dashboard({
     <Box flexDirection="column">
       {/* Status Card */}
       <Box flexDirection="column" marginBottom={1}>
-        <Box borderStyle="round" borderColor={THEME.muted} paddingX={2} paddingY={0} flexDirection="column">
+        <Box
+          borderStyle="round"
+          borderColor={THEME.muted}
+          paddingX={2}
+          paddingY={0}
+          flexDirection="column"
+        >
           <Box>
             <Text color={THEME.secondary}>{SYMBOLS.diamond} </Text>
             <Text color={THEME.muted}>Project Status</Text>
           </Box>
-          
+
           {loading ? (
             <Box marginTop={1}>
               <Text color={THEME.success}>
@@ -118,13 +118,18 @@ export function Dashboard({
                 <Text color={THEME.error}>{SYMBOLS.cross} </Text>
                 <Text color={THEME.error}>{error}</Text>
               </Box>
-              <Text color={THEME.muted} dimColor>   Make sure backend is running on localhost:3001</Text>
+              <Text color={THEME.muted} dimColor>
+                {' '}
+                Make sure backend is running on localhost:3001
+              </Text>
             </Box>
           ) : (
             <Box marginTop={1}>
               <Text color={THEME.success}>{SYMBOLS.check} </Text>
               <Text>Found </Text>
-              <Text bold color={THEME.accent}>{components.length}</Text>
+              <Text bold color={THEME.accent}>
+                {components.length}
+              </Text>
               <Text> components ready to tweak</Text>
             </Box>
           )}
@@ -134,10 +139,12 @@ export function Dashboard({
       {/* Menu */}
       <Box flexDirection="column">
         <Box marginBottom={1}>
-          <Text bold color={THEME.highlight}>Main Menu</Text>
+          <Text bold color={THEME.highlight}>
+            Main Menu
+          </Text>
           <Text color={THEME.muted}> ─ Select an option</Text>
         </Box>
-        
+
         <Box flexDirection="column">
           {menuItems.map((item, idx) => {
             const isSelected = idx === selectedIndex;
@@ -152,10 +159,7 @@ export function Dashboard({
                   <Text color={THEME.muted}>{idx + 1}.</Text>
                 </Box>
                 <Box width={20}>
-                  <Text 
-                    color={isSelected ? item.color : THEME.highlight} 
-                    bold={isSelected}
-                  >
+                  <Text color={isSelected ? item.color : THEME.highlight} bold={isSelected}>
                     {item.label}
                   </Text>
                 </Box>
