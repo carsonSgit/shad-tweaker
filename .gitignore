@@ -63,7 +63,24 @@ coverage/
 .tmp/
 .temp/
 
-# Lock files (optional - uncomment if you want to ignore them)
-# pnpm-lock.yaml
-# package-lock.json
-# yarn.lock
+# Lock files (keep only bun.lock)
+pnpm-lock.yaml
+**/pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Tool runtime data
+.shadcn-tweaker/
+**/.shadcn-tweaker/
+
+# NPM pack artifacts
+*.tgz
+
+# AI/IDE local settings
+.claude/
+
+# Sample components (dev only)
+components/
+
+# Tool version managers
+.tool-versions
