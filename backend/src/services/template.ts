@@ -7,8 +7,12 @@ import { logger } from '../utils/logger.js';
 const TEMPLATE_DIR = '.shadcn-tweaker/templates';
 const TEMPLATE_FILE = 'templates.json';
 
+function getWorkingDirectory(): string {
+  return process.env.SHADCN_TWEAKER_CWD || process.cwd();
+}
+
 function getTemplatePath(): string {
-  return path.join(process.cwd(), TEMPLATE_DIR, TEMPLATE_FILE);
+  return path.join(getWorkingDirectory(), TEMPLATE_DIR, TEMPLATE_FILE);
 }
 
 async function ensureTemplateFile(): Promise<void> {

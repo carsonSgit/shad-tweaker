@@ -7,7 +7,14 @@ import type {
   Backup,
 } from '../types/index.js';
 
+// Get backend URL from environment variable (set by CLI wrapper)
+// Falls back to localhost:3001 for development
 const BASE_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+
+// Export for debugging/status display
+export function getBackendUrl(): string {
+  return BASE_URL;
+}
 
 async function request<T>(
   endpoint: string,

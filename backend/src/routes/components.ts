@@ -4,6 +4,7 @@ import {
   getCachedComponents,
   getComponentByName,
   getComponentsWithContent,
+  getWorkingDirectory,
 } from '../services/scanner.js';
 import { logger } from '../utils/logger.js';
 import { validateCustomPath } from '../utils/validation.js';
@@ -13,7 +14,7 @@ const router = Router();
 router.get('/scan', async (req: Request, res: Response) => {
   try {
     const customPath = req.query.path as string | undefined;
-    const basePath = process.cwd();
+    const basePath = getWorkingDirectory();
 
     // Validate custom path to prevent path traversal attacks
     if (customPath) {

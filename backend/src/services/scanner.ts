@@ -22,7 +22,18 @@ const COMMON_COMPONENT_DIRS = [
 let cachedComponents: Component[] = [];
 let componentDirectory: string = '';
 
+// Get the working directory - either from environment or process.cwd()
+export function getWorkingDirectory(): string {
+  return process.env.SHADCN_TWEAKER_CWD || process.cwd();
+}
+
+// Get the configured components path from environment
+export function getConfiguredComponentsPath(): string | undefined {
+  return process.env.SHADCN_COMPONENTS_PATH;
+}
+
 export async function findComponentDirectory(basePath: string, customPath?: string): Promise<string | null> {
+  // Priority 1: Explicit custom path passed to function
   if (customPath) {
     const fullPath = path.isAbsolute(customPath) ? customPath : path.join(basePath, customPath);
     if (await fs.pathExists(fullPath)) {
@@ -31,6 +42,24 @@ export async function findComponentDirectory(basePath: string, customPath?: stri
     return null;
   }
 
+  // Priority 2: Environment variable from CLI
+  const envPath = getConfiguredComponentsPath();
+  if (envPath) {
+    // If it's already an absolute path, use it directly
+    if (path.isAbsolute(envPath)) {
+      if (await fs.pathExists(envPath)) {
+        return envPath;
+      }
+    } else {
+      const fullPath = path.join(basePath, envPath);
+      if (await fs.pathExists(fullPath)) {
+        return fullPath;
+      }
+    }
+    logger.warn(`Configured components path not found: ${envPath}`);
+  }
+
+  // Priority 3: Auto-detect from common paths
   for (const dir of COMMON_COMPONENT_DIRS) {
     const fullPath = path.join(basePath, dir);
     if (await fs.pathExists(fullPath)) {

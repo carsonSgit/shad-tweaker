@@ -5,8 +5,12 @@ import { logger } from '../utils/logger.js';
 
 const BACKUP_DIR = '.shadcn-tweaker/backups';
 
+function getWorkingDirectory(): string {
+  return process.env.SHADCN_TWEAKER_CWD || process.cwd();
+}
+
 function getBackupBasePath(): string {
-  return path.join(process.cwd(), BACKUP_DIR);
+  return path.join(getWorkingDirectory(), BACKUP_DIR);
 }
 
 function generateBackupId(): string {

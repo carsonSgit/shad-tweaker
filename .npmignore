@@ -1,0 +1,35 @@
+# Source files (we ship pre-built dist)
+cli/
+backend/src/
+frontend/src/
+
+# TypeScript config files
+tsconfig.json
+cli/tsconfig.json
+backend/tsconfig.json
+frontend/tsconfig.json
+
+# Development files
+*.map
+.git/
+.gitignore
+.cursor/
+
+# Node modules (will be installed from root deps)
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Lock files
+package-lock.json
+pnpm-lock.yaml
+backend/pnpm-lock.yaml
+frontend/pnpm-lock.yaml
+
+# Sample/test components
+components/
+
+# Misc
+CHANGELOG.md
+.shadcn-tweaker/
+*.tgz
