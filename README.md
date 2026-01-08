@@ -58,6 +58,15 @@ shadcn-tweaker
 - Node.js 18+
 - A project with shadcn/ui components
 
+## Contributing
+
+This project uses automatic versioning. When submitting pull requests, use conventional commit format in your PR title:
+- `feat:` for new features (minor version bump)
+- `fix:` for bug fixes (patch version bump)
+- `BREAKING CHANGE:` for breaking changes (major version bump)
+
+See [docs/VERSIONING.md](docs/VERSIONING.md) for more details.
+
 ## License
 
 MIT

@@ -1,0 +1,159 @@
+name: Auto Version and Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main, master]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  auto-version:
+    # Only run when PR is merged (not just closed)
+    if: github.event.pull_request.merged == true
+    name: Auto Version & Tag
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get current version
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+      - name: Determine version bump type
+        id: bump_type
+        run: |
+          # Get PR title and body
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+
+          # Default to patch
+          BUMP_TYPE="patch"
+
+          # Check for breaking changes (major)
+          if echo "$PR_TITLE" | grep -iE "(BREAKING CHANGE|breaking change|major)"; then
+            BUMP_TYPE="major"
+          elif echo "$PR_BODY" | grep -iE "BREAKING CHANGE"; then
+            BUMP_TYPE="major"
+          # Check for features (minor)
+          elif echo "$PR_TITLE" | grep -iE "^feat|^feature|minor"; then
+            BUMP_TYPE="minor"
+          # Check for fixes and other changes (patch)
+          elif echo "$PR_TITLE" | grep -iE "^fix|^bugfix|^patch|^chore|^docs|^refactor|^test|^ci"; then
+            BUMP_TYPE="patch"
+          fi
+
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+          echo "Version bump type: $BUMP_TYPE"
+
+      - name: Bump version
+        id: new_version
+        run: |
+          CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
+          BUMP_TYPE="${{ steps.bump_type.outputs.bump_type }}"
+
+          # Parse semantic version
+          IFS='.' read -r -a VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR="${VERSION_PARTS[0]}"
+          MINOR="${VERSION_PARTS[1]}"
+          PATCH="${VERSION_PARTS[2]}"
+
+          # Bump version based on type
+          if [ "$BUMP_TYPE" = "major" ]; then
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          elif [ "$BUMP_TYPE" = "minor" ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Update package.json files
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.version }}"
+
+          # Function to update package.json
+          update_package_json() {
+            local file=$1
+            if [ -f "$file" ]; then
+              node -e "
+                const fs = require('fs');
+                const pkg = JSON.parse(fs.readFileSync('$file', 'utf8'));
+                pkg.version = '$NEW_VERSION';
+                fs.writeFileSync('$file', JSON.stringify(pkg, null, 2) + '\n');
+              "
+              echo "Updated $file to version $NEW_VERSION"
+            else
+              echo "Skipping $file (not found)"
+            fi
+          }
+
+          # Update all package.json files
+          update_package_json "./package.json"
+          update_package_json "./backend/package.json"
+          update_package_json "./frontend/package.json"
+
+          echo "Package version update complete"
+
+      - name: Commit version bump
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.version }}"
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+
+          # Add only files that were modified
+          git add -u package.json backend/package.json frontend/package.json 2>/dev/null || true
+          git add package.json
+
+          # Check if there are changes to commit
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          git push origin HEAD:$BASE_BRANCH
+
+      - name: Create and push tag
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.version }}"
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"
+          echo "Created and pushed tag v$NEW_VERSION"
+
+      - name: Summary
+        run: |
+          echo "## Auto-versioning complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Previous version**: ${{ steps.current_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **New version**: ${{ steps.new_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bump type**: ${{ steps.bump_type.outputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag created**: v${{ steps.new_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The release workflow will be triggered automatically." >> $GITHUB_STEP_SUMMARY
