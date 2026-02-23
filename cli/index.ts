@@ -179,7 +179,6 @@ async function loadRulesFile(filePath: string): Promise<Array<{ find: string; re
 
 function printJsonIfNeeded(payload: unknown, asJson?: boolean): boolean {
   if (asJson) {
-    // biome-ignore lint/suspicious/noConsole: CLI command output
     console.log(JSON.stringify(payload, null, 2));
     return true;
   }
@@ -236,14 +235,11 @@ async function main() {
         return;
       }
 
-      // biome-ignore lint/suspicious/noConsole: CLI command output
       console.log(chalk.cyan(`Run ID: ${result.runId}`));
-      // biome-ignore lint/suspicious/noConsole: CLI command output
       console.log(
         `Indexed ${result.componentGraph.summary.filesIndexed} files (${result.componentGraph.summary.highConfidence} high, ${result.componentGraph.summary.mediumConfidence} medium, ${result.componentGraph.summary.lowConfidence} low confidence)`
       );
       for (const root of result.componentGraph.componentRoots) {
-        // biome-ignore lint/suspicious/noConsole: CLI command output
         console.log(`- ${root.path} [${root.confidence}] ${root.reason}`);
       }
     });
@@ -303,21 +299,16 @@ async function main() {
         return;
       }
 
-      // biome-ignore lint/suspicious/noConsole: CLI command output
       console.log(chalk.cyan(`Run ID: ${result.runId}`));
-      // biome-ignore lint/suspicious/noConsole: CLI command output
       console.log(`Plan checksum: ${result.plan.checksum}`);
-      // biome-ignore lint/suspicious/noConsole: CLI command output
       console.log(
         `Risk: ${result.plan.risk.level} (score ${result.plan.risk.score}) | touched files: ${result.plan.totals.touchedFiles} | expected changes: ${result.plan.totals.expectedChanges}`
       );
       if (result.plan.requiresConfirmation) {
-        // biome-ignore lint/suspicious/noConsole: CLI command output
         console.log(chalk.yellow('High-risk plan: apply requires --confirm'));
       }
       if (result.safetyReport.issues.length > 0) {
         for (const issue of result.safetyReport.issues) {
-          // biome-ignore lint/suspicious/noConsole: CLI command output
           console.log(`- [${issue.severity}] ${issue.code}: ${issue.message}`);
         }
       }
@@ -344,7 +335,6 @@ async function main() {
         return;
       }
 
-      // biome-ignore lint/suspicious/noConsole: CLI command output
       console.log(
         `Simulation complete: ${result.simulation.totalFiles} files, ${result.simulation.totalChanges} total changes`
       );
@@ -384,17 +374,14 @@ async function main() {
       }
 
       if (result.apply.blocked) {
-        // biome-ignore lint/suspicious/noConsole: CLI command output
         console.log(chalk.red('Apply blocked by safety policy'));
         return;
       }
 
-      // biome-ignore lint/suspicious/noConsole: CLI command output
       console.log(
         `Applied run (${result.apply.riskLevel} risk): ${result.apply.modifiedFiles.length} files, ${result.apply.totalChanges} changes`
       );
       if (result.apply.backupId) {
-        // biome-ignore lint/suspicious/noConsole: CLI command output
         console.log(`Backup ID: ${result.apply.backupId}`);
       }
     });
@@ -418,7 +405,6 @@ async function main() {
           }
           return response.text();
         });
-        // biome-ignore lint/suspicious/noConsole: CLI command output
         console.log(output);
         return;
       }
@@ -435,13 +421,9 @@ async function main() {
       }
 
       const report = result.report as { plan?: { risk?: { level?: string }; totals?: { touchedFiles?: number } }; applyResult?: { modifiedFiles?: string[] } };
-      // biome-ignore lint/suspicious/noConsole: CLI command output
       console.log(`Run report (${options.run})`);
-      // biome-ignore lint/suspicious/noConsole: CLI command output
       console.log(`Risk: ${report.plan?.risk?.level || 'unknown'}`);
-      // biome-ignore lint/suspicious/noConsole: CLI command output
       console.log(`Touched files: ${report.plan?.totals?.touchedFiles || 0}`);
-      // biome-ignore lint/suspicious/noConsole: CLI command output
       console.log(`Applied files: ${report.applyResult?.modifiedFiles?.length || 0}`);
     });
 

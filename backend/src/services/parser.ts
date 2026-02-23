@@ -142,7 +142,7 @@ async function resolveImportPath(
     const suffix = rawImport.slice(mapping.prefix.length);
     for (const target of mapping.targets) {
       const resolved = await tryResolveCandidate(path.resolve(target, suffix));
-      if (resolved && resolved.startsWith(path.resolve(projectRoot))) {
+      if (resolved?.startsWith(path.resolve(projectRoot))) {
         return resolved;
       }
     }
