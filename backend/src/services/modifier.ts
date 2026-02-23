@@ -1,22 +1,11 @@
-import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'fs-extra';
 import type { Preview } from '../types/index.js';
 import { logger } from '../utils/logger.js';
-import { escapeRegExpLiteral, validateRegex } from '../utils/validation.js';
+import { escapeRegExpLiteral } from '../utils/validation.js';
 import { createBackup } from './backup.js';
 import { createPreview } from './differ.js';
-
-/**
- * Generates a unique temporary file name using crypto.randomUUID
- * to prevent race conditions when multiple requests modify files concurrently.
- */
-function generateTempFileName(originalPath: string): string {
-  const uuid = crypto.randomUUID();
-  const baseName = path.basename(originalPath);
-  return path.join(os.tmpdir(), `shadcn-tweaker-${uuid}-${baseName}`);
-}
 
 export interface ModifyResult {
   success: boolean;
@@ -26,24 +15,176 @@ export interface ModifyResult {
   errors?: Array<{ path: string; error: string; code?: string }>;
 }
 
-function compileSearchPattern(
-  find: string,
-  isRegex: boolean
-): { pattern: RegExp | null; error?: string } {
-  if (find.length === 0) {
-    return { pattern: null, error: 'find pattern must not be empty' };
+type SearchPlan =
+  | { mode: 'literal'; needle: string }
+  | { mode: 'remove-class-token'; className: string };
+
+function countLiteralOccurrences(content: string, needle: string): number {
+  if (needle.length === 0) {
+    return 0;
   }
 
-  if (isRegex) {
-    const validation = validateRegex(find);
-    if (!validation.valid) {
-      return { pattern: null, error: validation.error || 'Invalid regex pattern' };
+  let count = 0;
+  let start = 0;
+  while (start <= content.length - needle.length) {
+    const index = content.indexOf(needle, start);
+    if (index === -1) {
+      break;
+    }
+    count += 1;
+    start = index + needle.length;
+  }
+
+  return count;
+}
+
+function isWhitespace(value: string): boolean {
+  return value === ' ' || value === '\t' || value === '\n' || value === '\r' || value === '\f' || value === '\v';
+}
+
+function removeClassToken(content: string, className: string): { nextContent: string; matchCount: number } {
+  if (!className) {
+    return { nextContent: content, matchCount: 0 };
+  }
+
+  let cursor = 0;
+  let matchCount = 0;
+  let output = '';
+
+  while (cursor < content.length) {
+    const index = content.indexOf(className, cursor);
+    if (index === -1) {
+      output += content.slice(cursor);
+      break;
     }
 
-    return { pattern: new RegExp(find, 'g') };
+    const tokenStart = index;
+    const tokenEnd = index + className.length;
+    const prevChar = tokenStart > 0 ? content[tokenStart - 1] : '';
+    const nextChar = tokenEnd < content.length ? content[tokenEnd] : '';
+    const hasBoundaryBefore = tokenStart === 0 || isWhitespace(prevChar);
+    const hasBoundaryAfter =
+      tokenEnd === content.length ||
+      isWhitespace(nextChar) ||
+      nextChar === '"' ||
+      nextChar === '\'' ||
+      nextChar === '`' ||
+      nextChar === '}';
+
+    if (!hasBoundaryBefore || !hasBoundaryAfter) {
+      output += content.slice(cursor, tokenEnd);
+      cursor = tokenEnd;
+      continue;
+    }
+
+    let trimStart = tokenStart;
+    while (trimStart > cursor && isWhitespace(content[trimStart - 1])) {
+      trimStart -= 1;
+    }
+
+    output += content.slice(cursor, trimStart);
+    cursor = tokenEnd;
+    matchCount += 1;
   }
 
-  return { pattern: new RegExp(escapeRegExpLiteral(find), 'g') };
+  return { nextContent: output, matchCount };
+}
+
+function executeSearchPlan(
+  content: string,
+  searchPlan: SearchPlan,
+  replace: string
+): { nextContent: string; matchCount: number } {
+  if (searchPlan.mode === 'literal') {
+    const matchCount = countLiteralOccurrences(content, searchPlan.needle);
+    if (matchCount === 0) {
+      return { nextContent: content, matchCount: 0 };
+    }
+
+    return {
+      nextContent: content.split(searchPlan.needle).join(replace),
+      matchCount,
+    };
+  }
+
+  return removeClassToken(content, searchPlan.className);
+}
+
+function parseRemoveClassRegex(find: string): string | null {
+  if (!find.startsWith('\\s*')) {
+    return null;
+  }
+
+  const tokenPattern = find.slice(3);
+  if (tokenPattern.length === 0) {
+    return null;
+  }
+
+  let className = '';
+  const regexMeta = new Set(['.', '+', '*', '?', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\']);
+  for (let i = 0; i < tokenPattern.length; i++) {
+    const char = tokenPattern[i];
+    if (char === '\\') {
+      i += 1;
+      if (i >= tokenPattern.length) {
+        return null;
+      }
+      className += tokenPattern[i];
+      continue;
+    }
+
+    if (regexMeta.has(char)) {
+      return null;
+    }
+
+    className += char;
+  }
+
+  if (className.trim().length === 0 || className.includes(' ')) {
+    return null;
+  }
+
+  return className;
+}
+
+function compileSearchPlan(
+  find: string,
+  isRegex: boolean,
+  replace: string
+): { searchPlan: SearchPlan | null; error?: string } {
+  if (find.length === 0) {
+    return { searchPlan: null, error: 'find pattern must not be empty' };
+  }
+
+  if (!isRegex) {
+    return { searchPlan: { mode: 'literal', needle: find } };
+  }
+
+  const className = parseRemoveClassRegex(find);
+  if (className) {
+    if (replace !== '') {
+      return {
+        searchPlan: null,
+        error: 'Class-removal regex patterns only support empty replace values',
+      };
+    }
+
+    return { searchPlan: { mode: 'remove-class-token', className } };
+  }
+
+  return { searchPlan: null, error: 'Unsupported regex pattern' };
+}
+
+async function writeFileAtomically(filePath: string, content: string): Promise<void> {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'shadcn-tweaker-'));
+  const tempPath = path.join(tempDir, 'pending-write.tmp');
+
+  try {
+    await fs.writeFile(tempPath, content, { encoding: 'utf-8', mode: 0o600, flag: 'wx' });
+    await fs.move(tempPath, filePath, { overwrite: true });
+  } finally {
+    await fs.remove(tempDir);
+  }
 }
 
 export async function previewChanges(
@@ -54,30 +195,19 @@ export async function previewChanges(
 ): Promise<{ previews: Preview[]; totalChanges: number }> {
   const previews: Preview[] = [];
   let totalChanges = 0;
-  const { pattern: searchPattern, error } = compileSearchPattern(find, isRegex);
+  const { searchPlan, error } = compileSearchPlan(find, isRegex, replace);
 
-  if (error || !searchPattern) {
+  if (error || !searchPlan) {
     return { previews, totalChanges };
   }
 
   for (const filePath of componentPaths) {
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      let newContent: string;
-      let matchCount: number;
-
-      if (isRegex) {
-        const matches = content.match(searchPattern);
-        matchCount = matches ? matches.length : 0;
-        newContent = content.replace(searchPattern, replace);
-      } else {
-        const matches = content.match(searchPattern);
-        matchCount = matches ? matches.length : 0;
-        newContent = content.split(find).join(replace);
-      }
+      const { nextContent, matchCount } = executeSearchPlan(content, searchPlan, replace);
 
       if (matchCount > 0) {
-        previews.push(createPreview(filePath, content, newContent));
+        previews.push(createPreview(filePath, content, nextContent));
         totalChanges += matchCount;
       }
     } catch (error) {
@@ -99,9 +229,9 @@ export async function applyChanges(
   const errors: Array<{ path: string; error: string; code?: string }> = [];
   let totalChanges = 0;
   let backupId: string | undefined;
-  const { pattern: searchPattern, error: patternError } = compileSearchPattern(find, isRegex);
+  const { searchPlan, error: planError } = compileSearchPlan(find, isRegex, replace);
 
-  if (patternError || !searchPattern) {
+  if (planError || !searchPlan) {
     return {
       success: false,
       modified,
@@ -109,7 +239,7 @@ export async function applyChanges(
       errors: [
         {
           path: 'pattern',
-          error: patternError || 'Invalid pattern',
+          error: planError || 'Invalid pattern',
           code: 'INVALID_REGEX',
         },
       ],
@@ -140,25 +270,10 @@ export async function applyChanges(
   for (const filePath of componentPaths) {
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      let newContent: string;
-      let matchCount: number;
+      const { nextContent, matchCount } = executeSearchPlan(content, searchPlan, replace);
 
-      if (isRegex) {
-        const matches = content.match(searchPattern);
-        matchCount = matches ? matches.length : 0;
-        newContent = content.replace(searchPattern, replace);
-      } else {
-        const matches = content.match(searchPattern);
-        matchCount = matches ? matches.length : 0;
-        newContent = content.split(find).join(replace);
-      }
-
-      if (matchCount > 0) {
-        // Use UUID-based temp file name to prevent race conditions
-        const tempPath = generateTempFileName(filePath);
-        await fs.writeFile(tempPath, newContent, 'utf-8');
-        await fs.move(tempPath, filePath, { overwrite: true });
-
+      if (matchCount > 0 && nextContent !== content) {
+        await writeFileAtomically(filePath, nextContent);
         modified.push(filePath);
         totalChanges += matchCount;
         logger.info(`Modified ${filePath}: ${matchCount} changes`);
@@ -192,85 +307,83 @@ interface BatchActionResult {
   code?: string;
 }
 
-const BATCH_ACTIONS: Record<string, (options?: Record<string, string>) => BatchAction> = {
-  'remove-cursor-pointer': () => ({
+function createRemoveCursorPointerAction(): BatchAction {
+  return {
     name: 'Remove cursor-pointer',
     find: '\\s*cursor-pointer',
     replace: '',
     isRegex: true,
-  }),
-  'add-focus-rings': () => ({
+  };
+}
+
+function createAddFocusRingsAction(): BatchAction {
+  return {
     name: 'Add focus rings',
     find: 'focus:outline-none',
     replace:
       'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
     isRegex: false,
-  }),
-  'update-border-radius': () => ({
+  };
+}
+
+function createUpdateBorderRadiusAction(): BatchAction {
+  return {
     name: 'Update border radius',
     find: 'rounded-md',
     replace: 'rounded-lg',
     isRegex: false,
-  }),
-  'remove-class': () => ({
-    name: 'Remove class',
-    find: '',
-    replace: '',
-    isRegex: true,
-  }),
-  'replace-class': (options) => ({
+  };
+}
+
+function createReplaceClassAction(options?: Record<string, string>): BatchAction {
+  return {
     name: `Replace ${options?.from || ''} with ${options?.to || ''}`,
     find: options?.from || '',
     replace: options?.to || '',
     isRegex: false,
-  }),
-};
+  };
+}
 
 export function getBatchAction(
   actionName: string,
   options?: Record<string, string>
 ): BatchActionResult {
-  const actionFn = BATCH_ACTIONS[actionName];
-  if (!actionFn) {
-    return {
-      action: null,
-      error: `Unknown batch action: ${actionName}`,
-      code: 'UNKNOWN_BATCH_ACTION',
-    };
-  }
+  switch (actionName) {
+    case 'remove-cursor-pointer':
+      return { action: createRemoveCursorPointerAction() };
+    case 'add-focus-rings':
+      return { action: createAddFocusRingsAction() };
+    case 'update-border-radius':
+      return { action: createUpdateBorderRadiusAction() };
+    case 'replace-class':
+      return { action: createReplaceClassAction(options) };
+    case 'remove-class': {
+      const className = options?.className?.trim();
+      if (!className) {
+        return {
+          action: null,
+          error: 'remove-class requires options.className',
+          code: 'BATCH_ACTION_INVALID_OPTIONS',
+        };
+      }
 
-  if (actionName === 'remove-class') {
-    const className = options?.className?.trim();
-    if (!className) {
+      const safeClass = escapeRegExpLiteral(className);
       return {
-        action: null,
-        error: 'remove-class requires options.className',
-        code: 'BATCH_ACTION_INVALID_OPTIONS',
+        action: {
+          name: `Remove class: ${className}`,
+          find: `\\s*${safeClass}`,
+          replace: '',
+          isRegex: true,
+        },
       };
     }
-
-    const safeClass = escapeRegExpLiteral(className);
-    const pattern = `\\s*${safeClass}`;
-    const validation = validateRegex(pattern);
-    if (!validation.valid) {
+    default:
       return {
         action: null,
-        error: validation.error || 'Invalid className pattern',
-        code: 'INVALID_REGEX',
+        error: `Unknown batch action: ${actionName}`,
+        code: 'UNKNOWN_BATCH_ACTION',
       };
-    }
-
-    return {
-      action: {
-        name: `Remove class: ${className}`,
-        find: pattern,
-        replace: '',
-        isRegex: true,
-      },
-    };
   }
-
-  return { action: actionFn(options) };
 }
 
 export async function applyBatchAction(

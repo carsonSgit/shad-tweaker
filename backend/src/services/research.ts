@@ -4,7 +4,7 @@ import path from 'node:path';
 import fs from 'fs-extra';
 import type { ComponentGraph, ResearchPlan, SafetyReport } from '../types/index.js';
 import { logger } from '../utils/logger.js';
-import { escapeRegExpLiteral } from '../utils/validation.js';
+import { isPathSafe, validateResearchRunId } from '../utils/validation.js';
 import { appendAuditEvent } from './audit.js';
 import { createBackup } from './backup.js';
 import { createPreview } from './differ.js';
@@ -48,6 +48,19 @@ interface ApplyArtifact {
 
 const RESEARCH_ROOT = path.join('.shadcn-tweaker', 'research', 'runs');
 const SUMMARY_FILE = 'summary.md';
+const ALLOWED_ARTIFACT_NAMES = new Set([
+  'component_graph.json',
+  'customization_candidates.json',
+  'safety_report.json',
+  'plan.json',
+  'simulate.json',
+  'apply.json',
+  'discovery.json',
+  SUMMARY_FILE,
+]);
+const SUPPORTED_RULE_REGEX_PATTERNS: Record<string, RegExp> = {
+  '\\s*cursor-pointer': /\s*cursor-pointer/g,
+};
 
 function getWorkingDirectory(): string {
   return process.env.SHADCN_TWEAKER_CWD || process.cwd();
@@ -60,12 +73,63 @@ function createRunId(): string {
   return `run_${timestamp}_${suffix}`;
 }
 
+function countLiteralOccurrences(content: string, needle: string): number {
+  if (needle.length === 0) {
+    return 0;
+  }
+
+  let count = 0;
+  let start = 0;
+  while (start <= content.length - needle.length) {
+    const index = content.indexOf(needle, start);
+    if (index === -1) {
+      break;
+    }
+    count += 1;
+    start = index + needle.length;
+  }
+  return count;
+}
+
+function getResearchRoot(projectRoot: string): string {
+  return path.resolve(projectRoot, RESEARCH_ROOT);
+}
+
+function assertValidRunId(runId: string): void {
+  const validation = validateResearchRunId(runId);
+  if (!validation.valid) {
+    throw new Error(validation.error || 'Invalid research run ID');
+  }
+}
+
+function assertPathInsideBase(targetPath: string, basePath: string, label: string): string {
+  const resolvedBase = path.resolve(basePath);
+  const resolvedTarget = path.resolve(targetPath);
+  if (!isPathSafe(resolvedTarget, resolvedBase)) {
+    throw new Error(`${label} is outside the allowed directory`);
+  }
+  return resolvedTarget;
+}
+
+function assertProjectFilePath(projectRoot: string, targetPath: string): string {
+  return assertPathInsideBase(targetPath, projectRoot, `File path ${targetPath}`);
+}
+
 function getRunDirectory(projectRoot: string, runId: string): string {
-  return path.join(projectRoot, RESEARCH_ROOT, runId);
+  assertValidRunId(runId);
+  const researchRoot = getResearchRoot(projectRoot);
+  const runPath = path.resolve(researchRoot, runId);
+  return assertPathInsideBase(runPath, researchRoot, `Run path ${runId}`);
 }
 
 function getArtifactPath(projectRoot: string, runId: string, name: string): string {
-  return path.join(getRunDirectory(projectRoot, runId), name);
+  if (!ALLOWED_ARTIFACT_NAMES.has(name)) {
+    throw new Error(`Artifact not allowed: ${name}`);
+  }
+
+  const runDir = getRunDirectory(projectRoot, runId);
+  const artifactPath = path.resolve(runDir, name);
+  return assertPathInsideBase(artifactPath, runDir, `Artifact path ${name}`);
 }
 
 async function writeArtifact(
@@ -140,17 +204,61 @@ function groupTargetsByFile(plan: ResearchPlan): Map<string, string[]> {
   return grouped;
 }
 
-function compileRulePattern(rule: { find: string; isRegex: boolean }): RegExp {
-  if (rule.isRegex) {
-    return new RegExp(rule.find, 'g');
+type CompiledRulePattern =
+  | { mode: 'regex'; pattern: RegExp }
+  | { mode: 'literal'; needle: string };
+
+function compileRulePattern(rule: { find: string; isRegex: boolean }): CompiledRulePattern {
+  if (!rule.isRegex) {
+    return { mode: 'literal', needle: rule.find };
   }
-  return new RegExp(escapeRegExpLiteral(rule.find), 'g');
+
+  const supportedPattern = SUPPORTED_RULE_REGEX_PATTERNS[rule.find];
+  if (!supportedPattern) {
+    throw new Error(`Unsupported regex pattern in plan: ${rule.find}`);
+  }
+
+  return { mode: 'regex', pattern: supportedPattern };
 }
 
-function generateTempFileName(originalPath: string): string {
-  const uuid = crypto.randomUUID();
-  const baseName = path.basename(originalPath);
-  return path.join(os.tmpdir(), `shadcn-tweaker-research-${uuid}-${baseName}`);
+function applyRule(
+  content: string,
+  compiled: CompiledRulePattern,
+  replace: string
+): { nextContent: string; matchCount: number } {
+  if (compiled.mode === 'regex') {
+    const matches = content.match(compiled.pattern);
+    const matchCount = matches ? matches.length : 0;
+    if (matchCount === 0) {
+      return { nextContent: content, matchCount: 0 };
+    }
+
+    return {
+      nextContent: content.replace(compiled.pattern, replace),
+      matchCount,
+    };
+  }
+
+  const matchCount = countLiteralOccurrences(content, compiled.needle);
+  if (matchCount === 0) {
+    return { nextContent: content, matchCount: 0 };
+  }
+
+  return {
+    nextContent: content.split(compiled.needle).join(replace),
+    matchCount,
+  };
+}
+
+async function writeFileAtomically(filePath: string, content: string): Promise<void> {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'shadcn-tweaker-research-'));
+  const tempPath = path.join(tempDir, 'pending-write.tmp');
+  try {
+    await fs.writeFile(tempPath, content, { encoding: 'utf-8', mode: 0o600, flag: 'wx' });
+    await fs.move(tempPath, filePath, { overwrite: true });
+  } finally {
+    await fs.remove(tempDir);
+  }
 }
 
 async function ensureRunExists(projectRoot: string, runId: string): Promise<void> {
@@ -223,37 +331,41 @@ export async function planResearch(request: PlanResearchRequest): Promise<{
 
   const graph = await readArtifact<ComponentGraph>(projectRoot, runId, 'component_graph.json');
   const discovery = await readArtifact<DiscoveryArtifact>(projectRoot, runId, 'discovery.json');
+  if (graph.runId !== runId) {
+    throw new Error('Research run metadata mismatch');
+  }
+
+  const canonicalRunId = graph.runId;
   const planResult = await buildResearchPlan({
-    runId,
+    runId: canonicalRunId,
     goals: request.goals,
     graph,
     customRules: request.customRules,
     maxFiles,
   });
   const safetyReport = buildSafetyReport({
-    runId,
+    runId: canonicalRunId,
     plan: planResult.plan,
     maxFiles,
     pathViolations: discovery.pathViolations,
     rejectedRules: planResult.rejectedRules,
   });
 
-  await writeArtifact(projectRoot, runId, 'customization_candidates.json', planResult.candidates);
-  await writeArtifact(projectRoot, runId, 'plan.json', planResult.plan);
-  await writeArtifact(projectRoot, runId, 'safety_report.json', safetyReport);
+  await writeArtifact(projectRoot, canonicalRunId, 'customization_candidates.json', planResult.candidates);
+  await writeArtifact(projectRoot, canonicalRunId, 'plan.json', planResult.plan);
+  await writeArtifact(projectRoot, canonicalRunId, 'safety_report.json', safetyReport);
   await fs.writeFile(
-    getArtifactPath(projectRoot, runId, SUMMARY_FILE),
+    getArtifactPath(projectRoot, canonicalRunId, SUMMARY_FILE),
     buildSummaryMarkdown(planResult.plan, safetyReport),
     'utf-8'
   );
-  await appendAuditEvent(projectRoot, 'research.plan', runId, {
-    goals: request.goals,
+  await appendAuditEvent(projectRoot, 'research.plan', canonicalRunId, {
     touchedFiles: planResult.plan.totals.touchedFiles,
     blocked: safetyReport.blocked,
   });
 
   return {
-    runId,
+    runId: canonicalRunId,
     plan: planResult.plan,
     safetyReport,
   };
@@ -269,7 +381,8 @@ export async function simulateResearch(runId: string): Promise<SimulationArtifac
   let totalChanges = 0;
 
   for (const [filePath, ruleIds] of groupedTargets.entries()) {
-    const original = await fs.readFile(filePath, 'utf-8');
+    const safeFilePath = assertProjectFilePath(projectRoot, filePath);
+    const original = await fs.readFile(safeFilePath, 'utf-8');
     let nextContent = original;
     let fileChanges = 0;
 
@@ -279,20 +392,20 @@ export async function simulateResearch(runId: string): Promise<SimulationArtifac
         continue;
       }
       const pattern = compileRulePattern(rule);
-      const matches = nextContent.match(pattern);
-      const matchCount = matches ? matches.length : 0;
+      const result = applyRule(nextContent, pattern, rule.replace);
+      const matchCount = result.matchCount;
       if (matchCount === 0) {
         continue;
       }
 
-      nextContent = nextContent.replace(pattern, rule.replace);
+      nextContent = result.nextContent;
       fileChanges += matchCount;
     }
 
     if (fileChanges > 0) {
-      const diffPreview = createPreview(filePath, original, nextContent);
+      const diffPreview = createPreview(safeFilePath, original, nextContent);
       previews.push({
-        path: filePath,
+        path: safeFilePath,
         changes: fileChanges,
         diff: diffPreview.diff,
       });
@@ -301,15 +414,15 @@ export async function simulateResearch(runId: string): Promise<SimulationArtifac
   }
 
   const simulation: SimulationArtifact = {
-    runId,
+    runId: plan.runId,
     generatedAt: new Date().toISOString(),
     totalFiles: previews.length,
     totalChanges,
     previews,
   };
 
-  await writeArtifact(projectRoot, runId, 'simulate.json', simulation);
-  await appendAuditEvent(projectRoot, 'research.simulate', runId, {
+  await writeArtifact(projectRoot, plan.runId, 'simulate.json', simulation);
+  await appendAuditEvent(projectRoot, 'research.simulate', plan.runId, {
     totalFiles: simulation.totalFiles,
     totalChanges: simulation.totalChanges,
   });
@@ -336,16 +449,16 @@ export async function applyResearch(request: ApplyResearchRequest): Promise<Appl
 
   if (safety.blocked || plan.blocked) {
     const artifact: ApplyArtifact = {
-      runId,
+      runId: plan.runId,
       appliedAt: new Date().toISOString(),
       modifiedFiles: [],
       totalChanges: 0,
       riskLevel: 'blocked',
       blocked: true,
     };
-    await writeArtifact(projectRoot, runId, 'apply.json', artifact);
+    await writeArtifact(projectRoot, plan.runId, 'apply.json', artifact);
     await fs.writeFile(
-      getArtifactPath(projectRoot, runId, SUMMARY_FILE),
+      getArtifactPath(projectRoot, plan.runId, SUMMARY_FILE),
       buildSummaryMarkdown(plan, safety, artifact),
       'utf-8'
     );
@@ -358,19 +471,21 @@ export async function applyResearch(request: ApplyResearchRequest): Promise<Appl
 
   const groupedTargets = groupTargetsByFile(plan);
   const files = Array.from(groupedTargets.keys()).sort();
+  const safeFiles = files.map((filePath) => assertProjectFilePath(projectRoot, filePath));
   const ruleMap = new Map(plan.rules.map((rule) => [rule.ruleId, rule]));
   const modifiedFiles: string[] = [];
   let totalChanges = 0;
   let backupId: string | undefined;
 
-  if (files.length > 0) {
-    const backup = await createBackup(files);
+  if (safeFiles.length > 0) {
+    const backup = await createBackup(safeFiles);
     backupId = backup.id;
   }
 
   for (const filePath of files) {
+    const safeFilePath = assertProjectFilePath(projectRoot, filePath);
     const ruleIds = groupedTargets.get(filePath) || [];
-    const original = await fs.readFile(filePath, 'utf-8');
+    const original = await fs.readFile(safeFilePath, 'utf-8');
     let nextContent = original;
     let fileChanges = 0;
 
@@ -380,26 +495,24 @@ export async function applyResearch(request: ApplyResearchRequest): Promise<Appl
         continue;
       }
       const pattern = compileRulePattern(rule);
-      const matches = nextContent.match(pattern);
-      const matchCount = matches ? matches.length : 0;
+      const result = applyRule(nextContent, pattern, rule.replace);
+      const matchCount = result.matchCount;
       if (matchCount === 0) {
         continue;
       }
-      nextContent = nextContent.replace(pattern, rule.replace);
+      nextContent = result.nextContent;
       fileChanges += matchCount;
     }
 
     if (fileChanges > 0 && nextContent !== original) {
-      const tempPath = generateTempFileName(filePath);
-      await fs.writeFile(tempPath, nextContent, 'utf-8');
-      await fs.move(tempPath, filePath, { overwrite: true });
-      modifiedFiles.push(filePath);
+      await writeFileAtomically(safeFilePath, nextContent);
+      modifiedFiles.push(safeFilePath);
       totalChanges += fileChanges;
     }
   }
 
   const artifact: ApplyArtifact = {
-    runId,
+    runId: plan.runId,
     appliedAt: new Date().toISOString(),
     backupId,
     modifiedFiles,
@@ -408,16 +521,15 @@ export async function applyResearch(request: ApplyResearchRequest): Promise<Appl
     blocked: false,
   };
 
-  await writeArtifact(projectRoot, runId, 'apply.json', artifact);
+  await writeArtifact(projectRoot, plan.runId, 'apply.json', artifact);
   await fs.writeFile(
-    getArtifactPath(projectRoot, runId, SUMMARY_FILE),
+    getArtifactPath(projectRoot, plan.runId, SUMMARY_FILE),
     buildSummaryMarkdown(plan, safety, artifact),
     'utf-8'
   );
-  await appendAuditEvent(projectRoot, 'research.apply', runId, {
+  await appendAuditEvent(projectRoot, 'research.apply', plan.runId, {
     modifiedFiles: modifiedFiles.length,
     totalChanges,
-    backupId: backupId || null,
   });
 
   return artifact;
@@ -453,7 +565,7 @@ export async function getResearchReport(
   }
 
   return {
-    runId,
+    runId: plan.runId,
     plan,
     safetyReport,
     simulation,
@@ -464,19 +576,6 @@ export async function getResearchReport(
 export async function getResearchArtifact(runId: string, name: string): Promise<unknown> {
   const projectRoot = getWorkingDirectory();
   await ensureRunExists(projectRoot, runId);
-
-  const allowed = new Set([
-    'component_graph.json',
-    'customization_candidates.json',
-    'safety_report.json',
-    'plan.json',
-    'simulate.json',
-    'apply.json',
-    'discovery.json',
-  ]);
-  if (!allowed.has(name)) {
-    throw new Error(`Artifact not allowed: ${name}`);
-  }
 
   return readArtifact(projectRoot, runId, name);
 }

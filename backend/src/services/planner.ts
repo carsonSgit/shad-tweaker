@@ -9,7 +9,7 @@ import type {
   RiskAssessment,
   RiskLevel,
 } from '../types/index.js';
-import { escapeRegExpLiteral, validateRegex } from '../utils/validation.js';
+import { validateRegex } from '../utils/validation.js';
 
 export interface PlannerRuleInput {
   name?: string;
@@ -82,20 +82,52 @@ function createRuleId(rule: PlannerRuleInput): string {
   return `rule_${hash}`;
 }
 
-function compileRule(rule: PlannerRuleInput): { pattern: RegExp | null; error?: string } {
+type CompiledRule =
+  | { mode: 'regex'; pattern: RegExp }
+  | { mode: 'literal'; needle: string };
+
+const SUPPORTED_REGEX_RULES: Record<string, RegExp> = {
+  '\\s*cursor-pointer': /\s*cursor-pointer/g,
+};
+
+function countLiteralOccurrences(content: string, needle: string): number {
+  if (needle.length === 0) {
+    return 0;
+  }
+
+  let count = 0;
+  let start = 0;
+  while (start <= content.length - needle.length) {
+    const index = content.indexOf(needle, start);
+    if (index === -1) {
+      break;
+    }
+    count += 1;
+    start = index + needle.length;
+  }
+  return count;
+}
+
+function compileRule(rule: PlannerRuleInput): { compiled: CompiledRule | null; error?: string } {
   if (rule.find.length === 0) {
-    return { pattern: null, error: 'find value cannot be empty' };
+    return { compiled: null, error: 'find value cannot be empty' };
   }
 
   if (rule.isRegex) {
     const validation = validateRegex(rule.find);
     if (!validation.valid) {
-      return { pattern: null, error: validation.error || 'invalid regex' };
+      return { compiled: null, error: validation.error || 'invalid regex' };
     }
-    return { pattern: new RegExp(rule.find, 'g') };
+
+    const supportedPattern = SUPPORTED_REGEX_RULES[rule.find];
+    if (!supportedPattern) {
+      return { compiled: null, error: 'unsupported regex pattern' };
+    }
+
+    return { compiled: { mode: 'regex', pattern: supportedPattern } };
   }
 
-  return { pattern: new RegExp(escapeRegExpLiteral(rule.find), 'g') };
+  return { compiled: { mode: 'literal', needle: rule.find } };
 }
 
 function targetRisk(matches: number, confidenceBand: 'high' | 'medium' | 'low'): RiskLevel {
@@ -174,7 +206,7 @@ export async function buildResearchPlan(input: BuildPlanInput): Promise<BuildPla
     seenRuleIds.add(ruleId);
 
     const compiled = compileRule(candidateRule);
-    if (!compiled.pattern) {
+    if (!compiled.compiled) {
       rejectedRules.push(ruleId);
       continue;
     }
@@ -198,8 +230,13 @@ export async function buildResearchPlan(input: BuildPlanInput): Promise<BuildPla
         fileContentCache.set(node.path, fileContent);
       }
 
-      const matches = fileContent.match(compiled.pattern);
-      const expectedMatches = matches ? matches.length : 0;
+      let expectedMatches = 0;
+      if (compiled.compiled.mode === 'regex') {
+        const matches = fileContent.match(compiled.compiled.pattern);
+        expectedMatches = matches ? matches.length : 0;
+      } else {
+        expectedMatches = countLiteralOccurrences(fileContent, compiled.compiled.needle);
+      }
       if (expectedMatches === 0) {
         continue;
       }

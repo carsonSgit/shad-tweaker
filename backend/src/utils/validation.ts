@@ -318,7 +318,25 @@ function isRegexDangerous(pattern: string): boolean {
   }
 
   // Count quantifiers - too many can be problematic
-  const quantifierCount = (pattern.match(/[+*?]|\{\d+,?\d*\}/g) || []).length;
+  let quantifierCount = 0;
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === '+' || ch === '*' || ch === '?') {
+      quantifierCount += 1;
+      continue;
+    }
+
+    if (ch === '{') {
+      const end = pattern.indexOf('}', i + 1);
+      if (end !== -1) {
+        const body = pattern.slice(i + 1, end);
+        if (/^\d+(,\d*)?$/.test(body)) {
+          quantifierCount += 1;
+          i = end;
+        }
+      }
+    }
+  }
   if (quantifierCount > 10) {
     return true;
   }
@@ -389,6 +407,8 @@ function isRegexSafe(pattern: string): boolean {
 }
 
 export function validateRegex(pattern: string): { valid: boolean; error?: string } {
+  const allowedPatterns = new Set(['\\s*cursor-pointer']);
+
   // Check for potentially dangerous patterns (ReDoS prevention)
   if (isRegexDangerous(pattern)) {
     return {
@@ -407,15 +427,14 @@ export function validateRegex(pattern: string): { valid: boolean; error?: string
     };
   }
 
-  try {
-    new RegExp(pattern);
-    return { valid: true };
-  } catch (e) {
+  if (!allowedPatterns.has(pattern)) {
     return {
       valid: false,
-      error: e instanceof Error ? e.message : 'Invalid regex pattern',
+      error: 'Only vetted built-in regex patterns are allowed.',
     };
   }
+
+  return { valid: true };
 }
 
 export function escapeRegExpLiteral(value: string): string {
