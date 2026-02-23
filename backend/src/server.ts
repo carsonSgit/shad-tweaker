@@ -3,6 +3,7 @@ import express from 'express';
 import backupRouter from './routes/backup.js';
 import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
+import researchRouter from './routes/research.js';
 import templatesRouter from './routes/templates.js';
 import { initializeDefaultTemplates } from './services/template.js';
 import { logger } from './utils/logger.js';
@@ -43,6 +44,7 @@ app.use('/api/components', componentsRouter);
 app.use('/api/edit', editRouter);
 app.use('/api/backup', backupRouter);
 app.use('/api/templates', templatesRouter);
+app.use('/api/research', researchRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', err);
@@ -84,6 +86,10 @@ async function start() {
       logger.info('  POST /api/backup/create - Create backup');
       logger.info('  GET  /api/backup/list - List backups');
       logger.info('  POST /api/backup/restore - Restore backup');
+      logger.info('  POST /api/research/scan - Discover and index components');
+      logger.info('  POST /api/research/plan - Build deterministic research plan');
+      logger.info('  POST /api/research/simulate - Generate plan simulation diffs');
+      logger.info('  POST /api/research/apply - Apply research plan with gating');
     });
   } catch (error) {
     logger.error('Failed to start server', error);

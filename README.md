@@ -18,6 +18,25 @@ shadcn-tweaker init
 shadcn-tweaker
 ```
 
+## Deep Research Agent
+
+```bash
+# Build a component graph and start a run
+shadcn-tweaker research scan
+
+# Create a deterministic edit plan
+shadcn-tweaker research plan --goal radius-normalization --goal focus-ring-normalization
+
+# Simulate planned edits
+shadcn-tweaker research simulate --run <runId>
+
+# Apply with safety gates (required for high-risk plans)
+shadcn-tweaker research apply --run <runId> --confirm
+
+# Export run report
+shadcn-tweaker research report --run <runId> --format md
+```
+
 ## What It Does
 
 | Action | Result |
@@ -57,6 +76,14 @@ shadcn-tweaker
 
 - Node.js 18+
 - A project with shadcn/ui components
+
+## Testing
+
+```bash
+bun run test
+```
+
+This runs the backend suite in `backend/test` (SDRA flow + safety regressions).
 
 ## Contributing
 

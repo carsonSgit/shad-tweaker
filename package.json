@@ -11,6 +11,8 @@
     "build:cli": "tsc -p cli/tsconfig.json",
     "build:backend": "cd backend && bun run build",
     "build:frontend": "cd frontend && bun run build",
+    "test:backend": "cd backend && node --test --test-isolation=none --test-concurrency=1 --import tsx test/**/*.test.ts",
+    "test": "bun run test:backend",
     "dev": "bun run cli/index.ts",
     "start": "bun dist/cli/index.js",
     "check": "biome check .",

@@ -12,7 +12,7 @@ import { logger } from '../utils/logger.js';
 import {
   validateComponentPaths,
   validateTemplateId,
-  validateTemplateRules,
+  validateTemplateRulesDetailed,
 } from '../utils/validation.js';
 
 const router = Router();
@@ -95,14 +95,15 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
-    if (!validateTemplateRules(rules)) {
+    const validation = validateTemplateRulesDetailed(rules);
+    if (!validation.valid) {
       res.status(400).json({
         success: false,
         error: {
-          message:
-            'Invalid rules format. Each rule must have find (string), replace (string), and isRegex (boolean)',
-          code: 'VALIDATION_ERROR',
+          message: 'Invalid template rules',
+          code: 'INVALID_TEMPLATE_RULES',
         },
+        validationErrors: validation.errors,
       });
       return;
     }
@@ -161,13 +162,15 @@ router.put('/:id', async (req: Request, res: Response) => {
     }
 
     if (rules !== undefined) {
-      if (!validateTemplateRules(rules)) {
+      const validation = validateTemplateRulesDetailed(rules);
+      if (!validation.valid) {
         res.status(400).json({
           success: false,
           error: {
-            message: 'Invalid rules format',
-            code: 'VALIDATION_ERROR',
+            message: 'Invalid template rules',
+            code: 'INVALID_TEMPLATE_RULES',
           },
+          validationErrors: validation.errors,
         });
         return;
       }
@@ -309,6 +312,7 @@ router.post('/:id/apply', async (req: Request, res: Response) => {
     const allModified: string[] = [];
     let totalChanges = 0;
     let backupId: string | undefined;
+    const applyErrors: Array<{ path: string; error: string; code?: string; ruleIndex: number }> = [];
 
     for (let i = 0; i < template.rules.length; i++) {
       const rule = template.rules[i];
@@ -325,12 +329,36 @@ router.post('/:id/apply', async (req: Request, res: Response) => {
         backupId = result.backupId;
       }
 
+      if (!result.success && result.errors) {
+        for (const error of result.errors) {
+          applyErrors.push({ ...error, ruleIndex: i });
+        }
+        break;
+      }
+
       for (const path of result.modified) {
         if (!allModified.includes(path)) {
           allModified.push(path);
         }
       }
       totalChanges += result.changes;
+    }
+
+    if (applyErrors.length > 0) {
+      const first = applyErrors[0];
+      const statusCode =
+        first.code === 'INVALID_REGEX' || first.code === 'BATCH_ACTION_INVALID_OPTIONS' ? 400 : 500;
+
+      res.status(statusCode).json({
+        success: false,
+        error: {
+          message: first.error,
+          code: first.code || 'TEMPLATE_APPLY_ERROR',
+        },
+        errors: applyErrors,
+        backupId,
+      });
+      return;
     }
 
     res.json({

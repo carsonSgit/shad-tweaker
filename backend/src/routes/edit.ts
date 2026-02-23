@@ -187,11 +187,15 @@ router.post('/batch-action', async (req: Request, res: Response) => {
     const result = await applyBatchAction(action, componentPaths, options);
 
     if (!result.success) {
-      res.status(500).json({
+      const firstError = result.errors?.[0];
+      const clientErrorCodes = new Set(['BATCH_ACTION_INVALID_OPTIONS', 'INVALID_REGEX']);
+      const statusCode = firstError?.code && clientErrorCodes.has(firstError.code) ? 400 : 500;
+
+      res.status(statusCode).json({
         success: false,
         error: {
-          message: result.errors?.[0]?.error || 'Batch action failed',
-          code: 'BATCH_ACTION_ERROR',
+          message: firstError?.error || 'Batch action failed',
+          code: firstError?.code || 'BATCH_ACTION_ERROR',
         },
         errors: result.errors,
       });

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import path from 'node:path';
 import fs from 'fs-extra';
 import type { Backup, BackupManifest } from '../types/index.js';
@@ -15,8 +16,25 @@ function getBackupBasePath(): string {
 
 function generateBackupId(): string {
   const now = new Date();
-  const timestamp = now.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
-  return `backup_${timestamp}`;
+  const timestamp = now.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 23);
+  const suffix = crypto.randomBytes(3).toString('hex');
+  return `backup_${timestamp}_${suffix}`;
+}
+
+function getRelativeBackupPath(filePath: string): string {
+  const relative = path.relative(getWorkingDirectory(), path.resolve(filePath));
+  if (relative.length === 0 || relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error('Invalid file path for backup');
+  }
+
+  return relative;
+}
+
+async function hashFile(filePath: string): Promise<string> {
+  const hash = crypto.createHash('sha256');
+  const content = await fs.readFile(filePath);
+  hash.update(content);
+  return hash.digest('hex');
 }
 
 export async function createBackup(componentPaths: string[]): Promise<Backup> {
@@ -35,10 +53,13 @@ export async function createBackup(componentPaths: string[]): Promise<Backup> {
 
   for (const componentPath of componentPaths) {
     try {
-      const fileName = path.basename(componentPath);
-      const destPath = path.join(backupPath, fileName);
+      const relativePath = getRelativeBackupPath(componentPath);
+      const destPath = path.join(backupPath, relativePath);
+
+      await fs.ensureDir(path.dirname(destPath));
 
       await fs.copy(componentPath, destPath);
+      const sha256 = await hashFile(destPath);
 
       const stats = await fs.stat(destPath);
       totalSize += stats.size;
@@ -46,6 +67,8 @@ export async function createBackup(componentPaths: string[]): Promise<Backup> {
       manifest.files.push({
         originalPath: componentPath,
         backupPath: destPath,
+        relativePath,
+        sha256,
       });
     } catch (error) {
       logger.error(`Failed to backup ${componentPath}`, error);
@@ -132,6 +155,14 @@ export async function restoreBackup(
   for (const file of manifest.files) {
     try {
       if (await fs.pathExists(file.backupPath)) {
+        if (file.sha256) {
+          const backupHash = await hashFile(file.backupPath);
+          if (backupHash !== file.sha256) {
+            throw new Error(`Backup integrity check failed for ${file.originalPath}`);
+          }
+        }
+
+        await fs.ensureDir(path.dirname(file.originalPath));
         await fs.copy(file.backupPath, file.originalPath, { overwrite: true });
         restored.push(file.originalPath);
         logger.info(`Restored ${file.originalPath} from backup`);

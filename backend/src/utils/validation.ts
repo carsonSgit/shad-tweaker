@@ -4,6 +4,7 @@ import type {
   BatchActionRequest,
   EditRequest,
   TemplateRule,
+  ValidationErrorDetail,
 } from '../types/index.js';
 
 // ============================================
@@ -90,11 +91,14 @@ export function validateComponentPaths(
 
 /**
  * Validates backup ID format to prevent path traversal.
- * Valid format: backup_YYYY-MM-DD_HH-MM-SS
+ * Valid formats:
+ * - backup_YYYY-MM-DD_HH-MM-SS
+ * - backup_YYYY-MM-DD_HH-MM-SS-mmm_<hex6>
  */
 export function validateBackupId(backupId: string): { valid: boolean; error?: string } {
   // Must match the expected pattern
-  const backupIdPattern = /^backup_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/;
+  const backupIdPattern =
+    /^backup_(?:\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}|\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}_[a-f0-9]{6})$/;
 
   if (!backupIdPattern.test(backupId)) {
     return { valid: false, error: 'Invalid backup ID format' };
@@ -184,15 +188,101 @@ export function validateBatchActionRequest(body: unknown): body is BatchActionRe
 }
 
 export function validateTemplateRules(rules: unknown): rules is TemplateRule[] {
-  if (!Array.isArray(rules)) return false;
+  return validateTemplateRulesDetailed(rules).valid;
+}
 
-  return rules.every((rule) => {
-    if (typeof rule !== 'object' || rule === null) return false;
+/**
+ * Validates research run ID format.
+ * Valid format:
+ * - run_YYYY-MM-DD_HH-MM-SS-mmm_<hex6>
+ */
+export function validateResearchRunId(runId: string): { valid: boolean; error?: string } {
+  const pattern = /^run_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}_[a-f0-9]{6}$/;
+  if (!pattern.test(runId)) {
+    return { valid: false, error: 'Invalid research run ID format' };
+  }
+  if (runId.includes('/') || runId.includes('\\') || runId.includes('..')) {
+    return { valid: false, error: 'Invalid characters in run ID' };
+  }
+  return { valid: true };
+}
+
+export function validateTemplateRulesDetailed(rules: unknown): {
+  valid: boolean;
+  errors: ValidationErrorDetail[];
+} {
+  if (!Array.isArray(rules)) {
+    return {
+      valid: false,
+      errors: [
+        {
+          index: -1,
+          field: 'rules',
+          code: 'INVALID_TEMPLATE_RULES',
+          message: 'Rules must be an array',
+        },
+      ],
+    };
+  }
+
+  const errors: ValidationErrorDetail[] = [];
+
+  for (let i = 0; i < rules.length; i++) {
+    const rule = rules[i];
+    if (typeof rule !== 'object' || rule === null) {
+      errors.push({
+        index: i,
+        field: 'rule',
+        code: 'INVALID_TEMPLATE_RULE',
+        message: 'Each rule must be an object',
+      });
+      continue;
+    }
+
     const r = rule as Record<string, unknown>;
-    return (
-      typeof r.find === 'string' && typeof r.replace === 'string' && typeof r.isRegex === 'boolean'
-    );
-  });
+
+    if (typeof r.find !== 'string') {
+      errors.push({
+        index: i,
+        field: 'find',
+        code: 'INVALID_TEMPLATE_RULE_FIND',
+        message: 'find must be a string',
+      });
+    }
+
+    if (typeof r.replace !== 'string') {
+      errors.push({
+        index: i,
+        field: 'replace',
+        code: 'INVALID_TEMPLATE_RULE_REPLACE',
+        message: 'replace must be a string',
+      });
+    }
+
+    if (typeof r.isRegex !== 'boolean') {
+      errors.push({
+        index: i,
+        field: 'isRegex',
+        code: 'INVALID_TEMPLATE_RULE_IS_REGEX',
+        message: 'isRegex must be a boolean',
+      });
+      continue;
+    }
+
+    if (r.isRegex && typeof r.find === 'string') {
+      const regexValidation = validateRegex(r.find);
+      if (!regexValidation.valid) {
+        errors.push({
+          index: i,
+          field: 'find',
+          code: 'INVALID_REGEX',
+          message: regexValidation.error || 'Invalid regex pattern',
+        });
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
 }
 
 // ============================================
@@ -326,4 +416,8 @@ export function validateRegex(pattern: string): { valid: boolean; error?: string
       error: e instanceof Error ? e.message : 'Invalid regex pattern',
     };
   }
+}
+
+export function escapeRegExpLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

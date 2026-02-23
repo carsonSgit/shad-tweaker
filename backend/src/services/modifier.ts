@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'fs-extra';
 import type { Preview } from '../types/index.js';
 import { logger } from '../utils/logger.js';
+import { escapeRegExpLiteral, validateRegex } from '../utils/validation.js';
 import { createBackup } from './backup.js';
 import { createPreview } from './differ.js';
 
@@ -22,7 +23,24 @@ export interface ModifyResult {
   modified: string[];
   changes: number;
   backupId?: string;
-  errors?: Array<{ path: string; error: string }>;
+  errors?: Array<{ path: string; error: string; code?: string }>;
+}
+
+function compileSearchPattern(find: string, isRegex: boolean): { pattern: RegExp | null; error?: string } {
+  if (find.length === 0) {
+    return { pattern: null, error: 'find pattern must not be empty' };
+  }
+
+  if (isRegex) {
+    const validation = validateRegex(find);
+    if (!validation.valid) {
+      return { pattern: null, error: validation.error || 'Invalid regex pattern' };
+    }
+
+    return { pattern: new RegExp(find, 'g') };
+  }
+
+  return { pattern: new RegExp(escapeRegExpLiteral(find), 'g') };
 }
 
 export async function previewChanges(
@@ -33,8 +51,11 @@ export async function previewChanges(
 ): Promise<{ previews: Preview[]; totalChanges: number }> {
   const previews: Preview[] = [];
   let totalChanges = 0;
+  const { pattern: searchPattern, error } = compileSearchPattern(find, isRegex);
 
-  const searchPattern = isRegex ? new RegExp(find, 'g') : null;
+  if (error || !searchPattern) {
+    return { previews, totalChanges };
+  }
 
   for (const filePath of componentPaths) {
     try {
@@ -42,14 +63,12 @@ export async function previewChanges(
       let newContent: string;
       let matchCount: number;
 
-      if (isRegex && searchPattern) {
+      if (isRegex) {
         const matches = content.match(searchPattern);
         matchCount = matches ? matches.length : 0;
         newContent = content.replace(searchPattern, replace);
       } else {
-        const escapedFind = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escapedFind, 'g');
-        const matches = content.match(regex);
+        const matches = content.match(searchPattern);
         matchCount = matches ? matches.length : 0;
         newContent = content.split(find).join(replace);
       }
@@ -74,9 +93,25 @@ export async function applyChanges(
   shouldBackup = true
 ): Promise<ModifyResult> {
   const modified: string[] = [];
-  const errors: Array<{ path: string; error: string }> = [];
+  const errors: Array<{ path: string; error: string; code?: string }> = [];
   let totalChanges = 0;
   let backupId: string | undefined;
+  const { pattern: searchPattern, error: patternError } = compileSearchPattern(find, isRegex);
+
+  if (patternError || !searchPattern) {
+    return {
+      success: false,
+      modified,
+      changes: totalChanges,
+      errors: [
+        {
+          path: 'pattern',
+          error: patternError || 'Invalid pattern',
+          code: 'INVALID_REGEX',
+        },
+      ],
+    };
+  }
 
   if (shouldBackup) {
     try {
@@ -88,12 +123,16 @@ export async function applyChanges(
         success: false,
         modified: [],
         changes: 0,
-        errors: [{ path: 'backup', error: 'Failed to create backup before modifications' }],
+        errors: [
+          {
+            path: 'backup',
+            error: 'Failed to create backup before modifications',
+            code: 'BACKUP_CREATE_ERROR',
+          },
+        ],
       };
     }
   }
-
-  const searchPattern = isRegex ? new RegExp(find, 'g') : null;
 
   for (const filePath of componentPaths) {
     try {
@@ -101,14 +140,12 @@ export async function applyChanges(
       let newContent: string;
       let matchCount: number;
 
-      if (isRegex && searchPattern) {
+      if (isRegex) {
         const matches = content.match(searchPattern);
         matchCount = matches ? matches.length : 0;
-        newContent = content.replace(new RegExp(find, 'g'), replace);
+        newContent = content.replace(searchPattern, replace);
       } else {
-        const escapedFind = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escapedFind, 'g');
-        const matches = content.match(regex);
+        const matches = content.match(searchPattern);
         matchCount = matches ? matches.length : 0;
         newContent = content.split(find).join(replace);
       }
@@ -125,7 +162,7 @@ export async function applyChanges(
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      errors.push({ path: filePath, error: errorMessage });
+      errors.push({ path: filePath, error: errorMessage, code: 'FILE_MODIFY_ERROR' });
       logger.error(`Failed to modify ${filePath}`, error);
     }
   }
@@ -144,6 +181,12 @@ export interface BatchAction {
   find: string;
   replace: string;
   isRegex: boolean;
+}
+
+interface BatchActionResult {
+  action: BatchAction | null;
+  error?: string;
+  code?: string;
 }
 
 const BATCH_ACTIONS: Record<string, (options?: Record<string, string>) => BatchAction> = {
@@ -166,9 +209,9 @@ const BATCH_ACTIONS: Record<string, (options?: Record<string, string>) => BatchA
     replace: 'rounded-lg',
     isRegex: false,
   }),
-  'remove-class': (options) => ({
-    name: `Remove class: ${options?.className || ''}`,
-    find: `\\s*${options?.className || ''}`,
+  'remove-class': () => ({
+    name: 'Remove class',
+    find: '',
     replace: '',
     isRegex: true,
   }),
@@ -183,10 +226,48 @@ const BATCH_ACTIONS: Record<string, (options?: Record<string, string>) => BatchA
 export function getBatchAction(
   actionName: string,
   options?: Record<string, string>
-): BatchAction | null {
+): BatchActionResult {
   const actionFn = BATCH_ACTIONS[actionName];
-  if (!actionFn) return null;
-  return actionFn(options);
+  if (!actionFn) {
+    return {
+      action: null,
+      error: `Unknown batch action: ${actionName}`,
+      code: 'UNKNOWN_BATCH_ACTION',
+    };
+  }
+
+  if (actionName === 'remove-class') {
+    const className = options?.className?.trim();
+    if (!className) {
+      return {
+        action: null,
+        error: 'remove-class requires options.className',
+        code: 'BATCH_ACTION_INVALID_OPTIONS',
+      };
+    }
+
+    const safeClass = escapeRegExpLiteral(className);
+    const pattern = `\\s*${safeClass}`;
+    const validation = validateRegex(pattern);
+    if (!validation.valid) {
+      return {
+        action: null,
+        error: validation.error || 'Invalid className pattern',
+        code: 'INVALID_REGEX',
+      };
+    }
+
+    return {
+      action: {
+        name: `Remove class: ${className}`,
+        find: pattern,
+        replace: '',
+        isRegex: true,
+      },
+    };
+  }
+
+  return { action: actionFn(options) };
 }
 
 export async function applyBatchAction(
@@ -194,16 +275,23 @@ export async function applyBatchAction(
   componentPaths: string[],
   options?: Record<string, string>
 ): Promise<ModifyResult> {
-  const action = getBatchAction(actionName, options);
+  const actionResult = getBatchAction(actionName, options);
 
-  if (!action) {
+  if (!actionResult.action) {
     return {
       success: false,
       modified: [],
       changes: 0,
-      errors: [{ path: 'action', error: `Unknown batch action: ${actionName}` }],
+      errors: [
+        {
+          path: 'action',
+          error: actionResult.error || `Unknown batch action: ${actionName}`,
+          code: actionResult.code || 'UNKNOWN_BATCH_ACTION',
+        },
+      ],
     };
   }
 
+  const action = actionResult.action;
   return applyChanges(componentPaths, action.find, action.replace, action.isRegex, true);
 }
