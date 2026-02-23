@@ -160,7 +160,9 @@ async function requestJson<T>(
   return data;
 }
 
-async function loadRulesFile(filePath: string): Promise<Array<{ find: string; replace: string; isRegex: boolean }>> {
+async function loadRulesFile(
+  filePath: string
+): Promise<Array<{ find: string; replace: string; isRegex: boolean }>> {
   const raw = await fs.readFile(filePath, 'utf-8');
   const parsed = JSON.parse(raw) as
     | Array<{ find: string; replace: string; isRegex: boolean }>
@@ -222,7 +224,12 @@ async function main() {
             success: boolean;
             runId: string;
             componentGraph: {
-              summary: { filesIndexed: number; highConfidence: number; mediumConfidence: number; lowConfidence: number };
+              summary: {
+                filesIndexed: number;
+                highConfidence: number;
+                mediumConfidence: number;
+                lowConfidence: number;
+              };
               componentRoots: Array<{ path: string; confidence: number; reason: string }>;
             };
           }>(backendUrl, '/api/research/scan', {
@@ -256,7 +263,9 @@ async function main() {
     .option('--json', 'Print full JSON response')
     .action(async (options: ResearchCommandOptions) => {
       const goals = options.goal || [];
-      const customRules = options.rules ? await loadRulesFile(path.resolve(process.cwd(), options.rules)) : [];
+      const customRules = options.rules
+        ? await loadRulesFile(path.resolve(process.cwd(), options.rules))
+        : [];
       if (goals.length === 0 && customRules.length === 0) {
         throw new Error('Provide at least one --goal or --rules file');
       }
@@ -269,7 +278,9 @@ async function main() {
         process.cwd(),
         {
           port: options.port,
-          componentsPath: options.path ? await resolveComponentsPath(options.path, process.cwd()) : null,
+          componentsPath: options.path
+            ? await resolveComponentsPath(options.path, process.cwd())
+            : null,
         },
         async (backendUrl) =>
           requestJson<{
@@ -282,7 +293,10 @@ async function main() {
               requiresConfirmation: boolean;
               blocked: boolean;
             };
-            safetyReport: { blocked: boolean; issues: Array<{ code: string; severity: string; message: string }> };
+            safetyReport: {
+              blocked: boolean;
+              issues: Array<{ code: string; severity: string; message: string }>;
+            };
           }>(backendUrl, '/api/research/plan', {
             method: 'POST',
             body: JSON.stringify({
@@ -321,14 +335,17 @@ async function main() {
     .option('--port <port>', 'Backend server port (default: auto-detect)')
     .option('--json', 'Print full JSON response')
     .action(async (options: ResearchCommandOptions) => {
-      const result = await withBackend(process.cwd(), { port: options.port, componentsPath: null }, async (backendUrl) =>
-        requestJson<{
-          success: boolean;
-          simulation: { totalFiles: number; totalChanges: number };
-        }>(backendUrl, '/api/research/simulate', {
-          method: 'POST',
-          body: JSON.stringify({ runId: options.run }),
-        })
+      const result = await withBackend(
+        process.cwd(),
+        { port: options.port, componentsPath: null },
+        async (backendUrl) =>
+          requestJson<{
+            success: boolean;
+            simulation: { totalFiles: number; totalChanges: number };
+          }>(backendUrl, '/api/research/simulate', {
+            method: 'POST',
+            body: JSON.stringify({ runId: options.run }),
+          })
       );
 
       if (printJsonIfNeeded(result, options.json)) {
@@ -349,24 +366,27 @@ async function main() {
     .option('--port <port>', 'Backend server port (default: auto-detect)')
     .option('--json', 'Print full JSON response')
     .action(async (options: ResearchCommandOptions) => {
-      const result = await withBackend(process.cwd(), { port: options.port, componentsPath: null }, async (backendUrl) =>
-        requestJson<{
-          success: boolean;
-          apply: {
-            blocked: boolean;
-            riskLevel: string;
-            modifiedFiles: string[];
-            totalChanges: number;
-            backupId?: string;
-          };
-        }>(backendUrl, '/api/research/apply', {
-          method: 'POST',
-          body: JSON.stringify({
-            runId: options.run,
-            confirmHighRisk: options.confirm === true,
-            expectedChecksum: options.checksum,
-          }),
-        })
+      const result = await withBackend(
+        process.cwd(),
+        { port: options.port, componentsPath: null },
+        async (backendUrl) =>
+          requestJson<{
+            success: boolean;
+            apply: {
+              blocked: boolean;
+              riskLevel: string;
+              modifiedFiles: string[];
+              totalChanges: number;
+              backupId?: string;
+            };
+          }>(backendUrl, '/api/research/apply', {
+            method: 'POST',
+            body: JSON.stringify({
+              runId: options.run,
+              confirmHighRisk: options.confirm === true,
+              expectedChecksum: options.checksum,
+            }),
+          })
       );
 
       if (printJsonIfNeeded(result, options.json)) {
@@ -395,32 +415,42 @@ async function main() {
     .option('--json', 'Print raw JSON response')
     .action(async (options: ResearchCommandOptions) => {
       if (options.format === 'md') {
-        const output = await withBackend(process.cwd(), { port: options.port, componentsPath: null }, async (backendUrl) => {
-          const response = await fetch(
-            `${backendUrl}/api/research/${encodeURIComponent(options.run || '')}/report?format=md`
-          );
-          if (!response.ok) {
-            const payload = (await response.json()) as { error?: { message?: string } };
-            throw new Error(payload.error?.message || 'Failed to fetch report');
+        const output = await withBackend(
+          process.cwd(),
+          { port: options.port, componentsPath: null },
+          async (backendUrl) => {
+            const response = await fetch(
+              `${backendUrl}/api/research/${encodeURIComponent(options.run || '')}/report?format=md`
+            );
+            if (!response.ok) {
+              const payload = (await response.json()) as { error?: { message?: string } };
+              throw new Error(payload.error?.message || 'Failed to fetch report');
+            }
+            return response.text();
           }
-          return response.text();
-        });
+        );
         console.log(output);
         return;
       }
 
-      const result = await withBackend(process.cwd(), { port: options.port, componentsPath: null }, async (backendUrl) =>
-        requestJson<{ success: boolean; report: unknown }>(
-          backendUrl,
-          `/api/research/${encodeURIComponent(options.run || '')}/report?format=json`
-        )
+      const result = await withBackend(
+        process.cwd(),
+        { port: options.port, componentsPath: null },
+        async (backendUrl) =>
+          requestJson<{ success: boolean; report: unknown }>(
+            backendUrl,
+            `/api/research/${encodeURIComponent(options.run || '')}/report?format=json`
+          )
       );
 
       if (printJsonIfNeeded(result, options.json)) {
         return;
       }
 
-      const report = result.report as { plan?: { risk?: { level?: string }; totals?: { touchedFiles?: number } }; applyResult?: { modifiedFiles?: string[] } };
+      const report = result.report as {
+        plan?: { risk?: { level?: string }; totals?: { touchedFiles?: number } };
+        applyResult?: { modifiedFiles?: string[] };
+      };
       console.log(`Run report (${options.run})`);
       console.log(`Risk: ${report.plan?.risk?.level || 'unknown'}`);
       console.log(`Touched files: ${report.plan?.totals?.touchedFiles || 0}`);

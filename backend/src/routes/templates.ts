@@ -312,7 +312,8 @@ router.post('/:id/apply', async (req: Request, res: Response) => {
     const allModified: string[] = [];
     let totalChanges = 0;
     let backupId: string | undefined;
-    const applyErrors: Array<{ path: string; error: string; code?: string; ruleIndex: number }> = [];
+    const applyErrors: Array<{ path: string; error: string; code?: string; ruleIndex: number }> =
+      [];
 
     for (let i = 0; i < template.rules.length; i++) {
       const rule = template.rules[i];

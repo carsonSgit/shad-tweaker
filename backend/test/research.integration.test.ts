@@ -66,7 +66,13 @@ test('research flow creates artifacts and applies planned changes', async () => 
       };
       assert.equal(planArtifact.checksum, planResult.plan.checksum);
 
-      const runDir = path.join(project.root, '.shadcn-tweaker', 'research', 'runs', scanResult.runId);
+      const runDir = path.join(
+        project.root,
+        '.shadcn-tweaker',
+        'research',
+        'runs',
+        scanResult.runId
+      );
       assert.equal(await fs.pathExists(path.join(runDir, 'component_graph.json')), true);
       assert.equal(await fs.pathExists(path.join(runDir, 'customization_candidates.json')), true);
       assert.equal(await fs.pathExists(path.join(runDir, 'safety_report.json')), true);
@@ -76,4 +82,3 @@ test('research flow creates artifacts and applies planned changes', async () => 
     await project.cleanup();
   }
 });
-

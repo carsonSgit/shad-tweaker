@@ -1,8 +1,4 @@
-import type {
-  ResearchPlan,
-  SafetyIssue,
-  SafetyReport,
-} from '../types/index.js';
+import type { ResearchPlan, SafetyIssue, SafetyReport } from '../types/index.js';
 
 export interface SafetyReportInput {
   runId: string;
@@ -81,7 +77,11 @@ export function buildSafetyReport(input: SafetyReportInput): SafetyReport {
       touchedFiles: input.plan.totals.touchedFiles,
       exceeded,
     },
-    blocked: input.pathViolations.length > 0 || exceeded || input.plan.blocked || input.plan.rules.length === 0,
+    blocked:
+      input.pathViolations.length > 0 ||
+      exceeded ||
+      input.plan.blocked ||
+      input.plan.rules.length === 0,
     issues,
   };
 }

@@ -36,4 +36,3 @@ export async function appendAuditEvent(
 
   await fs.appendFile(filePath, `${JSON.stringify(event)}\n`, 'utf-8');
 }
-

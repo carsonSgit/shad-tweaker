@@ -26,7 +26,10 @@ export interface ModifyResult {
   errors?: Array<{ path: string; error: string; code?: string }>;
 }
 
-function compileSearchPattern(find: string, isRegex: boolean): { pattern: RegExp | null; error?: string } {
+function compileSearchPattern(
+  find: string,
+  isRegex: boolean
+): { pattern: RegExp | null; error?: string } {
   if (find.length === 0) {
     return { pattern: null, error: 'find pattern must not be empty' };
   }

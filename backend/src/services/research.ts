@@ -2,11 +2,7 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'fs-extra';
-import type {
-  ComponentGraph,
-  ResearchPlan,
-  SafetyReport,
-} from '../types/index.js';
+import type { ComponentGraph, ResearchPlan, SafetyReport } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { escapeRegExpLiteral } from '../utils/validation.js';
 import { appendAuditEvent } from './audit.js';
@@ -14,8 +10,8 @@ import { createBackup } from './backup.js';
 import { createPreview } from './differ.js';
 import { discoverComponentRoots } from './discovery.js';
 import { buildComponentGraph } from './parser.js';
-import { buildResearchPlan } from './planner.js';
 import type { PlannerRuleInput } from './planner.js';
+import { buildResearchPlan } from './planner.js';
 import { buildSafetyReport } from './risk.js';
 
 interface DiscoveryArtifact {
@@ -88,7 +84,11 @@ async function readArtifact<T>(projectRoot: string, runId: string, name: string)
   return fs.readJson(artifactPath) as Promise<T>;
 }
 
-function buildSummaryMarkdown(plan: ResearchPlan, safety: SafetyReport, apply?: ApplyArtifact): string {
+function buildSummaryMarkdown(
+  plan: ResearchPlan,
+  safety: SafetyReport,
+  apply?: ApplyArtifact
+): string {
   const lines: string[] = [];
   lines.push(`# SDRA Run ${plan.runId}`);
   lines.push('');
@@ -169,7 +169,9 @@ export interface ScanResearchResponse {
   componentGraph: ComponentGraph;
 }
 
-export async function scanResearch(request: ScanResearchRequest = {}): Promise<ScanResearchResponse> {
+export async function scanResearch(
+  request: ScanResearchRequest = {}
+): Promise<ScanResearchResponse> {
   const projectRoot = getWorkingDirectory();
   const runId = createRunId();
   const discovery = await discoverComponentRoots(projectRoot, request.explicitPaths || []);
@@ -421,7 +423,10 @@ export async function applyResearch(request: ApplyResearchRequest): Promise<Appl
   return artifact;
 }
 
-export async function getResearchReport(runId: string, format: 'json' | 'md' = 'json'): Promise<unknown> {
+export async function getResearchReport(
+  runId: string,
+  format: 'json' | 'md' = 'json'
+): Promise<unknown> {
   const projectRoot = getWorkingDirectory();
   await ensureRunExists(projectRoot, runId);
 

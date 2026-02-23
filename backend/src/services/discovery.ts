@@ -101,7 +101,9 @@ export async function discoverComponentRoots(
   };
 
   for (const explicitPath of explicitPaths) {
-    const absolute = path.isAbsolute(explicitPath) ? explicitPath : path.join(projectRoot, explicitPath);
+    const absolute = path.isAbsolute(explicitPath)
+      ? explicitPath
+      : path.join(projectRoot, explicitPath);
     if (await fs.pathExists(absolute)) {
       pushRoot(absolute, true);
     }
@@ -119,9 +121,7 @@ export async function discoverComponentRoots(
   return {
     projectRoot,
     packageRoots,
-    componentRoots: Array.from(rootsByPath.values()).sort((a, b) =>
-      a.path.localeCompare(b.path)
-    ),
+    componentRoots: Array.from(rootsByPath.values()).sort((a, b) => a.path.localeCompare(b.path)),
     ignoredDirectories: Array.from(IGNORED_DIRS).sort(),
     pathViolations: Array.from(new Set(pathViolations)).sort(),
   };

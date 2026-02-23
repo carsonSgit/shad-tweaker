@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { ComponentGraph } from '../src/types/index.js';
 import { buildResearchPlan } from '../src/services/planner.js';
+import type { ComponentGraph } from '../src/types/index.js';
 import { createTempProject, writeProjectFile } from './helpers/temp-project.js';
 
 test('buildResearchPlan is deterministic for identical graph and goals', async () => {
@@ -125,4 +125,3 @@ test('buildResearchPlan blocks when all rules are rejected', async () => {
     await project.cleanup();
   }
 });
-

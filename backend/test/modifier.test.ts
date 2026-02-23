@@ -24,4 +24,3 @@ test('applyChanges returns INVALID_REGEX for malformed regex patterns', async ()
   assert.equal(result.success, false);
   assert.equal(result.errors?.[0]?.code, 'INVALID_REGEX');
 });
-

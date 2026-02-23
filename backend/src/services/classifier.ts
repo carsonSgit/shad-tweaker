@@ -90,7 +90,9 @@ export function scoreComponent(
 
   if (normalized.includes('/components/ui/')) {
     kind = 'primitive';
-  } else if (importsFound.some((entry) => entry.includes('/components/ui') || entry.startsWith('.'))) {
+  } else if (
+    importsFound.some((entry) => entry.includes('/components/ui') || entry.startsWith('.'))
+  ) {
     kind = 'wrapper';
   } else if (score >= 50) {
     kind = 'composition';
@@ -103,4 +105,3 @@ export function scoreComponent(
     rationale,
   };
 }
-

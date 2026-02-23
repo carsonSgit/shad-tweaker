@@ -7,9 +7,7 @@ import {
 } from '../src/utils/validation.js';
 
 test('validateTemplateRulesDetailed rejects invalid regex rules', () => {
-  const result = validateTemplateRulesDetailed([
-    { find: '(', replace: '', isRegex: true },
-  ]);
+  const result = validateTemplateRulesDetailed([{ find: '(', replace: '', isRegex: true }]);
 
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((entry) => entry.code === 'INVALID_REGEX'));
@@ -36,4 +34,3 @@ test('escapeRegExpLiteral escapes regex metacharacters', () => {
   const escaped = escapeRegExpLiteral(value);
   assert.equal(escaped, 'class\\(name\\)\\+\\$');
 });
-

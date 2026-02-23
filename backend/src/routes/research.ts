@@ -1,4 +1,5 @@
 import { type Request, type Response, Router } from 'express';
+import type { PlannerRuleInput } from '../services/planner.js';
 import {
   applyResearch,
   getResearchArtifact,
@@ -9,7 +10,6 @@ import {
   scanResearch,
   simulateResearch,
 } from '../services/research.js';
-import type { PlannerRuleInput } from '../services/planner.js';
 import { validateResearchRunId } from '../utils/validation.js';
 
 const router = Router();
@@ -244,12 +244,11 @@ router.post('/apply', async (req: Request, res: Response) => {
       success: false,
       error: {
         message,
-        code:
-          message.includes('not found')
-            ? 'RESEARCH_RUN_NOT_FOUND'
-            : isClientError
-              ? 'RESEARCH_APPLY_VALIDATION_ERROR'
-              : 'RESEARCH_APPLY_ERROR',
+        code: message.includes('not found')
+          ? 'RESEARCH_RUN_NOT_FOUND'
+          : isClientError
+            ? 'RESEARCH_APPLY_VALIDATION_ERROR'
+            : 'RESEARCH_APPLY_ERROR',
       },
     });
   }

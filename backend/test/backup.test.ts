@@ -25,7 +25,9 @@ test('backup preserves unique relative paths for duplicate basenames and restore
       assert.ok(details);
       assert.equal(details?.files.length, 2);
 
-      const relativePaths = new Set(details?.files.map((entry) => entry.relativePath).filter(Boolean));
+      const relativePaths = new Set(
+        details?.files.map((entry) => entry.relativePath).filter(Boolean)
+      );
       assert.equal(relativePaths.size, 2);
 
       for (const file of details?.files || []) {
@@ -45,11 +47,12 @@ test('backup preserves unique relative paths for duplicate basenames and restore
       assert.equal(restoredB, 'export const Button = () => "forms";\n');
 
       for (const file of details?.files || []) {
-        assert.ok(file.backupPath.startsWith(path.join(project.root, '.shadcn-tweaker', 'backups')));
+        assert.ok(
+          file.backupPath.startsWith(path.join(project.root, '.shadcn-tweaker', 'backups'))
+        );
       }
     });
   } finally {
     await project.cleanup();
   }
 });
-
