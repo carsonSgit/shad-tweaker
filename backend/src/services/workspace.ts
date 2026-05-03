@@ -258,6 +258,8 @@ async function writeManifest(manifest: WorkspaceManifest, cwd: string): Promise<
 }
 
 async function withManifestWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+  // Public load/save helpers acquire this queue. Code already inside the queue must use
+  // the Unsafe helpers below so it does not wait on its own pending operation.
   const previous = manifestWriteQueue;
   let release: () => void = () => {};
 
@@ -275,7 +277,21 @@ async function withManifestWriteLock<T>(operation: () => Promise<T>): Promise<T>
 }
 
 function presetsChanged(next: Preset[], current: Preset[]): boolean {
-  return JSON.stringify(next) !== JSON.stringify(current);
+  if (next.length !== current.length) {
+    return true;
+  }
+
+  return next.some((preset, index) => {
+    const currentPreset = current[index];
+    return (
+      !currentPreset ||
+      preset.id !== currentPreset.id ||
+      preset.name !== currentPreset.name ||
+      preset.created !== currentPreset.created ||
+      preset.migratedFromTemplateId !== currentPreset.migratedFromTemplateId ||
+      preset.classTransforms.length !== currentPreset.classTransforms.length
+    );
+  });
 }
 
 function backupsChanged(next: BackupMetadata[], current: BackupMetadata[]): boolean {
@@ -386,14 +402,7 @@ export async function updateWorkspaceConfig(
 ): Promise<WorkspaceManifest> {
   return withManifestWriteLock(async () => {
     const manifest = await loadWorkspaceManifestUnsafe(cwd);
-    const allowedKeys: Array<keyof WorkspaceConfig> = [
-      'componentDirectory',
-      'backupRetentionDays',
-      'maxBackups',
-      'autoBackup',
-      'validateAfterEdit',
-      'port',
-    ];
+    const allowedKeys = Object.keys(DEFAULT_CONFIG) as Array<keyof WorkspaceConfig>;
     const nextConfig = { ...manifest.config };
 
     for (const key of allowedKeys) {
@@ -433,12 +442,13 @@ export async function listRegistrySources(
 export async function upsertRegistrySource(
   source: Omit<RegistrySource, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
   cwd: string = getWorkingDirectory()
-): Promise<RegistrySource> {
+): Promise<{ source: RegistrySource; created: boolean }> {
   return withManifestWriteLock(async () => {
     const manifest = await loadWorkspaceManifestUnsafe(cwd);
     const now = new Date().toISOString();
     const id = source.id || createRegistrySourceId(source.name);
     const existing = manifest.sources.find((candidate) => candidate.id === id);
+    const created = !existing;
     const nextSource: RegistrySource = {
       id,
       name: source.name,
@@ -461,7 +471,7 @@ export async function upsertRegistrySource(
       cwd
     );
 
-    return nextSource;
+    return { source: nextSource, created };
   });
 }
 
@@ -521,17 +531,24 @@ export async function recordScannedComponents(
     await withManifestWriteLock(async () => {
       const manifest = await loadWorkspaceManifestUnsafe(cwd);
       const scannedAt = new Date().toISOString();
+      const componentsByPath = new Map(
+        manifest.components.map((component) => [component.path, component])
+      );
+
+      for (const component of components) {
+        componentsByPath.set(component.path, {
+          id: component.name,
+          name: component.name,
+          path: component.path,
+          lastScannedAt: scannedAt,
+          metadata: component.metadata,
+        });
+      }
 
       await saveWorkspaceManifestUnsafe(
         {
           ...manifest,
-          components: components.map((component) => ({
-            id: component.name,
-            name: component.name,
-            path: component.path,
-            lastScannedAt: scannedAt,
-            metadata: component.metadata,
-          })),
+          components: [...componentsByPath.values()].sort((a, b) => a.path.localeCompare(b.path)),
         },
         cwd
       );

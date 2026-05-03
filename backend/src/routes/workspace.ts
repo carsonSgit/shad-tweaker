@@ -123,10 +123,10 @@ function validateConfigUpdates(body: unknown): ValidationResult<Partial<Workspac
     if (
       typeof req.port !== 'number' ||
       !Number.isInteger(req.port) ||
-      req.port < 1 ||
+      req.port < 1024 ||
       req.port > 65535
     ) {
-      errors.port = 'Must be an integer between 1 and 65535.';
+      errors.port = 'Must be an integer between 1024 and 65535.';
     } else {
       updates.port = req.port;
     }
@@ -240,7 +240,7 @@ router.put('/config', async (req: Request, res: Response) => {
   try {
     const validation = validateConfigUpdates(req.body);
 
-    if (!validation.value) {
+    if (validation.errors !== null) {
       res.status(400).json({
         success: false,
         error: {
@@ -298,7 +298,7 @@ router.post('/registry-sources', async (req: Request, res: Response) => {
   try {
     const validation = validateRegistrySource(req.body);
 
-    if (!validation.value) {
+    if (validation.errors !== null) {
       res.status(400).json({
         success: false,
         error: {
@@ -310,8 +310,8 @@ router.post('/registry-sources', async (req: Request, res: Response) => {
       return;
     }
 
-    const saved = await upsertRegistrySource(validation.value);
-    res.status(201).json({ success: true, source: saved });
+    const { source, created } = await upsertRegistrySource(validation.value);
+    res.status(created ? 201 : 200).json({ success: true, source, created });
   } catch (error) {
     logger.error('Failed to save registry source', error);
     const message = error instanceof Error ? error.message : 'Failed to save registry source';

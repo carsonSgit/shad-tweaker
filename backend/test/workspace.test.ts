@@ -286,6 +286,40 @@ describe('workspace manifest service', () => {
     assert.deepEqual(manifest.components[0].metadata, component.metadata);
   });
 
+  it('merges scanned components with existing manifest inventory', async () => {
+    const root = await createTempRoot();
+    const button: Component = {
+      name: 'button',
+      path: path.join(root, 'components', 'ui', 'button.tsx'),
+      metadata: {
+        lines: 10,
+        size: 200,
+        lastModified: '2026-05-03T00:00:00.000Z',
+        classCount: 3,
+      },
+    };
+    const card: Component = {
+      name: 'card',
+      path: path.join(root, 'src', 'components', 'card.tsx'),
+      metadata: {
+        lines: 20,
+        size: 300,
+        lastModified: '2026-05-03T00:00:00.000Z',
+        classCount: 5,
+      },
+    };
+
+    await recordScannedComponents([button], root);
+    await recordScannedComponents([card], root);
+
+    const manifest = await loadWorkspaceManifest(root);
+
+    assert.deepEqual(manifest.components.map((component) => component.name).sort(), [
+      'button',
+      'card',
+    ]);
+  });
+
   it('rejects malformed manifest JSON with a useful error', async () => {
     const root = await createTempRoot();
     const manifestPath = path.join(root, '.shadcn-tweaker', 'manifest.json');
@@ -302,7 +336,7 @@ describe('workspace manifest service', () => {
   it('adds, updates, lists, and deletes registry sources', async () => {
     const root = await createTempRoot();
 
-    const created = await upsertRegistrySource(
+    const createdResult = await upsertRegistrySource(
       {
         name: 'Acme Registry',
         type: 'shadcn-registry',
@@ -311,9 +345,9 @@ describe('workspace manifest service', () => {
       },
       root
     );
-    const updated = await upsertRegistrySource(
+    const updatedResult = await upsertRegistrySource(
       {
-        id: created.id,
+        id: createdResult.source.id,
         name: 'Acme Registry',
         type: 'shadcn-registry',
         registryJsonUrl: 'https://example.com/r/registry.json',
@@ -322,12 +356,14 @@ describe('workspace manifest service', () => {
       root
     );
     const sources = await listRegistrySources(root);
-    const deleted = await deleteRegistrySource(created.id, root);
+    const deleted = await deleteRegistrySource(createdResult.source.id, root);
     const afterDelete = await listRegistrySources(root);
 
-    assert.equal(created.id, 'registry_acme-registry');
-    assert.equal(updated.createdAt, created.createdAt);
-    assert.notEqual(updated.updatedAt, created.updatedAt);
+    assert.equal(createdResult.created, true);
+    assert.equal(updatedResult.created, false);
+    assert.equal(createdResult.source.id, 'registry_acme-registry');
+    assert.equal(updatedResult.source.createdAt, createdResult.source.createdAt);
+    assert.notEqual(updatedResult.source.updatedAt, createdResult.source.updatedAt);
     assert.equal(sources.length, 1);
     assert.equal(sources[0].registryJsonUrl, 'https://example.com/r/registry.json');
     assert.equal(sources[0].enabled, false);

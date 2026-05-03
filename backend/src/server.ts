@@ -10,7 +10,6 @@ import { initializeWorkspace } from './services/workspace.js';
 import { logger } from './utils/logger.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
 
 // CORS configuration - restrict to local development
 app.use(
@@ -71,10 +70,11 @@ app.use((_req, res) => {
 async function start() {
   try {
     await initializeDefaultTemplates();
-    await initializeWorkspace();
+    const { manifest } = await initializeWorkspace();
+    const port = process.env.PORT || manifest.config.port;
 
-    app.listen(PORT, () => {
-      logger.info(`Shadcn Tweaker Backend running on http://localhost:${PORT}`);
+    app.listen(port, () => {
+      logger.info(`Shadcn Tweaker Backend running on http://localhost:${port}`);
       logger.info('Available endpoints:');
       logger.info('  GET  /api/components/scan - Scan for components');
       logger.info('  GET  /api/components - List all components');
