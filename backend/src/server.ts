@@ -4,11 +4,12 @@ import backupRouter from './routes/backup.js';
 import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
 import templatesRouter from './routes/templates.js';
+import workspaceRouter from './routes/workspace.js';
 import { initializeDefaultTemplates } from './services/template.js';
+import { initializeWorkspace } from './services/workspace.js';
 import { logger } from './utils/logger.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
 
 // CORS configuration - restrict to local development
 app.use(
@@ -43,6 +44,7 @@ app.use('/api/components', componentsRouter);
 app.use('/api/edit', editRouter);
 app.use('/api/backup', backupRouter);
 app.use('/api/templates', templatesRouter);
+app.use('/api/workspace', workspaceRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', err);
@@ -68,9 +70,17 @@ app.use((_req, res) => {
 async function start() {
   try {
     await initializeDefaultTemplates();
+    const { manifest } = await initializeWorkspace();
+    const port = process.env.PORT || manifest.config.port;
 
-    app.listen(PORT, () => {
-      logger.info(`Shadcn Tweaker Backend running on http://localhost:${PORT}`);
+    if (process.env.PORT) {
+      logger.info(
+        `PORT environment variable (${process.env.PORT}) overrides workspace manifest port (${manifest.config.port})`
+      );
+    }
+
+    app.listen(port, () => {
+      logger.info(`Shadcn Tweaker Backend running on http://localhost:${port}`);
       logger.info('Available endpoints:');
       logger.info('  GET  /api/components/scan - Scan for components');
       logger.info('  GET  /api/components - List all components');
@@ -84,6 +94,12 @@ async function start() {
       logger.info('  POST /api/backup/create - Create backup');
       logger.info('  GET  /api/backup/list - List backups');
       logger.info('  POST /api/backup/restore - Restore backup');
+      logger.info('  GET  /api/workspace - Get workspace manifest');
+      logger.info('  POST /api/workspace/initialize - Initialize workspace manifest');
+      logger.info('  PUT  /api/workspace/config - Update workspace config');
+      logger.info('  GET  /api/workspace/registry-sources - List registry sources');
+      logger.info('  POST /api/workspace/registry-sources - Create or update registry source');
+      logger.info('  DELETE /api/workspace/registry-sources/:id - Delete registry source');
     });
   } catch (error) {
     logger.error('Failed to start server', error);

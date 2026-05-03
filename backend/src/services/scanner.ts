@@ -2,6 +2,10 @@ import path from 'node:path';
 import fs from 'fs-extra';
 import type { Component, ScanResult } from '../types/index.js';
 import { logger } from '../utils/logger.js';
+import {
+  getWorkingDirectory as getWorkspaceWorkingDirectory,
+  recordScannedComponents,
+} from './workspace.js';
 
 const COMMON_COMPONENT_DIRS = [
   'src/components/ui',
@@ -22,9 +26,8 @@ const COMMON_COMPONENT_DIRS = [
 let cachedComponents: Component[] = [];
 let _componentDirectory = '';
 
-// Get the working directory - either from environment or process.cwd()
 export function getWorkingDirectory(): string {
-  return process.env.SHADCN_TWEAKER_CWD || process.cwd();
+  return getWorkspaceWorkingDirectory();
 }
 
 // Get the configured components path from environment
@@ -117,6 +120,7 @@ export async function scanComponents(basePath: string, customPath?: string): Pro
     }
 
     cachedComponents = components;
+    await recordScannedComponents(components, basePath);
 
     logger.info(`Scanned ${components.length} components in ${dir}`);
 

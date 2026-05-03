@@ -51,6 +51,7 @@ Thumbs.db
 coverage/
 *.lcov
 .nyc_output
+.shadcn-tweaker-test-workspaces/
 
 # Cache
 .cache/
