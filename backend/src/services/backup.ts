@@ -62,7 +62,8 @@ export async function createBackup(componentPaths: string[]): Promise<Backup> {
 
   logger.info(`Created backup ${backupId} with ${componentPaths.length} files`);
 
-  // Cleanup old backups asynchronously (don't block the response)
+  // Cleanup old backups asynchronously (don't block the response).
+  // TODO: Also enforce workspace config backupRetentionDays once backup cleanup reads manifest config.
   cleanupOldBackups().catch((err) => {
     logger.warn('Failed to cleanup old backups', err);
   });

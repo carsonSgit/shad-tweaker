@@ -151,7 +151,10 @@ function validateRegistrySource(body: unknown): ValidationResult<RegistrySourceI
     errors.name = 'Must be a non-empty string.';
   }
 
-  if (typeof req.type !== 'string' || !REGISTRY_SOURCE_TYPES.includes(req.type as never)) {
+  if (
+    typeof req.type !== 'string' ||
+    !REGISTRY_SOURCE_TYPES.includes(req.type as RegistrySource['type'])
+  ) {
     errors.type = `Must be one of: ${REGISTRY_SOURCE_TYPES.join(', ')}.`;
   }
 

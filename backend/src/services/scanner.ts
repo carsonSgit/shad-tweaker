@@ -26,7 +26,6 @@ const COMMON_COMPONENT_DIRS = [
 let cachedComponents: Component[] = [];
 let _componentDirectory = '';
 
-// Get the working directory - either from environment or process.cwd()
 export function getWorkingDirectory(): string {
   return getWorkspaceWorkingDirectory();
 }

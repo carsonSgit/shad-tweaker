@@ -333,6 +333,41 @@ describe('workspace manifest service', () => {
     );
   });
 
+  it('rejects manifest config with unsafe component paths', async () => {
+    const root = await createTempRoot();
+    const manifestPath = path.join(root, '.shadcn-tweaker', 'manifest.json');
+
+    await fs.ensureDir(path.dirname(manifestPath));
+    await fs.writeJson(
+      manifestPath,
+      {
+        version: 1,
+        createdAt: '2026-05-03T00:00:00.000Z',
+        updatedAt: '2026-05-03T00:00:00.000Z',
+        config: {
+          componentDirectory: '../outside',
+          backupRetentionDays: 30,
+          maxBackups: 20,
+          autoBackup: true,
+          validateAfterEdit: true,
+          port: 3001,
+        },
+        components: [],
+        sources: [],
+        packages: [],
+        tokenSets: [],
+        presets: [],
+        backups: [],
+      },
+      { spaces: 2 }
+    );
+
+    await assert.rejects(
+      () => loadWorkspaceManifest(root),
+      /Failed to load workspace manifest: Workspace manifest config has an invalid componentDirectory/
+    );
+  });
+
   it('adds, updates, lists, and deletes registry sources', async () => {
     const root = await createTempRoot();
 
@@ -369,5 +404,21 @@ describe('workspace manifest service', () => {
     assert.equal(sources[0].enabled, false);
     assert.equal(deleted, true);
     assert.deepEqual(afterDelete, []);
+  });
+
+  it('defaults registry sources to enabled for direct service callers', async () => {
+    const root = await createTempRoot();
+
+    const result = await upsertRegistrySource(
+      {
+        name: 'Default Enabled Registry',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/registry.json',
+      },
+      root
+    );
+
+    assert.equal(result.created, true);
+    assert.equal(result.source.enabled, true);
   });
 });

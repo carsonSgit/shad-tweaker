@@ -19,7 +19,7 @@ const LEGACY_CONFIG_FILE = '.shadcn-tweaker.json';
 const TEMPLATE_FILE = 'templates/templates.json';
 const BACKUP_DIR = 'backups';
 const ensuredWorkspaceDirs = new Set<string>();
-let manifestWriteQueue = Promise.resolve();
+const manifestWriteQueues = new Map<string, Promise<void>>();
 
 const DEFAULT_CONFIG: WorkspaceConfig = {
   componentDirectory: './components/ui',
@@ -85,14 +85,13 @@ function normalizeManifest(raw: unknown): WorkspaceManifest {
     throw new Error('Workspace manifest is missing required fields');
   }
 
+  const config = normalizeWorkspaceConfig(candidate.config);
+
   return {
     version: 1,
     createdAt: candidate.createdAt,
     updatedAt: candidate.updatedAt,
-    config: {
-      ...DEFAULT_CONFIG,
-      ...candidate.config,
-    },
+    config,
     components: Array.isArray(candidate.components) ? candidate.components : [],
     sources: Array.isArray(candidate.sources) ? candidate.sources : [],
     packages: Array.isArray(candidate.packages) ? candidate.packages : [],
@@ -100,6 +99,87 @@ function normalizeManifest(raw: unknown): WorkspaceManifest {
     presets: Array.isArray(candidate.presets) ? candidate.presets : [],
     backups: Array.isArray(candidate.backups) ? candidate.backups : [],
   };
+}
+
+function isSafeProjectRelativePath(value: string): boolean {
+  if (path.isAbsolute(value)) {
+    return false;
+  }
+
+  const normalized = path.normalize(value);
+  return normalized !== '..' && !normalized.startsWith(`..${path.sep}`);
+}
+
+function normalizeWorkspaceConfig(rawConfig: unknown): WorkspaceConfig {
+  if (typeof rawConfig !== 'object' || rawConfig === null) {
+    throw new Error('Workspace manifest config must be a JSON object');
+  }
+
+  const candidate = rawConfig as Partial<WorkspaceConfig>;
+  const config = { ...DEFAULT_CONFIG };
+
+  if (candidate.componentDirectory !== undefined) {
+    if (
+      typeof candidate.componentDirectory !== 'string' ||
+      candidate.componentDirectory.trim().length === 0 ||
+      !isSafeProjectRelativePath(candidate.componentDirectory.trim())
+    ) {
+      throw new Error('Workspace manifest config has an invalid componentDirectory');
+    }
+    config.componentDirectory = candidate.componentDirectory.trim();
+  }
+
+  if (candidate.backupRetentionDays !== undefined) {
+    if (
+      typeof candidate.backupRetentionDays !== 'number' ||
+      !Number.isInteger(candidate.backupRetentionDays) ||
+      candidate.backupRetentionDays < 1 ||
+      candidate.backupRetentionDays > 365
+    ) {
+      throw new Error('Workspace manifest config has an invalid backupRetentionDays');
+    }
+    config.backupRetentionDays = candidate.backupRetentionDays;
+  }
+
+  if (candidate.maxBackups !== undefined) {
+    if (
+      typeof candidate.maxBackups !== 'number' ||
+      !Number.isInteger(candidate.maxBackups) ||
+      candidate.maxBackups < 1 ||
+      candidate.maxBackups > 1000
+    ) {
+      throw new Error('Workspace manifest config has an invalid maxBackups');
+    }
+    config.maxBackups = candidate.maxBackups;
+  }
+
+  if (candidate.autoBackup !== undefined) {
+    if (typeof candidate.autoBackup !== 'boolean') {
+      throw new Error('Workspace manifest config has an invalid autoBackup');
+    }
+    config.autoBackup = candidate.autoBackup;
+  }
+
+  if (candidate.validateAfterEdit !== undefined) {
+    if (typeof candidate.validateAfterEdit !== 'boolean') {
+      throw new Error('Workspace manifest config has an invalid validateAfterEdit');
+    }
+    config.validateAfterEdit = candidate.validateAfterEdit;
+  }
+
+  if (candidate.port !== undefined) {
+    if (
+      typeof candidate.port !== 'number' ||
+      !Number.isInteger(candidate.port) ||
+      candidate.port < 1024 ||
+      candidate.port > 65535
+    ) {
+      throw new Error('Workspace manifest config has an invalid port');
+    }
+    config.port = candidate.port;
+  }
+
+  return config;
 }
 
 async function readLegacyConfig(cwd: string): Promise<Partial<WorkspaceConfig>> {
@@ -268,15 +348,18 @@ async function writeManifest(manifest: WorkspaceManifest, cwd: string): Promise<
   }
 }
 
-async function withManifestWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+async function withManifestWriteLock<T>(cwd: string, operation: () => Promise<T>): Promise<T> {
   // Public load/save helpers acquire this queue. Code already inside the queue must use
   // the Unsafe helpers below so it does not wait on its own pending operation.
-  const previous = manifestWriteQueue;
+  const queueKey = path.resolve(cwd);
+  const previous = manifestWriteQueues.get(queueKey) || Promise.resolve();
   let release: () => void = () => {};
 
-  manifestWriteQueue = new Promise<void>((resolve) => {
+  const next = new Promise<void>((resolve) => {
     release = resolve;
   });
+
+  manifestWriteQueues.set(queueKey, next);
 
   await previous;
 
@@ -284,6 +367,9 @@ async function withManifestWriteLock<T>(operation: () => Promise<T>): Promise<T>
     return await operation();
   } finally {
     release();
+    if (manifestWriteQueues.get(queueKey) === next) {
+      manifestWriteQueues.delete(queueKey);
+    }
   }
 }
 
@@ -387,19 +473,21 @@ export async function saveWorkspaceManifest(
   manifest: WorkspaceManifest,
   cwd: string = getWorkingDirectory()
 ): Promise<WorkspaceManifest> {
-  return withManifestWriteLock(() => saveWorkspaceManifestUnsafe(manifest, cwd));
+  return withManifestWriteLock(cwd, () => saveWorkspaceManifestUnsafe(manifest, cwd));
 }
 
 export async function loadWorkspaceManifest(
   cwd: string = getWorkingDirectory()
 ): Promise<WorkspaceManifest> {
-  return withManifestWriteLock(() => loadWorkspaceManifestUnsafe(cwd));
+  return withManifestWriteLock(cwd, () => loadWorkspaceManifestUnsafe(cwd));
 }
 
 export async function initializeWorkspace(
   cwd: string = getWorkingDirectory()
 ): Promise<{ manifest: WorkspaceManifest; created: boolean }> {
-  return withManifestWriteLock(async () => {
+  return withManifestWriteLock(cwd, async () => {
+    // This created flag is serialized within this process; another process could still
+    // create the manifest between the existence check and write.
     const created = !(await fs.pathExists(getManifestPath(cwd)));
     const manifest = await loadWorkspaceManifestUnsafe(cwd);
 
@@ -411,7 +499,7 @@ export async function updateWorkspaceConfig(
   updates: Partial<WorkspaceConfig>,
   cwd: string = getWorkingDirectory()
 ): Promise<WorkspaceManifest> {
-  return withManifestWriteLock(async () => {
+  return withManifestWriteLock(cwd, async () => {
     const manifest = await loadWorkspaceManifestUnsafe(cwd);
     const allowedKeys = Object.keys(DEFAULT_CONFIG) as Array<keyof WorkspaceConfig>;
     const nextConfig = { ...manifest.config };
@@ -454,7 +542,7 @@ export async function upsertRegistrySource(
   source: Omit<RegistrySource, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
   cwd: string = getWorkingDirectory()
 ): Promise<{ source: RegistrySource; created: boolean }> {
-  return withManifestWriteLock(async () => {
+  return withManifestWriteLock(cwd, async () => {
     const manifest = await loadWorkspaceManifestUnsafe(cwd);
     const now = new Date().toISOString();
     const id = source.id || createRegistrySourceId(source.name);
@@ -466,7 +554,7 @@ export async function upsertRegistrySource(
       type: source.type,
       baseUrl: source.baseUrl,
       registryJsonUrl: source.registryJsonUrl,
-      enabled: source.enabled,
+      enabled: source.enabled ?? true,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
     };
@@ -490,7 +578,7 @@ export async function deleteRegistrySource(
   id: string,
   cwd: string = getWorkingDirectory()
 ): Promise<boolean> {
-  return withManifestWriteLock(async () => {
+  return withManifestWriteLock(cwd, async () => {
     const manifest = await loadWorkspaceManifestUnsafe(cwd);
     const sources = manifest.sources.filter((source) => source.id !== id);
 
@@ -515,7 +603,7 @@ export async function recordBackupMetadata(
   cwd: string = getWorkingDirectory()
 ): Promise<void> {
   try {
-    await withManifestWriteLock(async () => {
+    await withManifestWriteLock(cwd, async () => {
       const manifest = await loadWorkspaceManifestUnsafe(cwd);
       const backups = manifest.backups.filter((existing) => existing.id !== backup.id);
 
@@ -539,7 +627,7 @@ export async function recordScannedComponents(
   cwd: string = getWorkingDirectory()
 ): Promise<void> {
   try {
-    await withManifestWriteLock(async () => {
+    await withManifestWriteLock(cwd, async () => {
       const manifest = await loadWorkspaceManifestUnsafe(cwd);
       const scannedAt = new Date().toISOString();
       const componentsByPath = new Map(
