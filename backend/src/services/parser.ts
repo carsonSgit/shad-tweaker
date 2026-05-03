@@ -20,6 +20,25 @@ type SourceFileWithParseDiagnostics = ts.SourceFile & {
 
 const SUPPORTED_EXTENSIONS = new Set(['.tsx', '.jsx']);
 
+export function resolveProjectParserPath(filePath: string, cwd: string): string | null {
+  if (filePath.trim().length === 0) return null;
+
+  const resolvedRoot = path.resolve(cwd);
+  const resolvedFile = path.resolve(resolvedRoot, filePath);
+  const relativePath = path.relative(resolvedRoot, resolvedFile);
+  const extension = path.extname(resolvedFile).toLowerCase();
+
+  if (relativePath === '' || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    return null;
+  }
+
+  if (!SUPPORTED_EXTENSIONS.has(extension)) {
+    return null;
+  }
+
+  return resolvedFile;
+}
+
 export async function parseComponentFile(filePath: string): Promise<ParsedComponentFile> {
   const content = await fs.readFile(filePath, 'utf-8');
   return parseComponentSource(filePath, content);

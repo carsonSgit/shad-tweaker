@@ -1,11 +1,27 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { describe, it } from 'node:test';
-import { parseComponentFile, parseComponentSource } from '../src/services/parser.js';
+import {
+  parseComponentFile,
+  parseComponentSource,
+  resolveProjectParserPath,
+} from '../src/services/parser.js';
 
 const fixtureRoot = path.join(process.cwd(), 'test', 'fixtures', 'parser');
 
 describe('component parser service', () => {
+  it('resolves only TSX/JSX files inside the project root', () => {
+    const root = path.resolve('project-root');
+
+    assert.equal(
+      resolveProjectParserPath('components/ui/button.tsx', root),
+      path.join(root, 'components', 'ui', 'button.tsx')
+    );
+    assert.equal(resolveProjectParserPath('../outside.tsx', root), null);
+    assert.equal(resolveProjectParserPath(path.resolve('outside.tsx'), root), null);
+    assert.equal(resolveProjectParserPath('components/ui/button.ts', root), null);
+  });
+
   it('extracts imports, exports, components, className, cn, and cva definitions', async () => {
     const parsed = await parseComponentFile(path.join(fixtureRoot, 'button.tsx'));
 
