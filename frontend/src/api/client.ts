@@ -1,8 +1,11 @@
 import type {
   ApiResponse,
+  ApplyImportPlanResult,
   Backup,
   Component,
   ComponentDetail,
+  ImportConflictResolution,
+  ImportPlan,
   Preview,
   Template,
 } from '../types/index.js';
@@ -169,6 +172,27 @@ export async function previewBackup(backupId: string): Promise<
   }>
 > {
   return request(`/api/backup/${encodeURIComponent(backupId)}/preview`);
+}
+
+// Import Planning
+export async function generateImportPlan(
+  itemName: string,
+  sourceId?: string
+): Promise<ApiResponse<{ plan: ImportPlan }>> {
+  return request('/api/imports/plan', {
+    method: 'POST',
+    body: JSON.stringify({ itemName, sourceId }),
+  });
+}
+
+export async function applyImportPlan(
+  plan: ImportPlan,
+  resolutions: ImportConflictResolution[] = []
+): Promise<ApiResponse<{ result: ApplyImportPlanResult }>> {
+  return request('/api/imports/apply', {
+    method: 'POST',
+    body: JSON.stringify({ plan, resolutions }),
+  });
 }
 
 // Health check

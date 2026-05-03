@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import type {
   ComponentPackage,
   RegistryDependency,
+  RegistryItemFile,
   RegistryItemSummary,
   RegistryReadWarning,
   RegistrySource,
@@ -20,6 +21,7 @@ interface RegistryItemRaw {
   type?: string;
   files?: unknown[];
   dependencies?: string[];
+  devDependencies?: string[];
   registryDependencies?: string[];
 }
 
@@ -69,16 +71,25 @@ function normalizeDeps(
 }
 
 function normalizeFiles(files: unknown[] | undefined): string[] {
+  return normalizeRegistryFiles(files).map((file) => file.path);
+}
+
+function normalizeRegistryFiles(files: unknown[] | undefined): RegistryItemFile[] {
   return (files ?? [])
     .map((file) => {
-      if (typeof file === 'string') return file;
-      if (typeof file === 'object' && file !== null && 'path' in file) {
-        const pathValue = (file as { path?: unknown }).path;
-        return typeof pathValue === 'string' ? pathValue : null;
-      }
-      return null;
+      if (typeof file === 'string') return { path: file };
+      if (typeof file !== 'object' || file === null || !('path' in file)) return null;
+
+      const candidate = file as { path?: unknown; content?: unknown; type?: unknown };
+      if (typeof candidate.path !== 'string') return null;
+
+      return {
+        path: candidate.path,
+        content: typeof candidate.content === 'string' ? candidate.content : undefined,
+        type: typeof candidate.type === 'string' ? candidate.type : undefined,
+      };
     })
-    .filter((file): file is string => file !== null);
+    .filter((file): file is RegistryItemFile => file !== null);
 }
 
 function mapToPackage(raw: RegistryItemRaw, source: RegistrySource): ComponentPackage {
@@ -89,12 +100,14 @@ function mapToPackage(raw: RegistryItemRaw, source: RegistrySource): ComponentPa
     name,
     type: normalizeType(raw.type),
     files: normalizeFiles(raw.files),
+    registryFiles: normalizeRegistryFiles(raw.files),
     source: {
       originRegistry: source.name,
       originalComponentName: name,
       importedAt: now,
     },
     dependencies: normalizeDeps(raw.dependencies, 'package'),
+    devDependencies: normalizeDeps(raw.devDependencies, 'package'),
     registryDependencies: normalizeDeps(raw.registryDependencies, 'registry'),
     createdAt: now,
     updatedAt: now,

@@ -138,10 +138,70 @@ export interface ComponentPackage {
   type: 'component' | 'hook' | 'utility' | 'page' | 'registry-item';
   source?: ComponentSource;
   files: string[];
+  registryFiles?: RegistryItemFile[];
   dependencies: RegistryDependency[];
+  devDependencies?: RegistryDependency[];
   registryDependencies: RegistryDependency[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface RegistryItemFile {
+  path: string;
+  content?: string;
+  type?: string;
+}
+
+export interface PlannedFile {
+  sourcePath: string;
+  targetPath: string;
+  content: string;
+}
+
+export interface ImportConflict {
+  path: string;
+  type: 'file-exists' | 'unsafe-path' | 'missing-content';
+  message: string;
+}
+
+export type ImportConflictAction = 'overwrite' | 'skip' | 'rename' | 'fork';
+
+export interface ImportConflictResolution {
+  path: string;
+  action: ImportConflictAction;
+  targetPath?: string;
+}
+
+export interface ImportPlan {
+  id: string;
+  itemName: string;
+  sourceId?: string;
+  filesToAdd: PlannedFile[];
+  filesToOverwrite: PlannedFile[];
+  dependencies: string[];
+  devDependencies: string[];
+  registryDependencies: string[];
+  aliasesNeeded: string[];
+  conflicts: ImportConflict[];
+}
+
+export interface ImportPlanRequest {
+  itemName: string;
+  sourceId?: string;
+}
+
+export interface ApplyImportPlanRequest {
+  plan: ImportPlan;
+  resolutions?: ImportConflictResolution[];
+}
+
+export interface ApplyImportPlanResult {
+  success: boolean;
+  added: string[];
+  overwritten: string[];
+  skipped: string[];
+  backupId?: string;
+  rolledBack?: boolean;
 }
 
 export interface TokenPatch {
