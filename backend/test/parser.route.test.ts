@@ -1,10 +1,12 @@
-import path from 'node:path';
-import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import express from 'express';
+import fs from 'fs-extra';
 import request from 'supertest';
 import parserRouter from '../src/routes/parser.js';
 
+// Paths resolved via relativePath must be relative to process.cwd()
 const fixtureRoot = path.join(process.cwd(), 'test', 'fixtures', 'parser');
 
 let savedCwd: string | undefined;
@@ -33,9 +35,7 @@ describe('POST /api/parser/analyze', () => {
   });
 
   it('returns 400 INVALID_FILE_PATH for traversal paths', async () => {
-    const res = await request(app)
-      .post('/api/parser/analyze')
-      .send({ filePath: '../outside.tsx' });
+    const res = await request(app).post('/api/parser/analyze').send({ filePath: '../outside.tsx' });
     assert.equal(res.status, 400);
     assert.equal(res.body.success, false);
     assert.equal(res.body.error.code, 'INVALID_FILE_PATH');
@@ -59,5 +59,37 @@ describe('POST /api/parser/analyze', () => {
     assert.equal(res.body.success, true);
     assert.ok(res.body.parsed);
     assert.ok(Array.isArray(res.body.parsed.components));
+  });
+
+  it('returns 400 INVALID_FILE_PATH for empty / whitespace-only filePath', async () => {
+    const res = await request(app).post('/api/parser/analyze').send({ filePath: '   ' });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.error.code, 'INVALID_FILE_PATH');
+  });
+
+  it('returns 400 INVALID_FILE_PATH for non-TSX extension', async () => {
+    const res = await request(app)
+      .post('/api/parser/analyze')
+      .send({ filePath: 'test/fixtures/parser/button.ts' });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.error.code, 'INVALID_FILE_PATH');
+  });
+
+  it('returns 413 FILE_TOO_LARGE for files exceeding 500 KB', async () => {
+    const largeFilePath = path.join(fixtureRoot, 'large-file.tsx');
+    const relPath = path.relative(process.cwd(), largeFilePath);
+    await fs.writeFile(largeFilePath, Buffer.alloc(501 * 1024, 'a'));
+    try {
+      const res = await request(app)
+        .post('/api/parser/analyze')
+        .send({ filePath: relPath.replace(/\\/g, '/') });
+      assert.equal(res.status, 413);
+      assert.equal(res.body.success, false);
+      assert.equal(res.body.error.code, 'FILE_TOO_LARGE');
+    } finally {
+      await fs.remove(largeFilePath);
+    }
   });
 });

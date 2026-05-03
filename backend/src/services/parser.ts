@@ -28,7 +28,7 @@ export function resolveProjectParserPath(filePath: string, cwd: string): string 
   const relativePath = path.relative(resolvedRoot, resolvedFile);
   const extension = path.extname(resolvedFile).toLowerCase();
 
-  if (relativePath === '' || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+  if (relativePath === '' || relativePath.startsWith('..')) {
     return null;
   }
 
@@ -477,7 +477,7 @@ function getPropertyName(name: ts.PropertyName): string | null {
 function getExpressionName(expression: ts.Expression): string {
   if (ts.isIdentifier(expression)) return expression.text;
   if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
-  return expression.getText?.() ?? '';
+  return expression.getText();
 }
 
 function getDeclarationName(node: ts.Node): string | null {
@@ -516,6 +516,10 @@ function isJsxOpeningLike(node: ts.Node): node is JsxOpeningLike {
   return ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node);
 }
 
+/**
+ * Extracts the literal string name from a JSX tag expression.
+ * Used to normalize tag names for component parsing.
+ */
 function getJsxTagName(tagName: ts.JsxTagNameExpression): string {
   return tagName.getText();
 }
@@ -529,5 +533,5 @@ function getLine(sourceFile: ts.SourceFile, position: number): number {
 }
 
 function isPascalCase(value: string): boolean {
-  return /^[A-Z][a-z]/.test(value);
+  return /^[A-Z]/.test(value);
 }

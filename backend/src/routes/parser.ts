@@ -1,6 +1,6 @@
-import fs from 'fs-extra';
 import { type Request, type Response, Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import fs from 'fs-extra';
 import { parseComponentFile, resolveProjectParserPath } from '../services/parser.js';
 import { getWorkingDirectory } from '../services/workspace.js';
 import { logger } from '../utils/logger.js';
