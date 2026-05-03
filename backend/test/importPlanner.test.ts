@@ -96,7 +96,7 @@ describe('import planner service', () => {
       plan.conflicts.some((conflict) => conflict.type === 'file-exists'),
       true
     );
-    assert.deepEqual(plan.backupPaths, [existingButton]);
+    assert.deepEqual(plan.backupPaths, [path.join('components', 'ui', 'button.tsx')]);
   });
 
   it('reports unsafe paths and missing content before import', async () => {
@@ -126,11 +126,14 @@ describe('import planner service', () => {
         files: [
           { path: 'ui/button.tsx', content: 'new button' },
           { path: 'ui/card.tsx', content: 'new card' },
+          { path: 'ui/dialog.tsx', content: 'new dialog' },
         ],
       },
     ]);
     const existingButton = path.join(root, 'components', 'ui', 'button.tsx');
+    const existingDialog = path.join(root, 'components', 'ui', 'dialog.tsx');
     await fs.outputFile(existingButton, 'old button');
+    await fs.outputFile(existingDialog, 'old dialog');
 
     const plan = await generateImportPlan({ sourceId, itemName: 'button' }, root);
     const result = await applyImportPlan(
@@ -138,14 +141,17 @@ describe('import planner service', () => {
         plan,
         resolutions: [
           { path: existingButton, action: 'rename', targetPath: 'components/ui/button-new.tsx' },
+          { path: existingDialog, action: 'skip' },
         ],
       },
       root
     );
 
     assert.equal(result.success, true);
-    assert.equal(result.backupId, undefined);
-    assert.equal(await fs.readFile(existingButton, 'utf-8'), 'old button');
+    assert.equal(typeof result.backupId, 'string');
+    assert.equal(await fs.pathExists(existingButton), false);
+    assert.equal(await fs.readFile(existingDialog, 'utf-8'), 'old dialog');
+    assert.deepEqual(result.skipped, [existingDialog]);
     assert.equal(
       await fs.readFile(path.join(root, 'components', 'ui', 'button-new.tsx'), 'utf-8'),
       'new button'

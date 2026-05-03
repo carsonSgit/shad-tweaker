@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import fs from 'fs-extra';
 import type {
@@ -11,6 +12,7 @@ import type {
   PlannedFile,
   RegistryItemFile,
 } from '../types/index.js';
+import { logger } from '../utils/logger.js';
 import { isSafeProjectRelativePath } from '../utils/paths.js';
 import { createBackup, restoreBackup } from './backup.js';
 import { findRegistryItem, getRegistryItem } from './registry.js';
@@ -21,6 +23,12 @@ interface PackageManifest {
   devDependencies?: Record<string, string>;
 }
 
+interface TsConfig {
+  compilerOptions?: {
+    paths?: Record<string, unknown>;
+  };
+}
+
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.trim().length > 0))].sort((a, b) =>
     a.localeCompare(b)
@@ -28,7 +36,7 @@ function uniqueSorted(values: string[]): string[] {
 }
 
 function planId(item: ComponentPackage): string {
-  return `${item.id}:${Date.now()}`;
+  return `${item.id}:${randomUUID()}`;
 }
 
 function normalizeRegistryPath(filePath: string): string | null {
@@ -39,9 +47,7 @@ function normalizeRegistryPath(filePath: string): string | null {
 
 function resolveTargetPath(cwd: string, componentDirectory: string, registryPath: string): string {
   const normalized = normalizeRegistryPath(registryPath);
-  if (!normalized) {
-    return path.resolve(cwd, componentDirectory, path.basename(registryPath));
-  }
+  if (!normalized) return '';
 
   const withoutLeadingUi = normalized.startsWith('ui/') ? normalized.slice(3) : normalized;
   return path.resolve(cwd, componentDirectory, withoutLeadingUi);
@@ -86,9 +92,11 @@ function dependencyDeltas(
 async function detectAliases(cwd: string, files: PlannedFile[]): Promise<string[]> {
   const aliases = new Set<string>();
   const tsconfigPath = path.join(cwd, 'tsconfig.json');
-  const rawConfig = (await fs.pathExists(tsconfigPath))
-    ? JSON.stringify(await fs.readJson(tsconfigPath))
-    : '';
+  const tsconfig = (await fs.pathExists(tsconfigPath))
+    ? ((await fs.readJson(tsconfigPath)) as TsConfig)
+    : {};
+  const paths = tsconfig.compilerOptions?.paths ?? {};
+  const hasAtAlias = Object.hasOwn(paths, '@/*');
 
   for (const file of files) {
     const matches = file.content.matchAll(
@@ -96,7 +104,7 @@ async function detectAliases(cwd: string, files: PlannedFile[]): Promise<string[
     );
     for (const match of matches) {
       const alias = match[1] ?? match[2];
-      if (!rawConfig.includes('@/*')) {
+      if (!hasAtAlias) {
         aliases.add(alias.split('/').slice(0, 2).join('/'));
       }
     }
@@ -243,7 +251,7 @@ export async function generateImportPlan(
     ),
     aliasesNeeded: await detectAliases(cwd, plannedFiles),
     conflicts,
-    backupPaths: filesToOverwrite.map((file) => file.targetPath),
+    backupPaths: filesToOverwrite.map((file) => path.relative(cwd, file.targetPath)),
   };
 }
 
@@ -284,7 +292,12 @@ export async function applyImportPlan(
   const skipped: string[] = [];
   let backupId: string | undefined;
 
-  const filesToWrite: Array<{ file: PlannedFile; targetPath: string; overwrites: boolean }> = [];
+  const filesToWrite: Array<{
+    file: PlannedFile;
+    targetPath: string;
+    overwrites: boolean;
+    removeOriginalPath?: string;
+  }> = [];
 
   for (const file of request.plan.filesToAdd) {
     filesToWrite.push({ file, targetPath: file.targetPath, overwrites: false });
@@ -302,13 +315,16 @@ export async function applyImportPlan(
       file,
       targetPath,
       overwrites: resolution.action === 'overwrite',
+      removeOriginalPath: resolution.action === 'rename' ? file.targetPath : undefined,
     });
   }
 
   const backupPaths = uniqueSorted(
     filesToWrite
-      .filter((entry) => entry.overwrites)
-      .map((entry) => entry.targetPath)
+      .flatMap((entry) => [
+        entry.overwrites ? entry.targetPath : '',
+        entry.removeOriginalPath ?? '',
+      ])
       .filter((targetPath) => fs.existsSync(targetPath))
   );
 
@@ -324,6 +340,9 @@ export async function applyImportPlan(
       }
 
       await writePlannedFile(entry.file, entry.targetPath);
+      if (entry.removeOriginalPath && entry.removeOriginalPath !== entry.targetPath) {
+        await fs.remove(entry.removeOriginalPath);
+      }
       if (entry.overwrites) {
         overwritten.push(entry.targetPath);
       } else {
@@ -331,12 +350,25 @@ export async function applyImportPlan(
       }
     }
   } catch (error) {
-    await Promise.all(added.map((targetPath) => fs.remove(targetPath)));
+    try {
+      await Promise.all(added.map((targetPath) => fs.remove(targetPath)));
+    } catch (cleanupError) {
+      logger.warn('Failed to clean up partially imported files', cleanupError);
+    }
+    let rolledBack = false;
+    let rollbackMessage = '';
     if (backupId) {
-      await restoreBackup(backupId);
+      try {
+        await restoreBackup(backupId);
+        rolledBack = true;
+      } catch (rollbackError) {
+        const message =
+          rollbackError instanceof Error ? rollbackError.message : 'Unknown rollback error';
+        rollbackMessage = ` Rollback failed: ${message}.`;
+      }
     }
     const message = error instanceof Error ? error.message : 'Failed to apply import plan';
-    throw new Error(`${message}${backupId ? ' Rolled back from backup.' : ''}`);
+    throw new Error(`${message}${rolledBack ? ' Rolled back from backup.' : ''}${rollbackMessage}`);
   }
 
   return {

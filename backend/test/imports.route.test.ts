@@ -35,9 +35,7 @@ describe('import routes', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it('returns an import plan for a registry item', async () => {
-    const root = await createTempRoot();
-    process.env.SHADCN_TWEAKER_CWD = root;
+  async function addRegistry(root: string, items: unknown[]) {
     const { source } = await upsertRegistrySource(
       {
         name: 'Registry',
@@ -48,12 +46,19 @@ describe('import routes', () => {
       root
     );
     globalThis.fetch = async () =>
-      new Response(
-        JSON.stringify({
-          items: [{ name: 'button', files: [{ path: 'ui/button.tsx', content: 'button' }] }],
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } }
-      );
+      new Response(JSON.stringify({ items }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    return source;
+  }
+
+  it('returns an import plan for a registry item', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+    const source = await addRegistry(root, [
+      { name: 'button', files: [{ path: 'ui/button.tsx', content: 'button' }] },
+    ]);
 
     const res = await request(app)
       .post('/api/imports/plan')
@@ -64,11 +69,73 @@ describe('import routes', () => {
     assert.equal(res.body.plan.filesToAdd.length, 1);
   });
 
+  it('returns 400 when itemName is missing', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+
+    const res = await request(app).post('/api/imports/plan').send({});
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+  });
+
   it('rejects unsafe import plan identifiers', async () => {
     const root = await createTempRoot();
     process.env.SHADCN_TWEAKER_CWD = root;
 
     const res = await request(app).post('/api/imports/plan').send({ itemName: '../button' });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+  });
+
+  it('returns 404 for unknown registry items', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+    await addRegistry(root, []);
+
+    const res = await request(app).post('/api/imports/plan').send({ itemName: 'missing' });
+
+    assert.equal(res.status, 404);
+    assert.equal(res.body.error.code, 'REGISTRY_ITEM_NOT_FOUND');
+  });
+
+  it('applies an import plan', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+    const source = await addRegistry(root, [
+      { name: 'button', files: [{ path: 'ui/button.tsx', content: 'button' }] },
+    ]);
+
+    const planRes = await request(app)
+      .post('/api/imports/plan')
+      .send({ sourceId: source.id, itemName: 'button' });
+    const applyRes = await request(app)
+      .post('/api/imports/apply')
+      .send({ plan: planRes.body.plan });
+
+    assert.equal(applyRes.status, 200);
+    assert.equal(applyRes.body.success, true);
+    assert.equal(
+      await fs.readFile(path.join(root, 'components', 'ui', 'button.tsx'), 'utf-8'),
+      'button'
+    );
+  });
+
+  it('returns 400 for invalid apply target paths', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+
+    const res = await request(app)
+      .post('/api/imports/apply')
+      .send({
+        plan: {
+          id: 'bad',
+          itemName: 'button',
+          filesToAdd: [{ sourcePath: 'ui/button.tsx', targetPath: '../button.tsx', content: 'x' }],
+          filesToOverwrite: [],
+        },
+      });
 
     assert.equal(res.status, 400);
     assert.equal(res.body.error.code, 'VALIDATION_ERROR');

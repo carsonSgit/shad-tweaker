@@ -1,16 +1,24 @@
 import { type Request, type Response, Router } from 'express';
 import { applyImportPlan, generateImportPlan } from '../services/importPlanner.js';
+import { getWorkingDirectory } from '../services/workspace.js';
 import type {
   ApplyImportPlanRequest,
   ImportConflictAction,
   ImportPlanRequest,
+  PlannedFile,
 } from '../types/index.js';
 import { logger } from '../utils/logger.js';
-import { isSafeRegistryIdentifier } from '../utils/validation.js';
+import { isSafeProjectRelativePath } from '../utils/paths.js';
+import { isPathSafe, isSafeRegistryIdentifier } from '../utils/validation.js';
 
 const router = Router();
 
-const CONFLICT_ACTIONS: ImportConflictAction[] = ['overwrite', 'skip', 'rename', 'fork'];
+const CONFLICT_ACTIONS = [
+  'overwrite',
+  'skip',
+  'rename',
+  'fork',
+] as const satisfies ImportConflictAction[];
 
 function validatePlanRequest(body: unknown): body is ImportPlanRequest {
   if (typeof body !== 'object' || body === null) return false;
@@ -24,7 +32,18 @@ function validatePlanRequest(body: unknown): body is ImportPlanRequest {
   return true;
 }
 
-function validateApplyRequest(body: unknown): body is ApplyImportPlanRequest {
+function isPlannedFile(value: unknown, cwd: string): value is PlannedFile {
+  if (typeof value !== 'object' || value === null) return false;
+  const file = value as Record<string, unknown>;
+  return (
+    typeof file.sourcePath === 'string' &&
+    typeof file.targetPath === 'string' &&
+    typeof file.content === 'string' &&
+    isPathSafe(file.targetPath, cwd)
+  );
+}
+
+function validateApplyRequest(body: unknown, cwd: string): body is ApplyImportPlanRequest {
   if (typeof body !== 'object' || body === null) return false;
   const req = body as Record<string, unknown>;
 
@@ -32,6 +51,8 @@ function validateApplyRequest(body: unknown): body is ApplyImportPlanRequest {
   const plan = req.plan as Record<string, unknown>;
   if (typeof plan.id !== 'string' || typeof plan.itemName !== 'string') return false;
   if (!Array.isArray(plan.filesToAdd) || !Array.isArray(plan.filesToOverwrite)) return false;
+  if (!plan.filesToAdd.every((file) => isPlannedFile(file, cwd))) return false;
+  if (!plan.filesToOverwrite.every((file) => isPlannedFile(file, cwd))) return false;
 
   if (req.resolutions === undefined) return true;
   if (!Array.isArray(req.resolutions)) return false;
@@ -43,7 +64,9 @@ function validateApplyRequest(body: unknown): body is ApplyImportPlanRequest {
       typeof candidate.path === 'string' &&
       typeof candidate.action === 'string' &&
       CONFLICT_ACTIONS.includes(candidate.action as ImportConflictAction) &&
-      (candidate.targetPath === undefined || typeof candidate.targetPath === 'string')
+      (candidate.targetPath === undefined ||
+        (typeof candidate.targetPath === 'string' &&
+          isSafeProjectRelativePath(candidate.targetPath)))
     );
   });
 }
@@ -79,7 +102,7 @@ router.post('/plan', async (req: Request, res: Response) => {
 
 router.post('/apply', async (req: Request, res: Response) => {
   try {
-    if (!validateApplyRequest(req.body)) {
+    if (!validateApplyRequest(req.body, getWorkingDirectory())) {
       res.status(400).json({
         success: false,
         error: {
