@@ -73,6 +73,12 @@ async function start() {
     const { manifest } = await initializeWorkspace();
     const port = process.env.PORT || manifest.config.port;
 
+    if (process.env.PORT) {
+      logger.info(
+        `PORT environment variable (${process.env.PORT}) overrides workspace manifest port (${manifest.config.port})`
+      );
+    }
+
     app.listen(port, () => {
       logger.info(`Shadcn Tweaker Backend running on http://localhost:${port}`);
       logger.info('Available endpoints:');
@@ -91,6 +97,9 @@ async function start() {
       logger.info('  GET  /api/workspace - Get workspace manifest');
       logger.info('  POST /api/workspace/initialize - Initialize workspace manifest');
       logger.info('  PUT  /api/workspace/config - Update workspace config');
+      logger.info('  GET  /api/workspace/registry-sources - List registry sources');
+      logger.info('  POST /api/workspace/registry-sources - Create or update registry source');
+      logger.info('  DELETE /api/workspace/registry-sources/:id - Delete registry source');
     });
   } catch (error) {
     logger.error('Failed to start server', error);

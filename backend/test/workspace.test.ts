@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import fs from 'fs-extra';
+import { cleanupOldBackups } from '../src/services/backup.js';
 import {
   deleteRegistrySource,
   initializeWorkspace,
@@ -14,6 +15,7 @@ import {
   upsertRegistrySource,
 } from '../src/services/workspace.js';
 import type { Component } from '../src/types/index.js';
+import { isSafeProjectRelativePath } from '../src/utils/paths.js';
 
 const tempRoots: string[] = [];
 const testWorkspaceBase = path.join(process.cwd(), '.shadcn-tweaker-test-workspaces');
@@ -30,6 +32,14 @@ afterEach(async () => {
 });
 
 describe('workspace manifest service', () => {
+  it('validates project-relative paths consistently', () => {
+    assert.equal(isSafeProjectRelativePath('./components/ui'), true);
+    assert.equal(isSafeProjectRelativePath('components/ui'), true);
+    assert.equal(isSafeProjectRelativePath('../outside'), false);
+    assert.equal(isSafeProjectRelativePath('./../../outside'), false);
+    assert.equal(isSafeProjectRelativePath(path.resolve('components/ui')), false);
+  });
+
   it('creates a fresh v1 manifest when none exists', async () => {
     const root = await createTempRoot();
 
@@ -127,6 +137,66 @@ describe('workspace manifest service', () => {
     assert.equal(manifest.backups[0].id, backupManifest.id);
     assert.equal(manifest.backups[0].components[0], backupManifest.files[0].originalPath);
     assert.equal(manifest.backups[0].size, Buffer.byteLength(backupFileContent));
+  });
+
+  it('cleans up backups by count and retention days from workspace config', async () => {
+    const root = await createTempRoot();
+    const previousCwd = process.env.SHADCN_TWEAKER_CWD;
+    process.env.SHADCN_TWEAKER_CWD = root;
+
+    try {
+      await updateWorkspaceConfig({ maxBackups: 2, backupRetentionDays: 7 }, root);
+
+      const backupBasePath = path.join(root, '.shadcn-tweaker', 'backups');
+      const backups = [
+        {
+          id: 'backup_2026-05-03_12-00-00',
+          timestamp: '2026-05-03T12:00:00.000Z',
+        },
+        {
+          id: 'backup_2026-05-02_12-00-00',
+          timestamp: '2026-05-02T12:00:00.000Z',
+        },
+        {
+          id: 'backup_2026-04-20_12-00-00',
+          timestamp: '2026-04-20T12:00:00.000Z',
+        },
+      ];
+
+      for (const backup of backups) {
+        const backupDir = path.join(backupBasePath, backup.id);
+        const backupFile = path.join(backupDir, 'button.tsx');
+        await fs.ensureDir(backupDir);
+        await fs.writeFile(backupFile, 'export const Button = () => null;');
+        await fs.writeJson(
+          path.join(backupDir, 'manifest.json'),
+          {
+            id: backup.id,
+            timestamp: backup.timestamp,
+            files: [
+              {
+                originalPath: path.join(root, 'components', 'ui', 'button.tsx'),
+                backupPath: backupFile,
+              },
+            ],
+          },
+          { spaces: 2 }
+        );
+      }
+
+      const deleted = await cleanupOldBackups();
+
+      assert.equal(deleted, 1);
+      assert.equal(await fs.pathExists(path.join(backupBasePath, backups[0].id)), true);
+      assert.equal(await fs.pathExists(path.join(backupBasePath, backups[1].id)), true);
+      assert.equal(await fs.pathExists(path.join(backupBasePath, backups[2].id)), false);
+    } finally {
+      if (previousCwd === undefined) {
+        delete process.env.SHADCN_TWEAKER_CWD;
+      } else {
+        process.env.SHADCN_TWEAKER_CWD = previousCwd;
+      }
+    }
   });
 
   it('updates manifest-owned config values', async () => {

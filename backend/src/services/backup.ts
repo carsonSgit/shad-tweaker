@@ -2,7 +2,7 @@ import path from 'node:path';
 import fs from 'fs-extra';
 import type { Backup, BackupManifest } from '../types/index.js';
 import { logger } from '../utils/logger.js';
-import { getWorkspacePath, recordBackupMetadata } from './workspace.js';
+import { getWorkspacePath, loadWorkspaceManifest, recordBackupMetadata } from './workspace.js';
 
 function getBackupBasePath(): string {
   return getWorkspacePath('backups');
@@ -63,7 +63,6 @@ export async function createBackup(componentPaths: string[]): Promise<Backup> {
   logger.info(`Created backup ${backupId} with ${componentPaths.length} files`);
 
   // Cleanup old backups asynchronously (don't block the response).
-  // TODO: Also enforce workspace config backupRetentionDays once backup cleanup reads manifest config.
   cleanupOldBackups().catch((err) => {
     logger.warn('Failed to cleanup old backups', err);
   });
@@ -171,21 +170,62 @@ export async function getBackupDetails(backupId: string): Promise<BackupManifest
   return fs.readJson(manifestPath);
 }
 
-// Default max backups to keep
 const DEFAULT_MAX_BACKUPS = 20;
+const DEFAULT_BACKUP_RETENTION_DAYS = 30;
 
-export async function cleanupOldBackups(maxBackups: number = DEFAULT_MAX_BACKUPS): Promise<number> {
-  const backups = await listBackups();
+interface BackupCleanupOptions {
+  maxBackups?: number;
+  backupRetentionDays?: number;
+}
 
-  if (backups.length <= maxBackups) {
-    return 0;
+async function getBackupCleanupOptions(
+  options: BackupCleanupOptions = {}
+): Promise<Required<BackupCleanupOptions>> {
+  if (options.maxBackups !== undefined && options.backupRetentionDays !== undefined) {
+    return {
+      maxBackups: options.maxBackups,
+      backupRetentionDays: options.backupRetentionDays,
+    };
   }
 
-  const toDelete = backups.slice(maxBackups);
-  let deleted = 0;
+  try {
+    const manifest = await loadWorkspaceManifest();
+    return {
+      maxBackups: options.maxBackups ?? manifest.config.maxBackups,
+      backupRetentionDays: options.backupRetentionDays ?? manifest.config.backupRetentionDays,
+    };
+  } catch (error) {
+    logger.warn('Failed to read workspace config for backup cleanup; using defaults', error);
+    return {
+      maxBackups: options.maxBackups ?? DEFAULT_MAX_BACKUPS,
+      backupRetentionDays: options.backupRetentionDays ?? DEFAULT_BACKUP_RETENTION_DAYS,
+    };
+  }
+}
 
-  for (const backup of toDelete) {
-    if (await deleteBackup(backup.id)) {
+export async function cleanupOldBackups(
+  options: BackupCleanupOptions | number = {}
+): Promise<number> {
+  const cleanupOptions = typeof options === 'number' ? { maxBackups: options } : options;
+  const { maxBackups, backupRetentionDays } = await getBackupCleanupOptions(cleanupOptions);
+  const backups = await listBackups();
+  const retentionCutoff = Date.now() - backupRetentionDays * 24 * 60 * 60 * 1000;
+  const backupIdsToDelete = new Set<string>();
+
+  for (const backup of backups) {
+    const timestamp = new Date(backup.timestamp).getTime();
+    if (!Number.isNaN(timestamp) && timestamp < retentionCutoff) {
+      backupIdsToDelete.add(backup.id);
+    }
+  }
+
+  for (const backup of backups.slice(maxBackups)) {
+    backupIdsToDelete.add(backup.id);
+  }
+
+  let deleted = 0;
+  for (const backupId of backupIdsToDelete) {
+    if (await deleteBackup(backupId)) {
       deleted++;
     }
   }

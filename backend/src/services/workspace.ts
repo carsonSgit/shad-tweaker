@@ -12,6 +12,7 @@ import type {
   WorkspaceManifest,
 } from '../types/index.js';
 import { logger } from '../utils/logger.js';
+import { isSafeProjectRelativePath } from '../utils/paths.js';
 
 const WORKSPACE_DIR = '.shadcn-tweaker';
 const MANIFEST_FILE = 'manifest.json';
@@ -99,15 +100,6 @@ function normalizeManifest(raw: unknown): WorkspaceManifest {
     presets: Array.isArray(candidate.presets) ? candidate.presets : [],
     backups: Array.isArray(candidate.backups) ? candidate.backups : [],
   };
-}
-
-function isSafeProjectRelativePath(value: string): boolean {
-  if (path.isAbsolute(value)) {
-    return false;
-  }
-
-  const normalized = path.normalize(value);
-  return normalized !== '..' && !normalized.startsWith(`..${path.sep}`);
 }
 
 function normalizeWorkspaceConfig(rawConfig: unknown): WorkspaceConfig {

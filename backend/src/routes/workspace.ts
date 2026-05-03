@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { type Request, type Response, Router } from 'express';
 import {
   deleteRegistrySource,
@@ -10,6 +9,7 @@ import {
 } from '../services/workspace.js';
 import type { RegistrySource, WorkspaceConfig } from '../types/index.js';
 import { logger } from '../utils/logger.js';
+import { isSafeProjectRelativePath } from '../utils/paths.js';
 
 const router = Router();
 
@@ -34,15 +34,6 @@ function invalid<T>(errors: Record<string, string>): ValidationResult<T> {
 
 function valid<T>(value: T): ValidationResult<T> {
   return { value, errors: null };
-}
-
-function isSafeProjectRelativePath(value: string): boolean {
-  if (path.isAbsolute(value)) {
-    return false;
-  }
-
-  const normalized = path.normalize(value);
-  return normalized !== '..' && !normalized.startsWith(`..${path.sep}`);
 }
 
 function isHttpUrl(value: string): boolean {
