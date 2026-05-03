@@ -77,6 +77,17 @@ export interface RegistryDependency {
   source?: string;
 }
 
+export interface RegistrySource {
+  id: string;
+  name: string;
+  type: 'shadcn-registry' | 'url-list' | 'local-folder' | 'npm-package';
+  baseUrl?: string;
+  registryJsonUrl?: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface WorkspaceComponent {
   id: string;
   name: string;
@@ -172,7 +183,7 @@ export interface WorkspaceManifest {
   updatedAt: string;
   config: WorkspaceConfig;
   components: WorkspaceComponent[];
-  sources: ComponentSource[];
+  sources: RegistrySource[];
   packages: ComponentPackage[];
   tokenSets: DesignTokenSet[];
   presets: Preset[];

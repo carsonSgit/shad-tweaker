@@ -6,9 +6,12 @@ import assert from 'node:assert/strict';
 import fs from 'fs-extra';
 import {
   loadWorkspaceManifest,
+  deleteRegistrySource,
+  listRegistrySources,
   recordBackupMetadata,
   recordScannedComponents,
   updateWorkspaceConfig,
+  upsertRegistrySource,
 } from '../src/services/workspace.js';
 import type { Component } from '../src/types/index.js';
 
@@ -171,5 +174,41 @@ describe('workspace manifest service', () => {
       () => loadWorkspaceManifest(root),
       /Failed to load workspace manifest: Unsupported workspace manifest version/
     );
+  });
+
+  it('adds, updates, lists, and deletes registry sources', async () => {
+    const root = await createTempRoot();
+
+    const created = await upsertRegistrySource(
+      {
+        name: 'Acme Registry',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/registry.json',
+        enabled: true,
+      },
+      root
+    );
+    const updated = await upsertRegistrySource(
+      {
+        id: created.id,
+        name: 'Acme Registry',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/r/registry.json',
+        enabled: false,
+      },
+      root
+    );
+    const sources = await listRegistrySources(root);
+    const deleted = await deleteRegistrySource(created.id, root);
+    const afterDelete = await listRegistrySources(root);
+
+    assert.equal(created.id, 'registry_acme-registry');
+    assert.equal(updated.createdAt, created.createdAt);
+    assert.notEqual(updated.updatedAt, created.updatedAt);
+    assert.equal(sources.length, 1);
+    assert.equal(sources[0].registryJsonUrl, 'https://example.com/r/registry.json');
+    assert.equal(sources[0].enabled, false);
+    assert.equal(deleted, true);
+    assert.deepEqual(afterDelete, []);
   });
 });

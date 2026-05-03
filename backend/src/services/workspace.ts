@@ -1,10 +1,12 @@
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import fs from 'fs-extra';
 import type {
   BackupManifest,
   BackupMetadata,
   Component,
   Preset,
+  RegistrySource,
   Template,
   WorkspaceConfig,
   WorkspaceManifest,
@@ -344,6 +346,79 @@ export async function updateWorkspaceConfig(
     },
     cwd
   );
+}
+
+function createRegistrySourceId(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40);
+
+  return `registry_${slug || randomUUID().slice(0, 8)}`;
+}
+
+export async function listRegistrySources(
+  cwd: string = getWorkingDirectory()
+): Promise<RegistrySource[]> {
+  const manifest = await loadWorkspaceManifest(cwd);
+  return manifest.sources;
+}
+
+export async function upsertRegistrySource(
+  source: Omit<RegistrySource, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
+  cwd: string = getWorkingDirectory()
+): Promise<RegistrySource> {
+  const manifest = await loadWorkspaceManifest(cwd);
+  const now = new Date().toISOString();
+  const id = source.id || createRegistrySourceId(source.name);
+  const existing = manifest.sources.find((candidate) => candidate.id === id);
+  const nextSource: RegistrySource = {
+    id,
+    name: source.name,
+    type: source.type,
+    baseUrl: source.baseUrl,
+    registryJsonUrl: source.registryJsonUrl,
+    enabled: source.enabled,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+  };
+  const sources = manifest.sources.filter((candidate) => candidate.id !== id);
+
+  sources.push(nextSource);
+
+  await saveWorkspaceManifest(
+    {
+      ...manifest,
+      sources: sources.sort((a, b) => a.name.localeCompare(b.name)),
+    },
+    cwd
+  );
+
+  return nextSource;
+}
+
+export async function deleteRegistrySource(
+  id: string,
+  cwd: string = getWorkingDirectory()
+): Promise<boolean> {
+  const manifest = await loadWorkspaceManifest(cwd);
+  const sources = manifest.sources.filter((source) => source.id !== id);
+
+  if (sources.length === manifest.sources.length) {
+    return false;
+  }
+
+  await saveWorkspaceManifest(
+    {
+      ...manifest,
+      sources,
+    },
+    cwd
+  );
+
+  return true;
 }
 
 export async function recordBackupMetadata(
