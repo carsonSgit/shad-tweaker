@@ -272,12 +272,14 @@ function parseClassNameAttribute(
   }
 
   if (ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression) {
+    const classes = collectStringLiterals([attribute.initializer.expression]).flatMap(splitClasses);
+
     return {
       tagName,
       line,
-      kind: 'expression',
+      kind: classes.length > 0 ? 'expression' : 'unsupported',
       raw: attribute.initializer.expression.getText(sourceFile),
-      classes: collectStringLiterals([attribute.initializer.expression]).flatMap(splitClasses),
+      classes,
     };
   }
 

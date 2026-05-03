@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "bun --watch src/server.ts",
     "build": "tsc",
-    "test": "tsx --test test/workspace.test.ts",
+    "test": "tsx --test test/*.test.ts",
     "start": "bun dist/server.js"
   },
   "dependencies": {
