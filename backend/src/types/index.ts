@@ -88,6 +88,41 @@ export interface RegistrySource {
   updatedAt: string;
 }
 
+export type RegistryHealthStatus = 'healthy' | 'degraded' | 'unhealthy';
+
+export interface RegistrySourceIssue {
+  code: string;
+  message: string;
+}
+
+export interface RegistrySourceHealth {
+  sourceId: string;
+  sourceName: string;
+  sourceType: RegistrySource['type'];
+  status: RegistryHealthStatus;
+  checkedAt: string;
+  issues: RegistrySourceIssue[];
+}
+
+export interface RegistryReadWarning {
+  sourceId: string;
+  sourceName: string;
+  message: string;
+}
+
+export interface RegistryItemSummary {
+  id: string;
+  name: string;
+  type: ComponentPackage['type'];
+  sourceId: string;
+  sourceName: string;
+}
+
+export interface RegistrySourceListResult {
+  items: RegistryItemSummary[];
+  warnings: RegistryReadWarning[];
+}
+
 export interface WorkspaceComponent {
   id: string;
   name: string;

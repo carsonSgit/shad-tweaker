@@ -101,8 +101,11 @@ async function start() {
       logger.info('  POST /api/workspace/initialize - Initialize workspace manifest');
       logger.info('  PUT  /api/workspace/config - Update workspace config');
       logger.info('  GET  /api/workspace/registry-sources - List registry sources');
+      logger.info('  GET  /api/workspace/registry-sources/health - Check registry source health');
       logger.info('  POST /api/workspace/registry-sources - Create or update registry source');
       logger.info('  DELETE /api/workspace/registry-sources/:id - Delete registry source');
+      logger.info('  GET  /api/workspace/registry-items - List registry items');
+      logger.info('  GET  /api/workspace/registry-items/:sourceId/:itemName - Fetch registry item');
     });
   } catch (error) {
     logger.error('Failed to start server', error);
