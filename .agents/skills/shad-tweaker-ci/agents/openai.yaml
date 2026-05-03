@@ -1,0 +1,4 @@
+interface:
+  display_name: "Shad Tweaker CI"
+  short_description: "Keep shad-tweaker PRs CI-clean"
+  default_prompt: "Use $shad-tweaker-ci to finish this shad-tweaker PR with small commits and passing CI checks."
