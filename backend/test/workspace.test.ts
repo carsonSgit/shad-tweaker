@@ -6,6 +6,7 @@ import { afterEach, describe, it } from 'node:test';
 import fs from 'fs-extra';
 import {
   deleteRegistrySource,
+  initializeWorkspace,
   listRegistrySources,
   loadWorkspaceManifest,
   recordBackupMetadata,
@@ -40,6 +41,18 @@ describe('workspace manifest service', () => {
     assert.deepEqual(manifest.components, []);
     assert.deepEqual(manifest.presets, []);
     assert.equal(await fs.pathExists(path.join(root, '.shadcn-tweaker', 'manifest.json')), true);
+  });
+
+  it('reports whether workspace initialization created the manifest', async () => {
+    const root = await createTempRoot();
+
+    const first = await initializeWorkspace(root);
+    const second = await initializeWorkspace(root);
+
+    assert.equal(first.created, true);
+    assert.equal(second.created, false);
+    assert.equal(first.manifest.version, 1);
+    assert.equal(second.manifest.version, 1);
   });
 
   it('merges legacy config values without rewriting the legacy file', async () => {
@@ -188,6 +201,58 @@ describe('workspace manifest service', () => {
 
     assert.equal(manifest.backups[0].id, 'backup_2026-05-03_12-00-00');
     assert.equal(manifest.components[0].name, 'button');
+  });
+
+  it('serializes hydration loads with concurrent metadata writes', async () => {
+    const root = await createTempRoot();
+    const templatePath = path.join(root, '.shadcn-tweaker', 'templates', 'templates.json');
+    const component: Component = {
+      name: 'button',
+      path: path.join(root, 'components', 'ui', 'button.tsx'),
+      metadata: {
+        lines: 10,
+        size: 200,
+        lastModified: '2026-05-03T00:00:00.000Z',
+        classCount: 3,
+      },
+    };
+
+    await fs.ensureDir(path.dirname(templatePath));
+    await fs.writeJson(
+      templatePath,
+      {
+        templates: [
+          {
+            id: 'template_concurrent',
+            name: 'Concurrent preset',
+            created: '2026-05-03T00:00:00.000Z',
+            rules: [{ find: 'rounded-md', replace: 'rounded-lg', isRegex: false }],
+          },
+        ],
+      },
+      { spaces: 2 }
+    );
+
+    await Promise.all([
+      loadWorkspaceManifest(root),
+      recordScannedComponents([component], root),
+      recordBackupMetadata(
+        {
+          id: 'backup_2026-05-03_13-00-00',
+          timestamp: '2026-05-03T13:00:00.000Z',
+          components: [component.path],
+          size: 200,
+        },
+        root
+      ),
+    ]);
+
+    const manifest = await loadWorkspaceManifest(root);
+
+    assert.equal(manifest.presets.length, 1);
+    assert.equal(manifest.presets[0].id, 'template_concurrent');
+    assert.equal(manifest.components[0].name, 'button');
+    assert.equal(manifest.backups[0].id, 'backup_2026-05-03_13-00-00');
   });
 
   it('records backup and scanned component metadata', async () => {

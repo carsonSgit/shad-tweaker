@@ -54,6 +54,10 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+function hasValue(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 function validateConfigUpdates(body: unknown): ValidationResult<Partial<WorkspaceConfig>> {
   if (typeof body !== 'object' || body === null) {
     return invalid({ body: 'Expected a JSON object.' });
@@ -151,18 +155,6 @@ function validateRegistrySource(body: unknown): ValidationResult<RegistrySourceI
     errors.type = `Must be one of: ${REGISTRY_SOURCE_TYPES.join(', ')}.`;
   }
 
-  if (req.baseUrl !== undefined) {
-    if (typeof req.baseUrl !== 'string' || !isHttpUrl(req.baseUrl.trim())) {
-      errors.baseUrl = 'Must be an http:// or https:// URL.';
-    }
-  }
-
-  if (req.registryJsonUrl !== undefined) {
-    if (typeof req.registryJsonUrl !== 'string' || !isHttpUrl(req.registryJsonUrl.trim())) {
-      errors.registryJsonUrl = 'Must be an http:// or https:// URL.';
-    }
-  }
-
   if (req.enabled !== undefined && typeof req.enabled !== 'boolean') {
     errors.enabled = 'Must be a boolean.';
   }
@@ -173,14 +165,37 @@ function validateRegistrySource(body: unknown): ValidationResult<RegistrySourceI
 
   const name = req.name as string;
   const type = req.type as RegistrySource['type'];
+  const baseUrl = hasValue(req.baseUrl) ? req.baseUrl.trim() : undefined;
+  const registryJsonUrl = hasValue(req.registryJsonUrl) ? req.registryJsonUrl.trim() : undefined;
+
+  if (type === 'local-folder') {
+    if (!baseUrl) {
+      errors.baseUrl = 'Local folder sources require a project-relative folder path.';
+    } else if (!isSafeProjectRelativePath(baseUrl)) {
+      errors.baseUrl = 'Must be a relative path inside the project for local folder sources.';
+    }
+    if (registryJsonUrl) {
+      errors.registryJsonUrl = 'Local folder sources should use baseUrl as the folder path.';
+    }
+  } else {
+    if (req.baseUrl !== undefined && (!baseUrl || !isHttpUrl(baseUrl))) {
+      errors.baseUrl = 'Must be an http:// or https:// URL.';
+    }
+    if (req.registryJsonUrl !== undefined && (!registryJsonUrl || !isHttpUrl(registryJsonUrl))) {
+      errors.registryJsonUrl = 'Must be an http:// or https:// URL.';
+    }
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return invalid(errors);
+  }
 
   return valid({
     id: req.id?.toString().trim(),
     name: name.trim(),
     type,
-    baseUrl: typeof req.baseUrl === 'string' ? req.baseUrl.trim() : undefined,
-    registryJsonUrl:
-      typeof req.registryJsonUrl === 'string' ? req.registryJsonUrl.trim() : undefined,
+    baseUrl,
+    registryJsonUrl,
     enabled: typeof req.enabled === 'boolean' ? req.enabled : true,
   });
 }
@@ -205,8 +220,8 @@ router.get('/', async (_req: Request, res: Response) => {
 
 router.post('/initialize', async (_req: Request, res: Response) => {
   try {
-    const manifest = await initializeWorkspace();
-    res.json({ success: true, manifest });
+    const { manifest, created } = await initializeWorkspace();
+    res.status(created ? 201 : 200).json({ success: true, manifest, created });
   } catch (error) {
     logger.error('Failed to initialize workspace', error);
     const message = error instanceof Error ? error.message : 'Failed to initialize workspace';
@@ -242,6 +257,10 @@ router.put('/config', async (req: Request, res: Response) => {
       success: true,
       manifest,
       restartRequired: validation.value.port !== undefined,
+      restartRequiredReason:
+        validation.value.port !== undefined
+          ? 'Port changes are persisted to the workspace manifest and take effect after restarting the backend.'
+          : undefined,
     });
   } catch (error) {
     logger.error('Failed to update workspace config', error);
