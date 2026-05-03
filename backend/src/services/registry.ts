@@ -21,6 +21,15 @@ interface RegistryItemRaw {
   registryDependencies?: string[];
 }
 
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function issue(code: string, message: string): RegistrySourceIssue {
   return { code, message };
 }
@@ -61,6 +70,9 @@ function mapToPackage(raw: RegistryItemRaw, source: RegistrySource): ComponentPa
 }
 
 async function checkRemoteUrl(url: string): Promise<RegistrySourceIssue[]> {
+  if (!isHttpUrl(url)) {
+    return [issue('INVALID_URL', `Invalid HTTP URL: ${url}`)];
+  }
   try {
     const response = await fetch(url, { method: 'GET' });
     if (!response.ok) {
@@ -125,7 +137,7 @@ export async function listRegistryItems(cwd: string = getWorkingDirectory()): Pr
   const items: RegistryItemSummary[] = [];
 
   for (const source of sources.filter((candidate) => candidate.enabled)) {
-    if (!source.registryJsonUrl) {
+    if (!source.registryJsonUrl || !isHttpUrl(source.registryJsonUrl)) {
       warnings.push({ sourceId: source.id, sourceName: source.name, message: 'No registryJsonUrl configured' });
       continue;
     }
@@ -167,9 +179,15 @@ export async function getRegistryItem(
   itemName: string,
   cwd: string = getWorkingDirectory()
 ): Promise<ComponentPackage | null> {
+  if (!sourceId || sourceId.includes('/') || sourceId.includes('\\') || sourceId.includes('..')) {
+    return null;
+  }
+  if (!itemName || itemName.includes('/') || itemName.includes('\\') || itemName.includes('..')) {
+    return null;
+  }
   const sources = await listRegistrySources(cwd);
   const source = sources.find((candidate) => candidate.id === sourceId && candidate.enabled);
-  if (!source || !source.registryJsonUrl) return null;
+  if (!source || !source.registryJsonUrl || !isHttpUrl(source.registryJsonUrl)) return null;
 
   try {
     const response = await fetch(source.registryJsonUrl, { method: 'GET' });
