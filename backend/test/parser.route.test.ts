@@ -1,11 +1,24 @@
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import request from 'supertest';
 import parserRouter from '../src/routes/parser.js';
 
 const fixtureRoot = path.join(process.cwd(), 'test', 'fixtures', 'parser');
+
+let savedCwd: string | undefined;
+before(() => {
+  savedCwd = process.env.SHADCN_TWEAKER_CWD;
+  process.env.SHADCN_TWEAKER_CWD = process.cwd();
+});
+after(() => {
+  if (savedCwd === undefined) {
+    delete process.env.SHADCN_TWEAKER_CWD;
+  } else {
+    process.env.SHADCN_TWEAKER_CWD = savedCwd;
+  }
+});
 
 const app = express();
 app.use(express.json());

@@ -73,7 +73,8 @@ export function parseComponentSource(filePath: string, content: string): ParsedC
     });
   }
 
-  const parseDiagnostics = (sourceFile as SourceFileWithParseDiagnostics).parseDiagnostics ?? []; // ts internal
+  // ts internal: parseDiagnostics is undocumented, verified against typescript ^5.3. May break on future TS versions.
+  const parseDiagnostics = (sourceFile as SourceFileWithParseDiagnostics).parseDiagnostics ?? [];
   for (const diagnostic of parseDiagnostics) {
     const line =
       typeof diagnostic.start === 'number' ? getLine(sourceFile, diagnostic.start) : undefined;
@@ -93,8 +94,7 @@ export function parseComponentSource(filePath: string, content: string): ParsedC
 
     collectExport(node, exports, exportedNames, sourceFile);
 
-    const component = parseComponentDeclaration(node, exportedNames, sourceFile);
-    if (component) components.push(component);
+    components.push(...parseComponentDeclaration(node, exportedNames, sourceFile));
 
     if (isJsxOpeningLike(node)) {
       jsxElements.push({
@@ -214,26 +214,31 @@ function parseComponentDeclaration(
   node: ts.Node,
   exportedNames: Set<string>,
   sourceFile: ts.SourceFile
-): ParsedComponent | null {
+): ParsedComponent[] {
   if (ts.isFunctionDeclaration(node) && node.name && isPascalCase(node.name.text)) {
-    return {
-      name: node.name.text,
-      declarationKind: 'function',
-      exported: isExported(node) || exportedNames.has(node.name.text),
-      line: getLine(sourceFile, node.getStart(sourceFile)),
-    };
+    return [
+      {
+        name: node.name.text,
+        declarationKind: 'function',
+        exported: isExported(node) || exportedNames.has(node.name.text),
+        line: getLine(sourceFile, node.getStart(sourceFile)),
+      },
+    ];
   }
 
   if (ts.isClassDeclaration(node) && node.name && isPascalCase(node.name.text)) {
-    return {
-      name: node.name.text,
-      declarationKind: 'class',
-      exported: isExported(node) || exportedNames.has(node.name.text),
-      line: getLine(sourceFile, node.getStart(sourceFile)),
-    };
+    return [
+      {
+        name: node.name.text,
+        declarationKind: 'class',
+        exported: isExported(node) || exportedNames.has(node.name.text),
+        line: getLine(sourceFile, node.getStart(sourceFile)),
+      },
+    ];
   }
 
   if (ts.isVariableStatement(node)) {
+    const result: ParsedComponent[] = [];
     for (const declaration of node.declarationList.declarations) {
       if (!ts.isIdentifier(declaration.name) || !isPascalCase(declaration.name.text)) continue;
       const initializer = declaration.initializer;
@@ -242,16 +247,17 @@ function parseComponentDeclaration(
       const declarationKind = getComponentInitializerKind(initializer);
       if (declarationKind === null) continue;
 
-      return {
+      result.push({
         name: declaration.name.text,
         declarationKind,
         exported: isExported(node) || exportedNames.has(declaration.name.text),
         line: getLine(sourceFile, declaration.getStart(sourceFile)),
-      };
+      });
     }
+    return result;
   }
 
-  return null;
+  return [];
 }
 
 function parseClassNameAttribute(
@@ -523,5 +529,5 @@ function getLine(sourceFile: ts.SourceFile, position: number): number {
 }
 
 function isPascalCase(value: string): boolean {
-  return /^[A-Z]/.test(value);
+  return /^[A-Z][a-z]/.test(value);
 }

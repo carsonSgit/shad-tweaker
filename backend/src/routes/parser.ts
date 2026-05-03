@@ -63,6 +63,18 @@ router.post('/analyze', analyzeLimiter, async (req: Request, res: Response) => {
       return;
     }
 
+    const { size } = await fs.stat(resolvedPath);
+    if (size > 500 * 1024) {
+      res.status(413).json({
+        success: false,
+        error: {
+          message: 'File exceeds the 500 KB size limit.',
+          code: 'FILE_TOO_LARGE',
+        },
+      });
+      return;
+    }
+
     const parsed = await parseComponentFile(resolvedPath);
     res.json({ success: true, parsed });
   } catch (error) {
