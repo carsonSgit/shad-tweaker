@@ -73,6 +73,30 @@ export function parseComponentSource(filePath: string, content: string): ParsedC
     });
   }
 
+  // Pre-pass to collect all exported names so that components declared BEFORE their export are correctly identified.
+  function preVisit(node: ts.Node): void {
+    if (isExported(node)) {
+      if (ts.isVariableStatement(node)) {
+        for (const declaration of node.declarationList.declarations) {
+          if (ts.isIdentifier(declaration.name)) {
+            exportedNames.add(declaration.name.text);
+          }
+        }
+      } else {
+        const name = getDeclarationName(node);
+        if (name) exportedNames.add(name);
+      }
+    }
+
+    if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause)) {
+      for (const element of node.exportClause.elements) {
+        exportedNames.add(element.name.text);
+      }
+    }
+    ts.forEachChild(node, preVisit);
+  }
+  preVisit(sourceFile);
+
   // ts internal: parseDiagnostics is undocumented, verified against typescript ^5.3. May break on future TS versions.
   const parseDiagnostics = (sourceFile as SourceFileWithParseDiagnostics).parseDiagnostics ?? [];
   for (const diagnostic of parseDiagnostics) {
@@ -181,10 +205,20 @@ function collectExport(
   sourceFile: ts.SourceFile
 ): void {
   if (isExported(node)) {
-    const name = getDeclarationName(node);
-    if (name) {
-      exportedNames.add(name);
-      exports.push({ name, kind: getExportKind(node) });
+    if (ts.isVariableStatement(node)) {
+      for (const declaration of node.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) {
+          const name = declaration.name.text;
+          exportedNames.add(name);
+          exports.push({ name, kind: 'const' });
+        }
+      }
+    } else {
+      const name = getDeclarationName(node);
+      if (name) {
+        exportedNames.add(name);
+        exports.push({ name, kind: getExportKind(node) });
+      }
     }
   }
 

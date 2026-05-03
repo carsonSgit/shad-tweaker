@@ -114,4 +114,41 @@ describe('component parser service', () => {
     assert.ok(parsed.diagnostics.some((diagnostic) => diagnostic.severity === 'error'));
     assert.ok(parsed.jsxElements.some((element) => element.tagName === 'div'));
   });
+
+  it('correctly identifies bottom-of-file re-exports as exported', () => {
+    const source = `
+function MyComponent() {
+  return <div />;
+}
+
+export { MyComponent };
+    `;
+    const parsed = parseComponentSource('test.tsx', source);
+    const component = parsed.components.find((c) => c.name === 'MyComponent');
+    assert.ok(component, 'Component should be found');
+    assert.equal(component.exported, true, 'Component should be marked as exported');
+  });
+
+  it('handles multiple variable declarations in a single export statement', () => {
+    const source = `
+export const ComponentA = () => <div />, ComponentB = () => <span />;
+    `;
+    const parsed = parseComponentSource('test.tsx', source);
+    const compA = parsed.components.find((c) => c.name === 'ComponentA');
+    const compB = parsed.components.find((c) => c.name === 'ComponentB');
+
+    assert.ok(compA, 'ComponentA should be found');
+    assert.ok(compB, 'ComponentB should be found');
+    assert.equal(compA.exported, true, 'ComponentA should be exported');
+    assert.equal(compB.exported, true, 'ComponentB should be exported');
+
+    assert.ok(
+      parsed.exports.some((e) => e.name === 'ComponentA'),
+      'Export ComponentA should be found'
+    );
+    assert.ok(
+      parsed.exports.some((e) => e.name === 'ComponentB'),
+      'Export ComponentB should be found'
+    );
+  });
 });
