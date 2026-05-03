@@ -10,8 +10,10 @@ import type {
   RegistrySourceIssue,
   RegistrySourceListResult,
 } from '../types/index.js';
-import { getWorkingDirectory, listRegistrySources } from './workspace.js';
+import { logger } from '../utils/logger.js';
 import { isSafeProjectRelativePath } from '../utils/paths.js';
+import { isHttpUrl, isSafeRegistryIdentifier } from '../utils/validation.js';
+import { getWorkingDirectory, listRegistrySources } from './workspace.js';
 
 interface RegistryItemRaw {
   name?: string;
@@ -21,20 +23,14 @@ interface RegistryItemRaw {
   registryDependencies?: string[];
 }
 
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
 function issue(code: string, message: string): RegistrySourceIssue {
   return { code, message };
 }
 
 function statusFromIssues(issues: RegistrySourceIssue[]): RegistrySourceHealth['status'] {
+  if (issues.some((entry) => entry.code === 'NETWORK_ERROR' || entry.code === 'HTTP_ERROR')) {
+    return 'unhealthy';
+  }
   return issues.length === 0 ? 'healthy' : 'degraded';
 }
 
@@ -45,8 +41,24 @@ function normalizeType(value?: string): ComponentPackage['type'] {
   return 'registry-item';
 }
 
-function normalizeDeps(deps: string[] | undefined, type: RegistryDependency['type']): RegistryDependency[] {
+function normalizeDeps(
+  deps: string[] | undefined,
+  type: RegistryDependency['type']
+): RegistryDependency[] {
   return (deps ?? []).map((name) => ({ name, type }));
+}
+
+function normalizeFiles(files: unknown[] | undefined): string[] {
+  return (files ?? [])
+    .map((file) => {
+      if (typeof file === 'string') return file;
+      if (typeof file === 'object' && file !== null && 'path' in file) {
+        const pathValue = (file as { path?: unknown }).path;
+        return typeof pathValue === 'string' ? pathValue : null;
+      }
+      return null;
+    })
+    .filter((file): file is string => file !== null);
 }
 
 function mapToPackage(raw: RegistryItemRaw, source: RegistrySource): ComponentPackage {
@@ -56,7 +68,7 @@ function mapToPackage(raw: RegistryItemRaw, source: RegistrySource): ComponentPa
     id: `${source.id}:${name}`,
     name,
     type: normalizeType(raw.type),
-    files: [],
+    files: normalizeFiles(raw.files),
     source: {
       originRegistry: source.name,
       originalComponentName: name,
@@ -109,11 +121,19 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
 
   if (source.type === 'npm-package') {
     if (!source.baseUrl) {
-      issues.push(issue('MISSING_PACKAGE_NAME', 'npm package source requires baseUrl package name'));
+      issues.push(
+        issue('MISSING_PACKAGE_NAME', 'npm package source requires baseUrl package name')
+      );
     } else {
       const lookup = `https://registry.npmjs.org/${encodeURIComponent(source.baseUrl)}`;
       issues.push(...(await checkRemoteUrl(lookup)));
     }
+    issues.push(
+      issue(
+        'LISTING_UNSUPPORTED',
+        'npm package sources are not supported by registry item listing yet'
+      )
+    );
   }
 
   return {
@@ -126,12 +146,16 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
   };
 }
 
-export async function getRegistrySourceHealth(cwd: string = getWorkingDirectory()): Promise<RegistrySourceHealth[]> {
+export async function getRegistrySourceHealth(
+  cwd: string = getWorkingDirectory()
+): Promise<RegistrySourceHealth[]> {
   const sources = await listRegistrySources(cwd);
   return Promise.all(sources.map((source) => healthForSource(source, cwd)));
 }
 
-export async function listRegistryItems(cwd: string = getWorkingDirectory()): Promise<RegistrySourceListResult> {
+export async function listRegistryItems(
+  cwd: string = getWorkingDirectory()
+): Promise<RegistrySourceListResult> {
   return listRegistryItemsBySource(undefined, cwd);
 }
 
@@ -144,11 +168,20 @@ export async function listRegistryItemsBySource(
   const items: RegistryItemSummary[] = [];
 
   const candidates = sources.filter((candidate) => candidate.enabled);
-  const filtered = sourceId ? candidates.filter((candidate) => candidate.id === sourceId) : candidates;
+  const filtered = sourceId
+    ? candidates.filter((candidate) => candidate.id === sourceId)
+    : candidates;
 
   for (const source of filtered) {
     if (!source.registryJsonUrl || !isHttpUrl(source.registryJsonUrl)) {
-      warnings.push({ sourceId: source.id, sourceName: source.name, message: 'No registryJsonUrl configured' });
+      warnings.push({
+        sourceId: source.id,
+        sourceName: source.name,
+        message:
+          source.type === 'npm-package'
+            ? 'npm package sources are not supported by registry item listing yet'
+            : 'No registryJsonUrl configured',
+      });
       continue;
     }
 
@@ -163,7 +196,9 @@ export async function listRegistryItemsBySource(
         continue;
       }
 
-      const payload = (await response.json()) as { items?: Array<{ name?: string; type?: string }> };
+      const payload = (await response.json()) as {
+        items?: Array<{ name?: string; type?: string }>;
+      };
       for (const item of payload.items ?? []) {
         if (!item.name) continue;
         items.push({
@@ -189,15 +224,15 @@ export async function getRegistryItem(
   itemName: string,
   cwd: string = getWorkingDirectory()
 ): Promise<ComponentPackage | null> {
-  if (!sourceId || sourceId.includes('/') || sourceId.includes('\\') || sourceId.includes('..')) {
+  if (!sourceId || !isSafeRegistryIdentifier(sourceId)) {
     return null;
   }
-  if (!itemName || itemName.includes('/') || itemName.includes('\\') || itemName.includes('..')) {
+  if (!itemName || !isSafeRegistryIdentifier(itemName)) {
     return null;
   }
   const sources = await listRegistrySources(cwd);
   const source = sources.find((candidate) => candidate.id === sourceId && candidate.enabled);
-  if (!source || !source.registryJsonUrl || !isHttpUrl(source.registryJsonUrl)) return null;
+  if (!source?.registryJsonUrl || !isHttpUrl(source.registryJsonUrl)) return null;
 
   try {
     const response = await fetch(source.registryJsonUrl, { method: 'GET' });
@@ -206,7 +241,8 @@ export async function getRegistryItem(
     const match = (payload.items ?? []).find((entry) => entry.name === itemName);
     if (!match) return null;
     return mapToPackage(match, source);
-  } catch {
+  } catch (error) {
+    logger.warn(`Failed to fetch registry item: ${sourceId}/${itemName}`, error);
     return null;
   }
 }
@@ -215,15 +251,14 @@ export async function findRegistryItem(
   itemName: string,
   cwd: string = getWorkingDirectory()
 ): Promise<ComponentPackage | null> {
-  if (!itemName || itemName.includes('/') || itemName.includes('\\') || itemName.includes('..')) {
+  if (!itemName || !isSafeRegistryIdentifier(itemName)) {
     return null;
   }
   const sources = (await listRegistrySources(cwd))
     .filter((source) => source.enabled)
     .sort((a, b) => a.name.localeCompare(b.name));
-  for (const source of sources) {
-    const item = await getRegistryItem(source.id, itemName, cwd);
-    if (item) return item;
-  }
-  return null;
+  const results = await Promise.all(
+    sources.map((source) => getRegistryItem(source.id, itemName, cwd))
+  );
+  return results.find((item): item is ComponentPackage => item !== null) ?? null;
 }

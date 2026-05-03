@@ -1,5 +1,11 @@
 import { type Request, type Response, Router } from 'express';
 import {
+  findRegistryItem,
+  getRegistryItem,
+  getRegistrySourceHealth,
+  listRegistryItemsBySource,
+} from '../services/registry.js';
+import {
   deleteRegistrySource,
   initializeWorkspace,
   listRegistrySources,
@@ -7,15 +13,10 @@ import {
   updateWorkspaceConfig,
   upsertRegistrySource,
 } from '../services/workspace.js';
-import {
-  findRegistryItem,
-  getRegistryItem,
-  getRegistrySourceHealth,
-  listRegistryItemsBySource,
-} from '../services/registry.js';
 import type { RegistrySource, WorkspaceConfig } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { isSafeProjectRelativePath } from '../utils/paths.js';
+import { isHttpUrl, isSafeRegistryIdentifier } from '../utils/validation.js';
 
 const router = Router();
 
@@ -40,15 +41,6 @@ function invalid<T>(errors: Record<string, string>): ValidationResult<T> {
 
 function valid<T>(value: T): ValidationResult<T> {
   return { value, errors: null };
-}
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
 }
 
 function hasValue(value: unknown): value is string {
@@ -330,7 +322,7 @@ router.delete('/registry-sources/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    if (!id || id.includes('/') || id.includes('\\') || id.includes('..')) {
+    if (!id || !isSafeRegistryIdentifier(id)) {
       res.status(400).json({
         success: false,
         error: {
@@ -375,7 +367,8 @@ router.get('/registry-sources/health', async (_req: Request, res: Response) => {
     res.json({ success: true, health });
   } catch (error) {
     logger.error('Failed to check registry source health', error);
-    const message = error instanceof Error ? error.message : 'Failed to check registry source health';
+    const message =
+      error instanceof Error ? error.message : 'Failed to check registry source health';
     res.status(500).json({
       success: false,
       error: {
@@ -447,7 +440,10 @@ router.get('/registry-items/:sourceId/:itemName', async (req: Request, res: Resp
     }
     res.json({ success: true, item });
   } catch (error) {
-    logger.error(`Failed to fetch registry item: ${req.params.sourceId}/${req.params.itemName}`, error);
+    logger.error(
+      `Failed to fetch registry item: ${req.params.sourceId}/${req.params.itemName}`,
+      error
+    );
     const message = error instanceof Error ? error.message : 'Failed to fetch registry item';
     res.status(500).json({
       success: false,

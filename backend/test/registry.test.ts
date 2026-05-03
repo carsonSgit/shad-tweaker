@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import fs from 'fs-extra';
 import {
+  findRegistryItem,
   getRegistryItem,
   getRegistrySourceHealth,
   listRegistryItems,
@@ -25,6 +26,20 @@ afterEach(async () => {
 });
 
 describe('registry service', () => {
+  const originalFetch = globalThis.fetch;
+
+  function mockRegistryFetch(items: unknown[]): void {
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ items }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+  }
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
   it('reports local-folder health issues when path is missing', async () => {
     const root = await createTempRoot();
     await upsertRegistrySource(
@@ -49,12 +64,98 @@ describe('registry service', () => {
 
   it('returns null for missing registry item', async () => {
     const root = await createTempRoot();
-    await upsertRegistrySource(
-      { name: 'Dead', type: 'shadcn-registry', registryJsonUrl: 'https://example.invalid/nope', enabled: true },
+    const { source } = await upsertRegistrySource(
+      {
+        name: 'Dead',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.invalid/nope',
+        enabled: true,
+      },
       root
     );
-    const sourceId = 'registry_dead';
-    const item = await getRegistryItem(sourceId, 'button', root);
+    globalThis.fetch = async () => new Response('nope', { status: 404 });
+    const item = await getRegistryItem(source.id, 'button', root);
     assert.equal(item, null);
+  });
+
+  it('maps registry item files into component packages', async () => {
+    const root = await createTempRoot();
+    const { source } = await upsertRegistrySource(
+      {
+        name: 'Registry',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/registry.json',
+        enabled: true,
+      },
+      root
+    );
+    mockRegistryFetch([
+      {
+        name: 'button',
+        type: 'component',
+        files: [{ path: 'ui/button.tsx' }],
+        dependencies: ['react'],
+        registryDependencies: ['utils'],
+      },
+    ]);
+
+    const item = await getRegistryItem(source.id, 'button', root);
+    assert.equal(item?.name, 'button');
+    assert.deepEqual(item?.files, ['ui/button.tsx']);
+    assert.deepEqual(item?.dependencies, [{ name: 'react', type: 'package' }]);
+    assert.deepEqual(item?.registryDependencies, [{ name: 'utils', type: 'registry' }]);
+  });
+
+  it('finds registry items across enabled sources by name', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource(
+      {
+        name: 'Alpha',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/a.json',
+        enabled: true,
+      },
+      root
+    );
+    await upsertRegistrySource(
+      {
+        name: 'Beta',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/b.json',
+        enabled: true,
+      },
+      root
+    );
+
+    globalThis.fetch = async (input) => {
+      const url = input.toString();
+      const items = url.endsWith('/b.json') ? [{ name: 'button', type: 'component' }] : [];
+      return new Response(JSON.stringify({ items }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    };
+
+    const item = await findRegistryItem('button', root);
+    assert.equal(item?.name, 'button');
+    assert.equal(item?.source?.originRegistry, 'Beta');
+  });
+
+  it('rejects unsafe registry item identifiers', async () => {
+    const root = await createTempRoot();
+    const { source } = await upsertRegistrySource(
+      {
+        name: 'Registry',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/registry.json',
+        enabled: true,
+      },
+      root
+    );
+    mockRegistryFetch([{ name: 'button', type: 'component' }]);
+
+    assert.equal(await getRegistryItem(source.id, '..', root), null);
+    assert.equal(await getRegistryItem(source.id, 'button/../../secret', root), null);
+    assert.equal(await findRegistryItem('button/../../secret', root), null);
   });
 });

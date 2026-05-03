@@ -28,6 +28,12 @@ afterEach(async () => {
 });
 
 describe('workspace registry routes', () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
   it('returns health payload', async () => {
     const root = await createTempRoot();
     process.env.SHADCN_TWEAKER_CWD = root;
@@ -45,6 +51,63 @@ describe('workspace registry routes', () => {
     const root = await createTempRoot();
     process.env.SHADCN_TWEAKER_CWD = root;
     const res = await request(app).get('/api/workspace/registry-items/source/item');
+    assert.equal(res.status, 404);
+    assert.equal(res.body.error.code, 'REGISTRY_ITEM_NOT_FOUND');
+  });
+
+  it('returns registry item summaries', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+    await upsertRegistrySource(
+      {
+        name: 'Registry',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/registry.json',
+        enabled: true,
+      },
+      root
+    );
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ items: [{ name: 'button', type: 'component' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+
+    const res = await request(app).get('/api/workspace/registry-items');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.items.length, 1);
+    assert.equal(res.body.items[0].name, 'button');
+  });
+
+  it('returns registry items by fallback name route', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+    await upsertRegistrySource(
+      {
+        name: 'Registry',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/registry.json',
+        enabled: true,
+      },
+      root
+    );
+    globalThis.fetch = async () =>
+      new Response(JSON.stringify({ items: [{ name: 'button', type: 'component' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+
+    const res = await request(app).get('/api/workspace/registry-items/button');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.item.name, 'button');
+  });
+
+  it('rejects traversal-shaped registry item paths as not found', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+    const res = await request(app).get('/api/workspace/registry-items/source/item%2F..%2Fsecret');
     assert.equal(res.status, 404);
     assert.equal(res.body.error.code, 'REGISTRY_ITEM_NOT_FOUND');
   });

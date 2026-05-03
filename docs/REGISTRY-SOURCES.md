@@ -10,6 +10,8 @@ Backend registry read endpoints are exposed under `/api/workspace` and are desig
   - Returns per-source health status and issues.
 - `GET /api/workspace/registry-items`
   - Returns merged registry item summaries from enabled sources plus source warnings.
+- `GET /api/workspace/registry-items/:itemName`
+  - Finds the first matching item by name across enabled sources.
 - `GET /api/workspace/registry-items/:sourceId/:itemName`
   - Returns one normalized internal `ComponentPackage` shape.
 
