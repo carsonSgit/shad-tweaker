@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { type Request, type Response, Router } from 'express';
 import {
   deleteRegistrySource,
@@ -12,6 +13,14 @@ import { logger } from '../utils/logger.js';
 
 const router = Router();
 
+type ValidationResult<T> =
+  | { value: T; errors: null }
+  | { value: null; errors: Record<string, string> };
+
+type RegistrySourceInput = Omit<RegistrySource, 'id' | 'createdAt' | 'updatedAt'> & {
+  id?: string;
+};
+
 const REGISTRY_SOURCE_TYPES: RegistrySource['type'][] = [
   'shadcn-registry',
   'url-list',
@@ -19,101 +28,161 @@ const REGISTRY_SOURCE_TYPES: RegistrySource['type'][] = [
   'npm-package',
 ];
 
-function validateConfigUpdates(body: unknown): Partial<WorkspaceConfig> | null {
+function invalid<T>(errors: Record<string, string>): ValidationResult<T> {
+  return { value: null, errors };
+}
+
+function valid<T>(value: T): ValidationResult<T> {
+  return { value, errors: null };
+}
+
+function isSafeProjectRelativePath(value: string): boolean {
+  if (path.isAbsolute(value)) {
+    return false;
+  }
+
+  const normalized = path.normalize(value);
+  return normalized !== '..' && !normalized.startsWith(`..${path.sep}`);
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function validateConfigUpdates(body: unknown): ValidationResult<Partial<WorkspaceConfig>> {
   if (typeof body !== 'object' || body === null) {
-    return null;
+    return invalid({ body: 'Expected a JSON object.' });
   }
 
   const req = body as Record<string, unknown>;
   const updates: Partial<WorkspaceConfig> = {};
+  const errors: Record<string, string> = {};
 
   if (req.componentDirectory !== undefined) {
     if (typeof req.componentDirectory !== 'string' || req.componentDirectory.trim().length === 0) {
-      return null;
+      errors.componentDirectory = 'Must be a non-empty string.';
+    } else if (!isSafeProjectRelativePath(req.componentDirectory.trim())) {
+      errors.componentDirectory = 'Must be a relative path inside the project.';
+    } else {
+      updates.componentDirectory = req.componentDirectory.trim();
     }
-    updates.componentDirectory = req.componentDirectory.trim();
   }
 
   if (req.backupRetentionDays !== undefined) {
-    if (typeof req.backupRetentionDays !== 'number' || req.backupRetentionDays < 1) {
-      return null;
+    if (
+      typeof req.backupRetentionDays !== 'number' ||
+      !Number.isInteger(req.backupRetentionDays) ||
+      req.backupRetentionDays < 1 ||
+      req.backupRetentionDays > 365
+    ) {
+      errors.backupRetentionDays = 'Must be an integer between 1 and 365.';
+    } else {
+      updates.backupRetentionDays = req.backupRetentionDays;
     }
-    updates.backupRetentionDays = req.backupRetentionDays;
   }
 
   if (req.maxBackups !== undefined) {
-    if (typeof req.maxBackups !== 'number' || req.maxBackups < 1) {
-      return null;
+    if (
+      typeof req.maxBackups !== 'number' ||
+      !Number.isInteger(req.maxBackups) ||
+      req.maxBackups < 1 ||
+      req.maxBackups > 1000
+    ) {
+      errors.maxBackups = 'Must be an integer between 1 and 1000.';
+    } else {
+      updates.maxBackups = req.maxBackups;
     }
-    updates.maxBackups = req.maxBackups;
   }
 
   if (req.autoBackup !== undefined) {
     if (typeof req.autoBackup !== 'boolean') {
-      return null;
+      errors.autoBackup = 'Must be a boolean.';
+    } else {
+      updates.autoBackup = req.autoBackup;
     }
-    updates.autoBackup = req.autoBackup;
   }
 
   if (req.validateAfterEdit !== undefined) {
     if (typeof req.validateAfterEdit !== 'boolean') {
-      return null;
+      errors.validateAfterEdit = 'Must be a boolean.';
+    } else {
+      updates.validateAfterEdit = req.validateAfterEdit;
     }
-    updates.validateAfterEdit = req.validateAfterEdit;
   }
 
   if (req.port !== undefined) {
-    if (typeof req.port !== 'number' || req.port < 1 || req.port > 65535) {
-      return null;
+    if (
+      typeof req.port !== 'number' ||
+      !Number.isInteger(req.port) ||
+      req.port < 1 ||
+      req.port > 65535
+    ) {
+      errors.port = 'Must be an integer between 1 and 65535.';
+    } else {
+      updates.port = req.port;
     }
-    updates.port = req.port;
   }
 
-  return updates;
+  return Object.keys(errors).length > 0 ? invalid(errors) : valid(updates);
 }
 
-function validateRegistrySource(
-  body: unknown
-): (Omit<RegistrySource, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) | null {
+function validateRegistrySource(body: unknown): ValidationResult<RegistrySourceInput> {
   if (typeof body !== 'object' || body === null) {
-    return null;
+    return invalid({ body: 'Expected a JSON object.' });
   }
 
   const req = body as Record<string, unknown>;
+  const errors: Record<string, string> = {};
 
   if (req.id !== undefined && (typeof req.id !== 'string' || req.id.trim().length === 0)) {
-    return null;
+    errors.id = 'Must be a non-empty string when provided.';
   }
 
   if (typeof req.name !== 'string' || req.name.trim().length === 0) {
-    return null;
+    errors.name = 'Must be a non-empty string.';
   }
 
   if (typeof req.type !== 'string' || !REGISTRY_SOURCE_TYPES.includes(req.type as never)) {
-    return null;
+    errors.type = `Must be one of: ${REGISTRY_SOURCE_TYPES.join(', ')}.`;
   }
 
-  if (req.baseUrl !== undefined && typeof req.baseUrl !== 'string') {
-    return null;
+  if (req.baseUrl !== undefined) {
+    if (typeof req.baseUrl !== 'string' || !isHttpUrl(req.baseUrl.trim())) {
+      errors.baseUrl = 'Must be an http:// or https:// URL.';
+    }
   }
 
-  if (req.registryJsonUrl !== undefined && typeof req.registryJsonUrl !== 'string') {
-    return null;
+  if (req.registryJsonUrl !== undefined) {
+    if (typeof req.registryJsonUrl !== 'string' || !isHttpUrl(req.registryJsonUrl.trim())) {
+      errors.registryJsonUrl = 'Must be an http:// or https:// URL.';
+    }
   }
 
   if (req.enabled !== undefined && typeof req.enabled !== 'boolean') {
-    return null;
+    errors.enabled = 'Must be a boolean.';
   }
 
-  return {
+  if (Object.keys(errors).length > 0) {
+    return invalid(errors);
+  }
+
+  const name = req.name as string;
+  const type = req.type as RegistrySource['type'];
+
+  return valid({
     id: req.id?.toString().trim(),
-    name: req.name.trim(),
-    type: req.type as RegistrySource['type'],
+    name: name.trim(),
+    type,
     baseUrl: typeof req.baseUrl === 'string' ? req.baseUrl.trim() : undefined,
     registryJsonUrl:
       typeof req.registryJsonUrl === 'string' ? req.registryJsonUrl.trim() : undefined,
     enabled: typeof req.enabled === 'boolean' ? req.enabled : true,
-  };
+  });
 }
 
 router.get('/', async (_req: Request, res: Response) => {
@@ -154,21 +223,26 @@ router.post('/initialize', async (_req: Request, res: Response) => {
 
 router.put('/config', async (req: Request, res: Response) => {
   try {
-    const updates = validateConfigUpdates(req.body);
+    const validation = validateConfigUpdates(req.body);
 
-    if (!updates) {
+    if (!validation.value) {
       res.status(400).json({
         success: false,
         error: {
           message: 'Invalid workspace config update',
           code: 'VALIDATION_ERROR',
+          fields: validation.errors,
         },
       });
       return;
     }
 
-    const manifest = await updateWorkspaceConfig(updates);
-    res.json({ success: true, manifest });
+    const manifest = await updateWorkspaceConfig(validation.value);
+    res.json({
+      success: true,
+      manifest,
+      restartRequired: validation.value.port !== undefined,
+    });
   } catch (error) {
     logger.error('Failed to update workspace config', error);
     const message = error instanceof Error ? error.message : 'Failed to update workspace config';
@@ -203,20 +277,21 @@ router.get('/registry-sources', async (_req: Request, res: Response) => {
 
 router.post('/registry-sources', async (req: Request, res: Response) => {
   try {
-    const source = validateRegistrySource(req.body);
+    const validation = validateRegistrySource(req.body);
 
-    if (!source) {
+    if (!validation.value) {
       res.status(400).json({
         success: false,
         error: {
           message: 'Invalid registry source',
           code: 'VALIDATION_ERROR',
+          fields: validation.errors,
         },
       });
       return;
     }
 
-    const saved = await upsertRegistrySource(source);
+    const saved = await upsertRegistrySource(validation.value);
     res.status(201).json({ success: true, source: saved });
   } catch (error) {
     logger.error('Failed to save registry source', error);

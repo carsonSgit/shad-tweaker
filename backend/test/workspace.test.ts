@@ -104,7 +104,8 @@ describe('workspace manifest service', () => {
     };
 
     await fs.ensureDir(backupDir);
-    await fs.writeFile(backupFile, 'export const Button = () => null;');
+    const backupFileContent = 'export const Button = () => null;';
+    await fs.writeFile(backupFile, backupFileContent);
     await fs.writeJson(path.join(backupDir, 'manifest.json'), backupManifest, { spaces: 2 });
 
     const manifest = await loadWorkspaceManifest(root);
@@ -112,7 +113,7 @@ describe('workspace manifest service', () => {
     assert.equal(manifest.backups.length, 1);
     assert.equal(manifest.backups[0].id, backupManifest.id);
     assert.equal(manifest.backups[0].components[0], backupManifest.files[0].originalPath);
-    assert.equal(manifest.backups[0].size, 33);
+    assert.equal(manifest.backups[0].size, Buffer.byteLength(backupFileContent));
   });
 
   it('updates manifest-owned config values', async () => {
@@ -130,6 +131,63 @@ describe('workspace manifest service', () => {
     assert.equal(manifest.config.maxBackups, 5);
     assert.equal(manifest.config.autoBackup, false);
     assert.equal(manifest.config.componentDirectory, './src/components/ui');
+  });
+
+  it('preserves manifest config updates after legacy config seeding', async () => {
+    const root = await createTempRoot();
+
+    await fs.writeJson(
+      path.join(root, '.shadcn-tweaker.json'),
+      {
+        componentsPath: './legacy/components',
+        maxBackups: 7,
+      },
+      { spaces: 2 }
+    );
+
+    const initial = await loadWorkspaceManifest(root);
+    const updated = await updateWorkspaceConfig(
+      { componentDirectory: './src/components/ui' },
+      root
+    );
+    const reloaded = await loadWorkspaceManifest(root);
+
+    assert.equal(initial.config.componentDirectory, './legacy/components');
+    assert.equal(updated.config.componentDirectory, './src/components/ui');
+    assert.equal(reloaded.config.componentDirectory, './src/components/ui');
+    assert.equal(reloaded.config.maxBackups, 7);
+  });
+
+  it('keeps concurrent backup and scan metadata updates', async () => {
+    const root = await createTempRoot();
+    const component: Component = {
+      name: 'button',
+      path: path.join(root, 'components', 'ui', 'button.tsx'),
+      metadata: {
+        lines: 10,
+        size: 200,
+        lastModified: '2026-05-03T00:00:00.000Z',
+        classCount: 3,
+      },
+    };
+
+    await Promise.all([
+      recordBackupMetadata(
+        {
+          id: 'backup_2026-05-03_12-00-00',
+          timestamp: '2026-05-03T12:00:00.000Z',
+          components: [component.path],
+          size: 200,
+        },
+        root
+      ),
+      recordScannedComponents([component], root),
+    ]);
+
+    const manifest = await loadWorkspaceManifest(root);
+
+    assert.equal(manifest.backups[0].id, 'backup_2026-05-03_12-00-00');
+    assert.equal(manifest.components[0].name, 'button');
   });
 
   it('records backup and scanned component metadata', async () => {

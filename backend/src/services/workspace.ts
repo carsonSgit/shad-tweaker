@@ -18,6 +18,8 @@ const MANIFEST_FILE = 'manifest.json';
 const LEGACY_CONFIG_FILE = '.shadcn-tweaker.json';
 const TEMPLATE_FILE = 'templates/templates.json';
 const BACKUP_DIR = 'backups';
+const ensuredWorkspaceDirs = new Set<string>();
+let manifestWriteQueue = Promise.resolve();
 
 const DEFAULT_CONFIG: WorkspaceConfig = {
   componentDirectory: './components/ui',
@@ -194,14 +196,16 @@ async function deriveBackups(cwd: string): Promise<BackupMetadata[]> {
       }
 
       const manifest = (await fs.readJson(manifestPath)) as BackupManifest;
-      let totalSize = 0;
-
-      for (const file of manifest.files) {
-        if (await fs.pathExists(file.backupPath)) {
-          const stats = await fs.stat(file.backupPath);
-          totalSize += stats.size;
-        }
-      }
+      const sizes = await Promise.all(
+        manifest.files.map(async (file) => {
+          if (await fs.pathExists(file.backupPath)) {
+            const stats = await fs.stat(file.backupPath);
+            return stats.size;
+          }
+          return 0;
+        })
+      );
+      const totalSize = sizes.reduce((sum, size) => sum + size, 0);
 
       backups.push({
         id: manifest.id,
@@ -238,14 +242,57 @@ function mergeBackups(
 }
 
 async function ensureWorkspaceDirs(cwd: string): Promise<void> {
+  if (ensuredWorkspaceDirs.has(cwd)) {
+    return;
+  }
+
   await fs.ensureDir(getWorkspaceDir(cwd));
   await fs.ensureDir(path.join(getWorkspaceDir(cwd), 'templates'));
   await fs.ensureDir(path.join(getWorkspaceDir(cwd), BACKUP_DIR));
+  ensuredWorkspaceDirs.add(cwd);
 }
 
 async function writeManifest(manifest: WorkspaceManifest, cwd: string): Promise<void> {
   await ensureWorkspaceDirs(cwd);
   await fs.writeJson(getManifestPath(cwd), manifest, { spaces: 2 });
+}
+
+async function withManifestWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+  const previous = manifestWriteQueue;
+  let release: () => void = () => {};
+
+  manifestWriteQueue = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  await previous;
+
+  try {
+    return await operation();
+  } finally {
+    release();
+  }
+}
+
+function presetsChanged(next: Preset[], current: Preset[]): boolean {
+  return JSON.stringify(next) !== JSON.stringify(current);
+}
+
+function backupsChanged(next: BackupMetadata[], current: BackupMetadata[]): boolean {
+  if (next.length !== current.length) {
+    return true;
+  }
+
+  return next.some((backup, index) => {
+    const currentBackup = current[index];
+    return (
+      !currentBackup ||
+      backup.id !== currentBackup.id ||
+      backup.timestamp !== currentBackup.timestamp ||
+      backup.size !== currentBackup.size ||
+      backup.components.length !== currentBackup.components.length
+    );
+  });
 }
 
 export async function saveWorkspaceManifest(
@@ -278,28 +325,27 @@ export async function loadWorkspaceManifest(
     }
   } else {
     manifest = createDefaultManifest();
+    const legacyConfig = await readLegacyConfig(cwd);
+    manifest.config = {
+      ...manifest.config,
+      ...legacyConfig,
+    };
     await writeManifest(manifest, cwd);
   }
 
-  const legacyConfig = await readLegacyConfig(cwd);
   const presets = await readMigratedPresets(cwd, manifest.presets);
-  const backups = mergeBackups(manifest.backups, await deriveBackups(cwd));
+  const backups =
+    manifest.backups.length > 0
+      ? manifest.backups
+      : mergeBackups(manifest.backups, await deriveBackups(cwd));
 
   const hydrated: WorkspaceManifest = {
     ...manifest,
-    config: {
-      ...manifest.config,
-      ...legacyConfig,
-    },
     presets,
     backups,
   };
 
-  if (
-    presets.length !== manifest.presets.length ||
-    backups.length !== manifest.backups.length ||
-    JSON.stringify(backups) !== JSON.stringify(manifest.backups)
-  ) {
+  if (presetsChanged(presets, manifest.presets) || backupsChanged(backups, manifest.backups)) {
     await writeManifest(
       {
         ...hydrated,
@@ -315,6 +361,7 @@ export async function loadWorkspaceManifest(
 export async function initializeWorkspace(
   cwd: string = getWorkingDirectory()
 ): Promise<WorkspaceManifest> {
+  // Initialization means "ensure the workspace store exists", while load also returns the hydrated view.
   return loadWorkspaceManifest(cwd);
 }
 
@@ -335,7 +382,7 @@ export async function updateWorkspaceConfig(
 
   for (const key of allowedKeys) {
     if (updates[key] !== undefined) {
-      nextConfig[key] = updates[key] as never;
+      Object.assign(nextConfig, { [key]: updates[key] });
     }
   }
 
@@ -426,18 +473,20 @@ export async function recordBackupMetadata(
   cwd: string = getWorkingDirectory()
 ): Promise<void> {
   try {
-    const manifest = await loadWorkspaceManifest(cwd);
-    const backups = manifest.backups.filter((existing) => existing.id !== backup.id);
+    await withManifestWriteLock(async () => {
+      const manifest = await loadWorkspaceManifest(cwd);
+      const backups = manifest.backups.filter((existing) => existing.id !== backup.id);
 
-    backups.unshift(backup);
+      backups.unshift(backup);
 
-    await saveWorkspaceManifest(
-      {
-        ...manifest,
-        backups,
-      },
-      cwd
-    );
+      await saveWorkspaceManifest(
+        {
+          ...manifest,
+          backups,
+        },
+        cwd
+      );
+    });
   } catch (error) {
     logger.warn(`Failed to record backup metadata for ${backup.id}`, error);
   }
@@ -448,22 +497,24 @@ export async function recordScannedComponents(
   cwd: string = getWorkingDirectory()
 ): Promise<void> {
   try {
-    const manifest = await loadWorkspaceManifest(cwd);
-    const scannedAt = new Date().toISOString();
+    await withManifestWriteLock(async () => {
+      const manifest = await loadWorkspaceManifest(cwd);
+      const scannedAt = new Date().toISOString();
 
-    await saveWorkspaceManifest(
-      {
-        ...manifest,
-        components: components.map((component) => ({
-          id: component.name,
-          name: component.name,
-          path: component.path,
-          lastScannedAt: scannedAt,
-          metadata: component.metadata,
-        })),
-      },
-      cwd
-    );
+      await saveWorkspaceManifest(
+        {
+          ...manifest,
+          components: components.map((component) => ({
+            id: component.name,
+            name: component.name,
+            path: component.path,
+            lastScannedAt: scannedAt,
+            metadata: component.metadata,
+          })),
+        },
+        cwd
+      );
+    });
   } catch (error) {
     logger.warn('Failed to record scanned components in workspace manifest', error);
   }

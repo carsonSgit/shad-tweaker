@@ -161,12 +161,7 @@ export interface DesignTokenSet {
   updatedAt: string;
 }
 
-export interface BackupMetadata {
-  id: string;
-  timestamp: string;
-  components: string[];
-  size: number;
-}
+export type BackupMetadata = Backup;
 
 export interface WorkspaceConfig {
   componentDirectory: string;

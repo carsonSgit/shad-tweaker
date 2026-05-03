@@ -70,7 +70,6 @@ app.use((_req, res) => {
 
 async function start() {
   try {
-    await initializeWorkspace();
     await initializeDefaultTemplates();
     await initializeWorkspace();
 
@@ -86,12 +85,12 @@ async function start() {
       logger.info('  GET  /api/templates - List templates');
       logger.info('  POST /api/templates - Create template');
       logger.info('  DELETE /api/templates/:id - Delete template');
-      logger.info('  GET  /api/workspace - Get workspace manifest');
-      logger.info('  POST /api/workspace/initialize - Initialize workspace manifest');
-      logger.info('  PUT  /api/workspace/config - Update workspace config');
       logger.info('  POST /api/backup/create - Create backup');
       logger.info('  GET  /api/backup/list - List backups');
       logger.info('  POST /api/backup/restore - Restore backup');
+      logger.info('  GET  /api/workspace - Get workspace manifest');
+      logger.info('  POST /api/workspace/initialize - Initialize workspace manifest');
+      logger.info('  PUT  /api/workspace/config - Update workspace config');
     });
   } catch (error) {
     logger.error('Failed to start server', error);
