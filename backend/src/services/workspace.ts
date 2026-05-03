@@ -254,7 +254,18 @@ async function ensureWorkspaceDirs(cwd: string): Promise<void> {
 
 async function writeManifest(manifest: WorkspaceManifest, cwd: string): Promise<void> {
   await ensureWorkspaceDirs(cwd);
-  await fs.writeJson(getManifestPath(cwd), manifest, { spaces: 2 });
+  const manifestPath = getManifestPath(cwd);
+  const manifestDir = path.dirname(manifestPath);
+  const tempManifestPath = path.join(manifestDir, `.manifest.${randomUUID()}.tmp`);
+  const content = `${JSON.stringify(manifest, null, 2)}\n`;
+
+  try {
+    await fs.outputFile(tempManifestPath, content, { flag: 'wx', mode: 0o600 });
+    await fs.rename(tempManifestPath, manifestPath);
+  } catch (error) {
+    await fs.remove(tempManifestPath);
+    throw error;
+  }
 }
 
 async function withManifestWriteLock<T>(operation: () => Promise<T>): Promise<T> {

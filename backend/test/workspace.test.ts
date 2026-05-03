@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import fs from 'fs-extra';
@@ -17,9 +16,10 @@ import {
 import type { Component } from '../src/types/index.js';
 
 const tempRoots: string[] = [];
+const testWorkspaceBase = path.join(process.cwd(), '.shadcn-tweaker-test-workspaces');
 
 async function createTempRoot(): Promise<string> {
-  const root = path.join(os.tmpdir(), `shadcn-tweaker-workspace-${randomUUID()}`);
+  const root = path.join(testWorkspaceBase, randomUUID());
   tempRoots.push(root);
   await fs.ensureDir(root);
   return root;
