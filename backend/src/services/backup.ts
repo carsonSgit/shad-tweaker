@@ -2,15 +2,10 @@ import path from 'node:path';
 import fs from 'fs-extra';
 import type { Backup, BackupManifest } from '../types/index.js';
 import { logger } from '../utils/logger.js';
-
-const BACKUP_DIR = '.shadcn-tweaker/backups';
-
-function getWorkingDirectory(): string {
-  return process.env.SHADCN_TWEAKER_CWD || process.cwd();
-}
+import { getWorkspacePath, recordBackupMetadata } from './workspace.js';
 
 function getBackupBasePath(): string {
-  return path.join(getWorkingDirectory(), BACKUP_DIR);
+  return getWorkspacePath('backups');
 }
 
 function generateBackupId(): string {
@@ -56,6 +51,15 @@ export async function createBackup(componentPaths: string[]): Promise<Backup> {
   const manifestPath = path.join(backupPath, 'manifest.json');
   await fs.writeJson(manifestPath, manifest, { spaces: 2 });
 
+  const backup: Backup = {
+    id: backupId,
+    timestamp: manifest.timestamp,
+    components: componentPaths,
+    size: totalSize,
+  };
+
+  await recordBackupMetadata(backup);
+
   logger.info(`Created backup ${backupId} with ${componentPaths.length} files`);
 
   // Cleanup old backups asynchronously (don't block the response)
@@ -63,12 +67,7 @@ export async function createBackup(componentPaths: string[]): Promise<Backup> {
     logger.warn('Failed to cleanup old backups', err);
   });
 
-  return {
-    id: backupId,
-    timestamp: manifest.timestamp,
-    components: componentPaths,
-    size: totalSize,
-  };
+  return backup;
 }
 
 export async function listBackups(): Promise<Backup[]> {

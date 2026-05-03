@@ -3,16 +3,12 @@ import fs from 'fs-extra';
 import { v4 as uuidv4 } from 'uuid';
 import type { Template, TemplateRule } from '../types/index.js';
 import { logger } from '../utils/logger.js';
+import { getWorkspacePath } from './workspace.js';
 
-const TEMPLATE_DIR = '.shadcn-tweaker/templates';
 const TEMPLATE_FILE = 'templates.json';
 
-function getWorkingDirectory(): string {
-  return process.env.SHADCN_TWEAKER_CWD || process.cwd();
-}
-
 function getTemplatePath(): string {
-  return path.join(getWorkingDirectory(), TEMPLATE_DIR, TEMPLATE_FILE);
+  return getWorkspacePath('templates', TEMPLATE_FILE);
 }
 
 async function ensureTemplateFile(): Promise<void> {

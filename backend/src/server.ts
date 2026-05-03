@@ -4,7 +4,9 @@ import backupRouter from './routes/backup.js';
 import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
 import templatesRouter from './routes/templates.js';
+import workspaceRouter from './routes/workspace.js';
 import { initializeDefaultTemplates } from './services/template.js';
+import { initializeWorkspace } from './services/workspace.js';
 import { logger } from './utils/logger.js';
 
 const app = express();
@@ -43,6 +45,7 @@ app.use('/api/components', componentsRouter);
 app.use('/api/edit', editRouter);
 app.use('/api/backup', backupRouter);
 app.use('/api/templates', templatesRouter);
+app.use('/api/workspace', workspaceRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', err);
@@ -67,7 +70,9 @@ app.use((_req, res) => {
 
 async function start() {
   try {
+    await initializeWorkspace();
     await initializeDefaultTemplates();
+    await initializeWorkspace();
 
     app.listen(PORT, () => {
       logger.info(`Shadcn Tweaker Backend running on http://localhost:${PORT}`);
@@ -81,6 +86,9 @@ async function start() {
       logger.info('  GET  /api/templates - List templates');
       logger.info('  POST /api/templates - Create template');
       logger.info('  DELETE /api/templates/:id - Delete template');
+      logger.info('  GET  /api/workspace - Get workspace manifest');
+      logger.info('  POST /api/workspace/initialize - Initialize workspace manifest');
+      logger.info('  PUT  /api/workspace/config - Update workspace config');
       logger.info('  POST /api/backup/create - Create backup');
       logger.info('  GET  /api/backup/list - List backups');
       logger.info('  POST /api/backup/restore - Restore backup');
