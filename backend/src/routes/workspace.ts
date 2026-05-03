@@ -1,5 +1,11 @@
 import { type Request, type Response, Router } from 'express';
 import {
+  findRegistryItem,
+  getRegistryItem,
+  getRegistrySourceHealth,
+  listRegistryItemsBySource,
+} from '../services/registry.js';
+import {
   deleteRegistrySource,
   initializeWorkspace,
   listRegistrySources,
@@ -10,6 +16,7 @@ import {
 import type { RegistrySource, WorkspaceConfig } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { isSafeProjectRelativePath } from '../utils/paths.js';
+import { isHttpUrl, isSafeRegistryIdentifier } from '../utils/validation.js';
 
 const router = Router();
 
@@ -34,15 +41,6 @@ function invalid<T>(errors: Record<string, string>): ValidationResult<T> {
 
 function valid<T>(value: T): ValidationResult<T> {
   return { value, errors: null };
-}
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
 }
 
 function hasValue(value: unknown): value is string {
@@ -288,6 +286,24 @@ router.get('/registry-sources', async (_req: Request, res: Response) => {
   }
 });
 
+router.get('/registry-sources/health', async (_req: Request, res: Response) => {
+  try {
+    const health = await getRegistrySourceHealth();
+    res.json({ success: true, health });
+  } catch (error) {
+    logger.error('Failed to check registry source health', error);
+    const message =
+      error instanceof Error ? error.message : 'Failed to check registry source health';
+    res.status(500).json({
+      success: false,
+      error: {
+        message,
+        code: 'REGISTRY_SOURCE_HEALTH_ERROR',
+      },
+    });
+  }
+});
+
 router.post('/registry-sources', async (req: Request, res: Response) => {
   try {
     const validation = validateRegistrySource(req.body);
@@ -324,7 +340,7 @@ router.delete('/registry-sources/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    if (!id || id.includes('/') || id.includes('\\') || id.includes('..')) {
+    if (!id || !isSafeRegistryIdentifier(id)) {
       res.status(400).json({
         success: false,
         error: {
@@ -358,6 +374,92 @@ router.delete('/registry-sources/:id', async (req: Request, res: Response) => {
       error: {
         message,
         code: 'REGISTRY_SOURCE_DELETE_ERROR',
+      },
+    });
+  }
+});
+
+router.get('/registry-items', async (req: Request, res: Response) => {
+  try {
+    const sourceId = typeof req.query.sourceId === 'string' ? req.query.sourceId : undefined;
+    if (sourceId !== undefined && !isSafeRegistryIdentifier(sourceId)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: 'Invalid registry source ID',
+          code: 'INVALID_REGISTRY_SOURCE_ID',
+        },
+      });
+      return;
+    }
+    const result = await listRegistryItemsBySource(sourceId);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    logger.error('Failed to list registry items', error);
+    const message = error instanceof Error ? error.message : 'Failed to list registry items';
+    res.status(500).json({
+      success: false,
+      error: {
+        message,
+        code: 'REGISTRY_ITEM_LIST_ERROR',
+      },
+    });
+  }
+});
+
+router.get('/registry-items/:itemName', async (req: Request, res: Response) => {
+  try {
+    const item = await findRegistryItem(req.params.itemName);
+    if (!item) {
+      res.status(404).json({
+        success: false,
+        error: {
+          message: `Registry item not found: ${req.params.itemName}`,
+          code: 'REGISTRY_ITEM_NOT_FOUND',
+        },
+      });
+      return;
+    }
+    res.json({ success: true, item });
+  } catch (error) {
+    logger.error(`Failed to fetch registry item: ${req.params.itemName}`, error);
+    const message = error instanceof Error ? error.message : 'Failed to fetch registry item';
+    res.status(500).json({
+      success: false,
+      error: {
+        message,
+        code: 'REGISTRY_ITEM_FETCH_ERROR',
+      },
+    });
+  }
+});
+
+router.get('/registry-items/:sourceId/:itemName', async (req: Request, res: Response) => {
+  try {
+    const { sourceId, itemName } = req.params;
+    const item = await getRegistryItem(sourceId, itemName);
+    if (!item) {
+      res.status(404).json({
+        success: false,
+        error: {
+          message: `Registry item not found: ${sourceId}/${itemName}`,
+          code: 'REGISTRY_ITEM_NOT_FOUND',
+        },
+      });
+      return;
+    }
+    res.json({ success: true, item });
+  } catch (error) {
+    logger.error(
+      `Failed to fetch registry item: ${req.params.sourceId}/${req.params.itemName}`,
+      error
+    );
+    const message = error instanceof Error ? error.message : 'Failed to fetch registry item';
+    res.status(500).json({
+      success: false,
+      error: {
+        message,
+        code: 'REGISTRY_ITEM_FETCH_ERROR',
       },
     });
   }

@@ -133,6 +133,23 @@ export function validateTemplateId(templateId: string): { valid: boolean; error?
 }
 
 // ============================================
+// Registry Validation
+// ============================================
+
+export function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+export function isSafeRegistryIdentifier(value: string): boolean {
+  return value.length > 0 && value.length <= 128 && /^[a-zA-Z0-9_-]+$/.test(value);
+}
+
+// ============================================
 // Request Body Validation
 // ============================================
 
