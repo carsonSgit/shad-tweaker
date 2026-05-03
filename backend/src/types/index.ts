@@ -175,7 +175,7 @@ export interface ParsedExport {
 
 export interface ParsedComponent {
   name: string;
-  declarationKind: 'function' | 'const' | 'class' | 'forwardRef' | 'memo' | 'unknown';
+  declarationKind: 'function' | 'const' | 'class' | 'forwardRef' | 'memo';
   exported: boolean;
   line: number;
 }

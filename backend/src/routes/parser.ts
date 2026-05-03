@@ -1,3 +1,4 @@
+import fs from 'fs-extra';
 import { type Request, type Response, Router } from 'express';
 import { parseComponentFile, resolveProjectParserPath } from '../services/parser.js';
 import { getWorkingDirectory } from '../services/workspace.js';
@@ -31,6 +32,17 @@ router.post('/analyze', async (req: Request, res: Response) => {
         error: {
           message: 'filePath must point to a TSX/JSX file inside the project.',
           code: 'INVALID_FILE_PATH',
+        },
+      });
+      return;
+    }
+
+    if (!(await fs.pathExists(resolvedPath))) {
+      res.status(404).json({
+        success: false,
+        error: {
+          message: 'File not found.',
+          code: 'FILE_NOT_FOUND',
         },
       });
       return;

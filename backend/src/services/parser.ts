@@ -73,7 +73,7 @@ export function parseComponentSource(filePath: string, content: string): ParsedC
     });
   }
 
-  const parseDiagnostics = (sourceFile as SourceFileWithParseDiagnostics).parseDiagnostics ?? [];
+  const parseDiagnostics = (sourceFile as SourceFileWithParseDiagnostics).parseDiagnostics ?? []; // ts internal
   for (const diagnostic of parseDiagnostics) {
     const line =
       typeof diagnostic.start === 'number' ? getLine(sourceFile, diagnostic.start) : undefined;
@@ -350,6 +350,7 @@ function getVariantConfigObject(
   node: ts.CallExpression,
   callee: 'cva' | 'tv'
 ): ts.ObjectLiteralExpression | null {
+  // tv extend (second argument) is not supported
   const argument = callee === 'cva' ? node.arguments[1] : node.arguments[0];
   return argument && ts.isObjectLiteralExpression(argument) ? argument : null;
 }
@@ -470,7 +471,7 @@ function getPropertyName(name: ts.PropertyName): string | null {
 function getExpressionName(expression: ts.Expression): string {
   if (ts.isIdentifier(expression)) return expression.text;
   if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
-  return expression.getText();
+  return expression.getText?.() ?? '';
 }
 
 function getDeclarationName(node: ts.Node): string | null {

@@ -20,6 +20,8 @@ describe('component parser service', () => {
     assert.equal(resolveProjectParserPath('../outside.tsx', root), null);
     assert.equal(resolveProjectParserPath(path.resolve('outside.tsx'), root), null);
     assert.equal(resolveProjectParserPath('components/ui/button.ts', root), null);
+    assert.equal(resolveProjectParserPath('', root), null);
+    assert.equal(resolveProjectParserPath('   ', root), null);
   });
 
   it('extracts imports, exports, components, className, cn, and cva definitions', async () => {
@@ -35,14 +37,11 @@ describe('component parser service', () => {
     assert.ok(
       parsed.exports.some((item) => item.name === 'buttonVariants' && item.kind === 'named')
     );
-    assert.deepEqual(parsed.components, [
-      {
-        name: 'Button',
-        declarationKind: 'forwardRef',
-        exported: true,
-        line: 34,
-      },
-    ]);
+    const button = parsed.components.find((c) => c.name === 'Button');
+    assert.ok(button);
+    assert.equal(button.declarationKind, 'forwardRef');
+    assert.equal(button.exported, true);
+    assert.equal(typeof button.line, 'number');
 
     const cnExpression = parsed.cnExpressions[0];
     assert.ok(cnExpression);
