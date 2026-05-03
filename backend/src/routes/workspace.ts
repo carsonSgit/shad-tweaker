@@ -286,6 +286,24 @@ router.get('/registry-sources', async (_req: Request, res: Response) => {
   }
 });
 
+router.get('/registry-sources/health', async (_req: Request, res: Response) => {
+  try {
+    const health = await getRegistrySourceHealth();
+    res.json({ success: true, health });
+  } catch (error) {
+    logger.error('Failed to check registry source health', error);
+    const message =
+      error instanceof Error ? error.message : 'Failed to check registry source health';
+    res.status(500).json({
+      success: false,
+      error: {
+        message,
+        code: 'REGISTRY_SOURCE_HEALTH_ERROR',
+      },
+    });
+  }
+});
+
 router.post('/registry-sources', async (req: Request, res: Response) => {
   try {
     const validation = validateRegistrySource(req.body);
@@ -361,27 +379,19 @@ router.delete('/registry-sources/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/registry-sources/health', async (_req: Request, res: Response) => {
-  try {
-    const health = await getRegistrySourceHealth();
-    res.json({ success: true, health });
-  } catch (error) {
-    logger.error('Failed to check registry source health', error);
-    const message =
-      error instanceof Error ? error.message : 'Failed to check registry source health';
-    res.status(500).json({
-      success: false,
-      error: {
-        message,
-        code: 'REGISTRY_SOURCE_HEALTH_ERROR',
-      },
-    });
-  }
-});
-
 router.get('/registry-items', async (req: Request, res: Response) => {
   try {
     const sourceId = typeof req.query.sourceId === 'string' ? req.query.sourceId : undefined;
+    if (sourceId !== undefined && !isSafeRegistryIdentifier(sourceId)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: 'Invalid registry source ID',
+          code: 'INVALID_REGISTRY_SOURCE_ID',
+        },
+      });
+      return;
+    }
     const result = await listRegistryItemsBySource(sourceId);
     res.json({ success: true, ...result });
   } catch (error) {

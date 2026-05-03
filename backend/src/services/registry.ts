@@ -23,6 +23,26 @@ interface RegistryItemRaw {
   registryDependencies?: string[];
 }
 
+const REGISTRY_FETCH_TIMEOUT_MS = 10_000;
+
+async function fetchRegistryUrl(url: string): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REGISTRY_FETCH_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, { method: 'GET', signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.name === 'AbortError') {
+    return `Request timed out after ${REGISTRY_FETCH_TIMEOUT_MS}ms`;
+  }
+  return error instanceof Error ? error.message : fallback;
+}
+
 function issue(code: string, message: string): RegistrySourceIssue {
   return { code, message };
 }
@@ -35,7 +55,7 @@ function statusFromIssues(issues: RegistrySourceIssue[]): RegistrySourceHealth['
 }
 
 function normalizeType(value?: string): ComponentPackage['type'] {
-  if (value === 'hook' || value === 'utility' || value === 'page') {
+  if (value === 'component' || value === 'hook' || value === 'utility' || value === 'page') {
     return value;
   }
   return 'registry-item';
@@ -86,14 +106,13 @@ async function checkRemoteUrl(url: string): Promise<RegistrySourceIssue[]> {
     return [issue('INVALID_URL', `Invalid HTTP URL: ${url}`)];
   }
   try {
-    const response = await fetch(url, { method: 'GET' });
+    const response = await fetchRegistryUrl(url);
     if (!response.ok) {
       return [issue('HTTP_ERROR', `HTTP ${response.status} returned from ${url}`)];
     }
     return [];
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown network error';
-    return [issue('NETWORK_ERROR', message)];
+    return [issue('NETWORK_ERROR', errorMessage(error, 'Unknown network error'))];
   }
 }
 
@@ -128,12 +147,14 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
       const lookup = `https://registry.npmjs.org/${encodeURIComponent(source.baseUrl)}`;
       issues.push(...(await checkRemoteUrl(lookup)));
     }
-    issues.push(
-      issue(
-        'LISTING_UNSUPPORTED',
-        'npm package sources are not supported by registry item listing yet'
-      )
-    );
+    if (source.enabled) {
+      issues.push(
+        issue(
+          'LISTING_UNSUPPORTED',
+          'npm package sources are not supported by registry item listing yet'
+        )
+      );
+    }
   }
 
   return {
@@ -186,7 +207,7 @@ export async function listRegistryItemsBySource(
     }
 
     try {
-      const response = await fetch(source.registryJsonUrl, { method: 'GET' });
+      const response = await fetchRegistryUrl(source.registryJsonUrl);
       if (!response.ok) {
         warnings.push({
           sourceId: source.id,
@@ -210,8 +231,11 @@ export async function listRegistryItemsBySource(
         });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown fetch error';
-      warnings.push({ sourceId: source.id, sourceName: source.name, message });
+      warnings.push({
+        sourceId: source.id,
+        sourceName: source.name,
+        message: errorMessage(error, 'Unknown fetch error'),
+      });
     }
   }
 
@@ -235,7 +259,7 @@ export async function getRegistryItem(
   if (!source?.registryJsonUrl || !isHttpUrl(source.registryJsonUrl)) return null;
 
   try {
-    const response = await fetch(source.registryJsonUrl, { method: 'GET' });
+    const response = await fetchRegistryUrl(source.registryJsonUrl);
     if (!response.ok) return null;
     const payload = (await response.json()) as { items?: RegistryItemRaw[] };
     const match = (payload.items ?? []).find((entry) => entry.name === itemName);
@@ -257,8 +281,9 @@ export async function findRegistryItem(
   const sources = (await listRegistrySources(cwd))
     .filter((source) => source.enabled)
     .sort((a, b) => a.name.localeCompare(b.name));
-  const results = await Promise.all(
-    sources.map((source) => getRegistryItem(source.id, itemName, cwd))
-  );
-  return results.find((item): item is ComponentPackage => item !== null) ?? null;
+  for (const source of sources) {
+    const item = await getRegistryItem(source.id, itemName, cwd);
+    if (item) return item;
+  }
+  return null;
 }

@@ -146,7 +146,7 @@ export function isHttpUrl(value: string): boolean {
 }
 
 export function isSafeRegistryIdentifier(value: string): boolean {
-  return /^[a-zA-Z0-9_-]+$/.test(value);
+  return value.length > 0 && value.length <= 128 && /^[a-zA-Z0-9_-]+$/.test(value);
 }
 
 // ============================================

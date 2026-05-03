@@ -78,6 +78,16 @@ describe('workspace registry routes', () => {
     assert.equal(res.body.success, true);
     assert.equal(res.body.items.length, 1);
     assert.equal(res.body.items[0].name, 'button');
+    assert.equal(res.body.items[0].type, 'component');
+  });
+
+  it('rejects unsafe registry item sourceId query params', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+
+    const res = await request(app).get('/api/workspace/registry-items?sourceId=../secret');
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'INVALID_REGISTRY_SOURCE_ID');
   });
 
   it('returns registry items by fallback name route', async () => {
