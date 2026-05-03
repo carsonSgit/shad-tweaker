@@ -20,6 +20,8 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "typecheck": "tsc --noEmit -p cli/tsconfig.json",
+    "backend:test": "cd backend && npx tsx --test test/*.ts",
+    "backend:build": "npm run build --prefix backend",
     "prepublishOnly": "bun run build",
     "preversion": "bun run check && bun run typecheck",
     "version": "bun run format && git add -A",

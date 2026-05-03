@@ -8,9 +8,10 @@ import {
   upsertRegistrySource,
 } from '../services/workspace.js';
 import {
+  findRegistryItem,
   getRegistryItem,
   getRegistrySourceHealth,
-  listRegistryItems,
+  listRegistryItemsBySource,
 } from '../services/registry.js';
 import type { RegistrySource, WorkspaceConfig } from '../types/index.js';
 import { logger } from '../utils/logger.js';
@@ -385,9 +386,10 @@ router.get('/registry-sources/health', async (_req: Request, res: Response) => {
   }
 });
 
-router.get('/registry-items', async (_req: Request, res: Response) => {
+router.get('/registry-items', async (req: Request, res: Response) => {
   try {
-    const result = await listRegistryItems();
+    const sourceId = typeof req.query.sourceId === 'string' ? req.query.sourceId : undefined;
+    const result = await listRegistryItemsBySource(sourceId);
     res.json({ success: true, ...result });
   } catch (error) {
     logger.error('Failed to list registry items', error);
@@ -397,6 +399,33 @@ router.get('/registry-items', async (_req: Request, res: Response) => {
       error: {
         message,
         code: 'REGISTRY_ITEM_LIST_ERROR',
+      },
+    });
+  }
+});
+
+router.get('/registry-items/:itemName', async (req: Request, res: Response) => {
+  try {
+    const item = await findRegistryItem(req.params.itemName);
+    if (!item) {
+      res.status(404).json({
+        success: false,
+        error: {
+          message: `Registry item not found: ${req.params.itemName}`,
+          code: 'REGISTRY_ITEM_NOT_FOUND',
+        },
+      });
+      return;
+    }
+    res.json({ success: true, item });
+  } catch (error) {
+    logger.error(`Failed to fetch registry item: ${req.params.itemName}`, error);
+    const message = error instanceof Error ? error.message : 'Failed to fetch registry item';
+    res.status(500).json({
+      success: false,
+      error: {
+        message,
+        code: 'REGISTRY_ITEM_FETCH_ERROR',
       },
     });
   }

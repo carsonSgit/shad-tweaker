@@ -105,6 +105,7 @@ async function start() {
       logger.info('  POST /api/workspace/registry-sources - Create or update registry source');
       logger.info('  DELETE /api/workspace/registry-sources/:id - Delete registry source');
       logger.info('  GET  /api/workspace/registry-items - List registry items');
+      logger.info('  GET  /api/workspace/registry-items/:itemName - Find registry item by name');
       logger.info('  GET  /api/workspace/registry-items/:sourceId/:itemName - Fetch registry item');
     });
   } catch (error) {

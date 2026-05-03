@@ -132,11 +132,21 @@ export async function getRegistrySourceHealth(cwd: string = getWorkingDirectory(
 }
 
 export async function listRegistryItems(cwd: string = getWorkingDirectory()): Promise<RegistrySourceListResult> {
+  return listRegistryItemsBySource(undefined, cwd);
+}
+
+export async function listRegistryItemsBySource(
+  sourceId: string | undefined,
+  cwd: string = getWorkingDirectory()
+): Promise<RegistrySourceListResult> {
   const sources = await listRegistrySources(cwd);
   const warnings: RegistryReadWarning[] = [];
   const items: RegistryItemSummary[] = [];
 
-  for (const source of sources.filter((candidate) => candidate.enabled)) {
+  const candidates = sources.filter((candidate) => candidate.enabled);
+  const filtered = sourceId ? candidates.filter((candidate) => candidate.id === sourceId) : candidates;
+
+  for (const source of filtered) {
     if (!source.registryJsonUrl || !isHttpUrl(source.registryJsonUrl)) {
       warnings.push({ sourceId: source.id, sourceName: source.name, message: 'No registryJsonUrl configured' });
       continue;
@@ -199,4 +209,21 @@ export async function getRegistryItem(
   } catch {
     return null;
   }
+}
+
+export async function findRegistryItem(
+  itemName: string,
+  cwd: string = getWorkingDirectory()
+): Promise<ComponentPackage | null> {
+  if (!itemName || itemName.includes('/') || itemName.includes('\\') || itemName.includes('..')) {
+    return null;
+  }
+  const sources = (await listRegistrySources(cwd))
+    .filter((source) => source.enabled)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  for (const source of sources) {
+    const item = await getRegistryItem(source.id, itemName, cwd);
+    if (item) return item;
+  }
+  return null;
 }
