@@ -161,6 +161,74 @@ export interface DesignTokenSet {
   updatedAt: string;
 }
 
+export interface ParsedImport {
+  moduleSpecifier: string;
+  defaultImport?: string;
+  namespaceImport?: string;
+  namedImports: string[];
+}
+
+export interface ParsedExport {
+  name: string;
+  kind: 'function' | 'const' | 'class' | 'default' | 'named' | 're-export';
+}
+
+export interface ParsedComponent {
+  name: string;
+  declarationKind: 'function' | 'const' | 'class' | 'forwardRef' | 'memo' | 'unknown';
+  exported: boolean;
+  line: number;
+}
+
+export interface ParsedJsxElement {
+  tagName: string;
+  line: number;
+}
+
+export interface ParsedClassNameAttribute {
+  tagName: string;
+  line: number;
+  kind: 'string' | 'expression' | 'unsupported';
+  raw: string;
+  classes: string[];
+}
+
+export interface ParsedCnExpression {
+  line: number;
+  raw: string;
+  stringLiterals: string[];
+}
+
+export interface ParsedVariantDefinition {
+  name: string;
+  callee: 'cva' | 'tv';
+  line: number;
+  baseClasses: string[];
+  variants: Record<string, string[]>;
+  defaultVariants: Record<string, string>;
+  raw: string;
+}
+
+export interface ParserDiagnostic {
+  severity: 'info' | 'warning' | 'error';
+  code: string;
+  message: string;
+  line?: number;
+}
+
+export interface ParsedComponentFile {
+  path: string;
+  language: 'tsx' | 'jsx';
+  imports: ParsedImport[];
+  exports: ParsedExport[];
+  components: ParsedComponent[];
+  jsxElements: ParsedJsxElement[];
+  classNameAttributes: ParsedClassNameAttribute[];
+  cnExpressions: ParsedCnExpression[];
+  variantDefinitions: ParsedVariantDefinition[];
+  diagnostics: ParserDiagnostic[];
+}
+
 export type BackupMetadata = Backup;
 
 export interface WorkspaceConfig {
