@@ -3,6 +3,7 @@ import express from 'express';
 import backupRouter from './routes/backup.js';
 import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
+import importsRouter from './routes/imports.js';
 import parserRouter from './routes/parser.js';
 import templatesRouter from './routes/templates.js';
 import workspaceRouter from './routes/workspace.js';
@@ -47,6 +48,7 @@ app.use('/api/backup', backupRouter);
 app.use('/api/templates', templatesRouter);
 app.use('/api/workspace', workspaceRouter);
 app.use('/api/parser', parserRouter);
+app.use('/api/imports', importsRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', err);
@@ -91,6 +93,8 @@ async function start() {
       logger.info('  POST /api/edit/apply - Apply changes');
       logger.info('  POST /api/edit/batch-action - Apply batch action');
       logger.info('  POST /api/parser/analyze - Analyze component structure');
+      logger.info('  POST /api/imports/plan - Generate import plan');
+      logger.info('  POST /api/imports/apply - Apply approved import plan');
       logger.info('  GET  /api/templates - List templates');
       logger.info('  POST /api/templates - Create template');
       logger.info('  DELETE /api/templates/:id - Delete template');

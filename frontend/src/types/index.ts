@@ -46,6 +46,49 @@ export interface Backup {
   components: string[];
 }
 
+export interface PlannedFile {
+  sourcePath: string;
+  targetPath: string;
+  content: string;
+}
+
+export interface ImportConflict {
+  path: string;
+  type: 'file-exists' | 'unsafe-path' | 'missing-content';
+  message: string;
+}
+
+export type ImportConflictAction = 'overwrite' | 'skip' | 'rename' | 'fork';
+
+export interface ImportConflictResolution {
+  path: string;
+  action: ImportConflictAction;
+  targetPath?: string;
+}
+
+export interface ImportPlan {
+  id: string;
+  itemName: string;
+  sourceId?: string;
+  filesToAdd: PlannedFile[];
+  filesToOverwrite: PlannedFile[];
+  dependencies: string[];
+  devDependencies: string[];
+  registryDependencies: string[];
+  aliasesNeeded: string[];
+  conflicts: ImportConflict[];
+  backupPaths: string[];
+}
+
+export interface ApplyImportPlanResult {
+  success: boolean;
+  added: string[];
+  overwritten: string[];
+  skipped: string[];
+  backupId?: string;
+  rolledBack?: boolean;
+}
+
 export interface ApiError {
   message: string;
   code: string;
