@@ -29,6 +29,14 @@ interface TsConfig {
   };
 }
 
+export class RegistryItemNotFoundError extends Error {
+  readonly code = 'REGISTRY_ITEM_NOT_FOUND';
+
+  constructor(itemName: string, sourceId?: string) {
+    super(`Registry item not found: ${sourceId ? `${sourceId}/` : ''}${itemName}`);
+  }
+}
+
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.trim().length > 0))].sort((a, b) =>
     a.localeCompare(b)
@@ -36,6 +44,7 @@ function uniqueSorted(values: string[]): string[] {
 }
 
 function planId(item: ComponentPackage): string {
+  // Component package ids use "<sourceId>:<itemName>"; append a UUID after that stable prefix.
   return `${item.id}:${randomUUID()}`;
 }
 
@@ -45,9 +54,13 @@ function normalizeRegistryPath(filePath: string): string | null {
   return trimmed.replace(/^\.?\//, '');
 }
 
-function resolveTargetPath(cwd: string, componentDirectory: string, registryPath: string): string {
+function resolveTargetPath(
+  cwd: string,
+  componentDirectory: string,
+  registryPath: string
+): string | null {
   const normalized = normalizeRegistryPath(registryPath);
-  if (!normalized) return '';
+  if (!normalized) return null;
 
   const withoutLeadingUi = normalized.startsWith('ui/') ? normalized.slice(3) : normalized;
   return path.resolve(cwd, componentDirectory, withoutLeadingUi);
@@ -60,7 +73,7 @@ function toPlannedFile(
 ): PlannedFile {
   return {
     sourcePath: file.path,
-    targetPath: resolveTargetPath(cwd, componentDirectory, file.path),
+    targetPath: resolveTargetPath(cwd, componentDirectory, file.path) ?? '',
     content: file.content ?? '',
   };
 }
@@ -143,9 +156,7 @@ async function resolveRegistryItem(
     : await findRegistryItem(request.itemName, cwd);
 
   if (!item) {
-    throw new Error(
-      `Registry item not found: ${request.sourceId ? `${request.sourceId}/` : ''}${request.itemName}`
-    );
+    throw new RegistryItemNotFoundError(request.itemName, request.sourceId);
   }
 
   return item;
@@ -251,7 +262,6 @@ export async function generateImportPlan(
     ),
     aliasesNeeded: await detectAliases(cwd, plannedFiles),
     conflicts,
-    backupPaths: filesToOverwrite.map((file) => path.relative(cwd, file.targetPath)),
   };
 }
 
@@ -319,14 +329,21 @@ export async function applyImportPlan(
     });
   }
 
-  const backupPaths = uniqueSorted(
-    filesToWrite
-      .flatMap((entry) => [
-        entry.overwrites ? entry.targetPath : '',
-        entry.removeOriginalPath ?? '',
-      ])
-      .filter((targetPath) => fs.existsSync(targetPath))
+  const candidateBackupPaths = uniqueSorted(
+    filesToWrite.flatMap((entry) => [
+      entry.overwrites ? entry.targetPath : '',
+      entry.removeOriginalPath ?? '',
+    ])
   );
+  const backupPathExists = await Promise.all(
+    candidateBackupPaths.map(async (targetPath) => ({
+      targetPath,
+      exists: await fs.pathExists(targetPath),
+    }))
+  );
+  const backupPaths = backupPathExists
+    .filter((entry) => entry.exists)
+    .map((entry) => entry.targetPath);
 
   if (backupPaths.length > 0) {
     const backup = await createBackup(backupPaths);

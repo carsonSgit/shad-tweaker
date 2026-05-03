@@ -77,7 +77,6 @@ export interface ImportPlan {
   registryDependencies: string[];
   aliasesNeeded: string[];
   conflicts: ImportConflict[];
-  backupPaths: string[];
 }
 
 export interface ApplyImportPlanResult {

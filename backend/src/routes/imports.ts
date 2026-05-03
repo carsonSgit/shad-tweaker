@@ -1,5 +1,9 @@
 import { type Request, type Response, Router } from 'express';
-import { applyImportPlan, generateImportPlan } from '../services/importPlanner.js';
+import {
+  applyImportPlan,
+  generateImportPlan,
+  RegistryItemNotFoundError,
+} from '../services/importPlanner.js';
 import { getWorkingDirectory } from '../services/workspace.js';
 import type {
   ApplyImportPlanRequest,
@@ -49,7 +53,13 @@ function validateApplyRequest(body: unknown, cwd: string): body is ApplyImportPl
 
   if (typeof req.plan !== 'object' || req.plan === null) return false;
   const plan = req.plan as Record<string, unknown>;
-  if (typeof plan.id !== 'string' || typeof plan.itemName !== 'string') return false;
+  if (
+    typeof plan.id !== 'string' ||
+    typeof plan.itemName !== 'string' ||
+    !isSafeRegistryIdentifier(plan.itemName)
+  ) {
+    return false;
+  }
   if (!Array.isArray(plan.filesToAdd) || !Array.isArray(plan.filesToOverwrite)) return false;
   if (!plan.filesToAdd.every((file) => isPlannedFile(file, cwd))) return false;
   if (!plan.filesToOverwrite.every((file) => isPlannedFile(file, cwd))) return false;
@@ -89,12 +99,13 @@ router.post('/plan', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Failed to generate import plan', error);
     const message = error instanceof Error ? error.message : 'Failed to generate import plan';
-    const status = message.includes('not found') ? 404 : 500;
+    const notFound = error instanceof RegistryItemNotFoundError;
+    const status = notFound ? 404 : 500;
     res.status(status).json({
       success: false,
       error: {
         message,
-        code: status === 404 ? 'REGISTRY_ITEM_NOT_FOUND' : 'IMPORT_PLAN_ERROR',
+        code: notFound ? error.code : 'IMPORT_PLAN_ERROR',
       },
     });
   }

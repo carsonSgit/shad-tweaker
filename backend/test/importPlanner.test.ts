@@ -96,7 +96,33 @@ describe('import planner service', () => {
       plan.conflicts.some((conflict) => conflict.type === 'file-exists'),
       true
     );
-    assert.deepEqual(plan.backupPaths, [path.join('components', 'ui', 'button.tsx')]);
+    assert.equal('backupPaths' in plan, false);
+  });
+
+  it('does not report aliases that are configured in tsconfig paths', async () => {
+    const root = await createTempRoot();
+    await fs.writeJson(path.join(root, 'tsconfig.json'), {
+      compilerOptions: {
+        paths: {
+          '@/*': ['./src/*'],
+        },
+      },
+    });
+    const sourceId = await addRegistry(root, [
+      {
+        name: 'button',
+        files: [
+          {
+            path: 'ui/button.tsx',
+            content: "import { cn } from '@/lib/utils';\nexport function Button() {}\n",
+          },
+        ],
+      },
+    ]);
+
+    const plan = await generateImportPlan({ sourceId, itemName: 'button' }, root);
+
+    assert.deepEqual(plan.aliasesNeeded, []);
   });
 
   it('reports unsafe paths and missing content before import', async () => {
@@ -185,7 +211,6 @@ describe('import planner service', () => {
       registryDependencies: [],
       aliasesNeeded: [],
       conflicts: [],
-      backupPaths: [existingButton],
     };
 
     await assert.rejects(
@@ -193,5 +218,47 @@ describe('import planner service', () => {
       /Refusing to write outside project.*Rolled back/
     );
     assert.equal(await fs.readFile(existingButton, 'utf-8'), 'old button');
+  });
+
+  it('overwrites by default and forks when requested', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+    const existingButton = path.join(root, 'components', 'ui', 'button.tsx');
+    const existingCard = path.join(root, 'components', 'ui', 'card.tsx');
+    await fs.outputFile(existingButton, 'old button');
+    await fs.outputFile(existingCard, 'old card');
+
+    const plan: ImportPlan = {
+      id: 'manual',
+      itemName: 'button',
+      filesToAdd: [],
+      filesToOverwrite: [
+        { sourcePath: 'ui/button.tsx', targetPath: existingButton, content: 'new button' },
+        { sourcePath: 'ui/card.tsx', targetPath: existingCard, content: 'new card' },
+      ],
+      dependencies: [],
+      devDependencies: [],
+      registryDependencies: [],
+      aliasesNeeded: [],
+      conflicts: [],
+    };
+
+    const result = await applyImportPlan(
+      {
+        plan,
+        resolutions: [
+          { path: existingCard, action: 'fork', targetPath: 'components/ui/card-copy.tsx' },
+        ],
+      },
+      root
+    );
+
+    assert.equal(await fs.readFile(existingButton, 'utf-8'), 'new button');
+    assert.equal(await fs.readFile(existingCard, 'utf-8'), 'old card');
+    assert.equal(
+      await fs.readFile(path.join(root, 'components', 'ui', 'card-copy.tsx'), 'utf-8'),
+      'new card'
+    );
+    assert.deepEqual(result.overwritten, [existingButton]);
   });
 });

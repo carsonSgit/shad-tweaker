@@ -140,4 +140,23 @@ describe('import routes', () => {
     assert.equal(res.status, 400);
     assert.equal(res.body.error.code, 'VALIDATION_ERROR');
   });
+
+  it('returns 400 for unsafe apply item names', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+
+    const res = await request(app)
+      .post('/api/imports/apply')
+      .send({
+        plan: {
+          id: 'bad',
+          itemName: '../button',
+          filesToAdd: [],
+          filesToOverwrite: [],
+        },
+      });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+  });
 });
