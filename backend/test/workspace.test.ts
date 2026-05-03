@@ -1,13 +1,13 @@
+import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
-import assert from 'node:assert/strict';
 import fs from 'fs-extra';
 import {
-  loadWorkspaceManifest,
   deleteRegistrySource,
   listRegistrySources,
+  loadWorkspaceManifest,
   recordBackupMetadata,
   recordScannedComponents,
   updateWorkspaceConfig,

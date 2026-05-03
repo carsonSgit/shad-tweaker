@@ -1,7 +1,7 @@
 import { type Request, type Response, Router } from 'express';
 import {
-  initializeWorkspace,
   deleteRegistrySource,
+  initializeWorkspace,
   listRegistrySources,
   loadWorkspaceManifest,
   updateWorkspaceConfig,
