@@ -216,6 +216,25 @@ async function deriveBackups(cwd: string): Promise<BackupMetadata[]> {
   return backups;
 }
 
+function mergeBackups(
+  manifestBackups: BackupMetadata[],
+  derivedBackups: BackupMetadata[]
+): BackupMetadata[] {
+  const backupsById = new Map<string, BackupMetadata>();
+
+  for (const backup of manifestBackups) {
+    backupsById.set(backup.id, backup);
+  }
+
+  for (const backup of derivedBackups) {
+    backupsById.set(backup.id, backup);
+  }
+
+  return [...backupsById.values()].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+}
+
 async function ensureWorkspaceDirs(cwd: string): Promise<void> {
   await fs.ensureDir(getWorkspaceDir(cwd));
   await fs.ensureDir(path.join(getWorkspaceDir(cwd), 'templates'));
@@ -262,7 +281,7 @@ export async function loadWorkspaceManifest(
 
   const legacyConfig = await readLegacyConfig(cwd);
   const presets = await readMigratedPresets(cwd, manifest.presets);
-  const backups = await deriveBackups(cwd);
+  const backups = mergeBackups(manifest.backups, await deriveBackups(cwd));
 
   const hydrated: WorkspaceManifest = {
     ...manifest,
