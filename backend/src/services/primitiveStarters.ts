@@ -2,7 +2,6 @@ import path from 'node:path';
 import fs from 'fs-extra';
 import type {
   PrimitiveStarterApplyResult,
-  PrimitiveStarterGeneratedFile,
   PrimitiveStarterProvider,
   PrimitiveStarterRequest,
   PrimitiveStarterResult,
@@ -21,6 +20,21 @@ export class PrimitiveStarterValidationError extends Error {
 
 export class PrimitiveStarterConflictError extends Error {
   readonly code = 'PRIMITIVE_STARTER_CONFLICT';
+}
+
+const MAX_COMPONENT_NAME_LENGTH = 64;
+
+interface PrimitiveStarterFilePlan {
+  relativePath: string;
+  absolutePath: string;
+  content: string;
+}
+
+interface PrimitiveStarterPlan {
+  template: PrimitiveStarterTemplate;
+  componentName: string;
+  files: PrimitiveStarterFilePlan[];
+  conflicts: string[];
 }
 
 export const PRIMITIVE_STARTER_TEMPLATES: PrimitiveStarterTemplate[] = [
@@ -75,6 +89,7 @@ export function findPrimitiveStarterTemplate(
 function toPascalCase(value: string): string {
   return value
     .trim()
+    .toLowerCase()
     .split(/[^a-zA-Z0-9]+/)
     .filter(Boolean)
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
@@ -93,40 +108,35 @@ function toKebabCase(value: string): string {
 
 function normalizeComponentName(value: string | undefined, fallback: string): string | null {
   const name = toPascalCase(value ?? fallback);
-  if (!name || !/^[A-Z][a-zA-Z0-9]*$/.test(name)) return null;
+  if (!name || name.length > MAX_COMPONENT_NAME_LENGTH || !/^[A-Z][a-zA-Z0-9]*$/.test(name)) {
+    return null;
+  }
   return name;
 }
 
-function resolveTargetPath(
-  cwd: string,
-  componentDirectory: string,
-  componentName: string,
-  targetPath?: string
-): string | null {
+function normalizeTargetPath(componentName: string, targetPath?: string): string | null {
   const relativePath = targetPath ?? `${toKebabCase(componentName)}.tsx`;
   if (!relativePath || !isSafeProjectRelativePath(relativePath)) return null;
-
-  const baseDir = path.resolve(cwd, componentDirectory);
-  const resolvedTargetPath = path.resolve(baseDir, relativePath);
-  if (resolvedTargetPath !== baseDir && !resolvedTargetPath.startsWith(baseDir + path.sep)) {
-    return null;
-  }
-
-  return resolvedTargetPath;
+  const normalizedPath = path.normalize(relativePath).replace(/\\/g, '/').replace(/^\.\//, '');
+  return normalizedPath.endsWith('.tsx') ? normalizedPath : null;
 }
 
-function resolveSafeGeneratedPath(baseDir: string, targetPath: string): string {
+function resolveSafeGeneratedPath(baseDir: string, relativePath: string): string {
   const resolvedBaseDir = path.resolve(baseDir);
-  const resolvedTargetPath = path.resolve(targetPath);
-  const relativePath = path.relative(resolvedBaseDir, resolvedTargetPath);
+  const resolvedTargetPath = path.resolve(resolvedBaseDir, relativePath);
+  const pathFromBase = path.relative(resolvedBaseDir, resolvedTargetPath);
 
-  if (relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath))) {
+  if (pathFromBase !== '' && !pathFromBase.startsWith('..') && !path.isAbsolute(pathFromBase)) {
     return resolvedTargetPath;
   }
 
   throw new PrimitiveStarterValidationError(
-    `Generated file path must stay inside the component directory: ${targetPath}`
+    `Generated file path must stay inside the component directory: ${relativePath}`
   );
+}
+
+function toProjectRelativePath(componentDirectory: string, relativePath: string): string {
+  return path.join(componentDirectory, relativePath).replace(/\\/g, '/').replace(/^\.\//, '');
 }
 
 function variantName(componentName: string): string {
@@ -397,9 +407,10 @@ export {
 function generateFiles(
   template: PrimitiveStarterTemplate,
   componentName: string,
-  targetPath: string,
+  relativePath: string,
+  absolutePath: string,
   includeCva: boolean
-): PrimitiveStarterGeneratedFile[] {
+): PrimitiveStarterFilePlan[] {
   const generators: Record<PrimitiveStarterProvider, (name: string, cva: boolean) => string> = {
     blank: blankStarterContent,
     radix: radixDialogStarterContent,
@@ -409,16 +420,29 @@ function generateFiles(
 
   return [
     {
-      path: targetPath,
+      relativePath,
+      absolutePath,
       content,
     },
   ];
 }
 
-export async function generatePrimitiveStarter(
+function toPublicResult(plan: PrimitiveStarterPlan): PrimitiveStarterResult {
+  return {
+    template: plan.template,
+    componentName: plan.componentName,
+    files: plan.files.map((file) => ({
+      path: file.relativePath,
+      content: file.content,
+    })),
+    conflicts: plan.conflicts,
+  };
+}
+
+async function buildPrimitiveStarterPlan(
   request: PrimitiveStarterRequest,
   cwd: string
-): Promise<PrimitiveStarterResult> {
+): Promise<PrimitiveStarterPlan> {
   const template = findPrimitiveStarterTemplate(request.provider, request.templateId);
   if (!template) {
     throw new PrimitiveStarterTemplateNotFoundError('Primitive starter template not found.');
@@ -431,28 +455,32 @@ export async function generatePrimitiveStarter(
   );
   if (!componentName) {
     throw new PrimitiveStarterValidationError(
-      'componentName must produce a valid PascalCase component name.'
+      `componentName must produce a valid PascalCase component name up to ${MAX_COMPONENT_NAME_LENGTH} characters.`
     );
   }
 
-  const targetPath = resolveTargetPath(
-    cwd,
-    manifest.config.componentDirectory,
-    componentName,
-    request.targetPath
-  );
+  const targetPath = normalizeTargetPath(componentName, request.targetPath);
   if (!targetPath) {
-    throw new PrimitiveStarterValidationError('targetPath must be a safe project-relative path.');
+    throw new PrimitiveStarterValidationError(
+      'targetPath must be a safe project-relative .tsx path.'
+    );
   }
 
-  const files = generateFiles(template, componentName, targetPath, request.includeCva === true);
   const componentBaseDir = path.resolve(cwd, manifest.config.componentDirectory);
+  const absolutePath = resolveSafeGeneratedPath(componentBaseDir, targetPath);
+  const publicPath = toProjectRelativePath(manifest.config.componentDirectory, targetPath);
+  const files = generateFiles(
+    template,
+    componentName,
+    publicPath,
+    absolutePath,
+    request.includeCva === true
+  );
   const conflicts: string[] = [];
 
   for (const file of files) {
-    const safePath = resolveSafeGeneratedPath(componentBaseDir, file.path);
-    if (await fs.pathExists(safePath)) {
-      conflicts.push(safePath);
+    if (await fs.pathExists(file.absolutePath)) {
+      conflicts.push(file.relativePath);
     }
   }
 
@@ -464,32 +492,35 @@ export async function generatePrimitiveStarter(
   };
 }
 
+export async function generatePrimitiveStarter(
+  request: PrimitiveStarterRequest,
+  cwd: string
+): Promise<PrimitiveStarterResult> {
+  return toPublicResult(await buildPrimitiveStarterPlan(request, cwd));
+}
+
 export async function applyPrimitiveStarter(
   request: PrimitiveStarterRequest,
   cwd: string
 ): Promise<PrimitiveStarterApplyResult> {
-  const result = await generatePrimitiveStarter(request, cwd);
+  const plan = await buildPrimitiveStarterPlan(request, cwd);
 
-  if (result.conflicts.length > 0 && request.overwrite !== true) {
+  if (plan.conflicts.length > 0 && request.overwrite !== true) {
     throw new PrimitiveStarterConflictError(
       'Primitive starter target already exists. Pass overwrite to replace it.'
     );
   }
 
-  const manifest = await loadWorkspaceManifest(cwd);
-  const componentBaseDir = path.resolve(cwd, manifest.config.componentDirectory);
   const written: string[] = [];
 
-  for (const file of result.files) {
-    const safePath = resolveSafeGeneratedPath(componentBaseDir, file.path);
-
-    await fs.ensureDir(path.dirname(safePath));
-    await fs.writeFile(safePath, file.content, 'utf-8');
-    written.push(safePath);
+  for (const file of plan.files) {
+    await fs.ensureDir(path.dirname(file.absolutePath));
+    await fs.writeFile(file.absolutePath, file.content, 'utf-8');
+    written.push(file.relativePath);
   }
 
   return {
-    ...result,
+    ...toPublicResult(plan),
     success: true,
     written,
   };

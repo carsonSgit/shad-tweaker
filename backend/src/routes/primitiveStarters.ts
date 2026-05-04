@@ -10,10 +10,12 @@ import {
 import { getWorkingDirectory } from '../services/workspace.js';
 import type { PrimitiveStarterProvider, PrimitiveStarterRequest } from '../types/index.js';
 import { logger } from '../utils/logger.js';
+import { isSafeProjectRelativePath } from '../utils/paths.js';
 import { isSafeRegistryIdentifier } from '../utils/validation.js';
 
 const router = Router();
 const PROVIDERS = ['blank', 'radix', 'base-ui'] as const satisfies PrimitiveStarterProvider[];
+const MAX_COMPONENT_NAME_LENGTH = 64;
 
 function validateStarterRequest(body: unknown): body is PrimitiveStarterRequest {
   if (typeof body !== 'object' || body === null) return false;
@@ -36,7 +38,19 @@ function validateStarterRequest(body: unknown): body is PrimitiveStarterRequest 
   if (bodyRecord.componentName !== undefined && typeof bodyRecord.componentName !== 'string') {
     return false;
   }
+  if (
+    typeof bodyRecord.componentName === 'string' &&
+    bodyRecord.componentName.trim().length > MAX_COMPONENT_NAME_LENGTH
+  ) {
+    return false;
+  }
   if (bodyRecord.targetPath !== undefined && typeof bodyRecord.targetPath !== 'string') {
+    return false;
+  }
+  if (
+    typeof bodyRecord.targetPath === 'string' &&
+    !isSafeProjectRelativePath(bodyRecord.targetPath)
+  ) {
     return false;
   }
   if (bodyRecord.includeCva !== undefined && typeof bodyRecord.includeCva !== 'boolean') {

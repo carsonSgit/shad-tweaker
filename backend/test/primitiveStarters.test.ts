@@ -33,9 +33,21 @@ describe('primitive starter service', () => {
 
     assert.equal(result.componentName, 'EmptyState');
     assert.equal(result.files.length, 1);
-    assert.match(result.files[0].path, /empty-state\.tsx$/);
+    assert.equal(result.files[0].path, 'components/ui/empty-state.tsx');
     assert.match(result.files[0].content, /import \{ cn \} from '@\/lib\/utils';/);
     assert.match(result.files[0].content, /data-slot="empty-state"/);
+  });
+
+  it('normalizes uppercase component names predictably', async () => {
+    const root = await createTempRoot();
+
+    const result = await generatePrimitiveStarter(
+      { provider: 'blank', componentName: 'MY_COMPONENT' },
+      root
+    );
+
+    assert.equal(result.componentName, 'MyComponent');
+    assert.equal(result.files[0].path, 'components/ui/my-component.tsx');
   });
 
   it('generates a Radix dialog wrapper with primitive parts', async () => {
@@ -92,7 +104,7 @@ describe('primitive starter service', () => {
       { provider: 'blank', componentName: 'Dialog' },
       root
     );
-    assert.deepEqual(preview.conflicts, [target]);
+    assert.deepEqual(preview.conflicts, ['components/ui/dialog.tsx']);
 
     await assert.rejects(
       applyPrimitiveStarter({ provider: 'blank', componentName: 'Dialog' }, root),
@@ -110,8 +122,17 @@ describe('primitive starter service', () => {
       root
     );
 
-    assert.deepEqual(result.written, [target]);
+    assert.deepEqual(result.written, ['components/ui/dialog.tsx']);
     assert.match(await fs.readFile(target, 'utf-8'), /export function Dialog/);
     assert.doesNotMatch(await fs.readFile(target, 'utf-8'), /existing/);
+  });
+
+  it('rejects component names over the normalized length limit', async () => {
+    const root = await createTempRoot();
+
+    await assert.rejects(
+      generatePrimitiveStarter({ provider: 'blank', componentName: 'A'.repeat(65) }, root),
+      /64/
+    );
   });
 });

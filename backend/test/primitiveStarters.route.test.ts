@@ -49,7 +49,8 @@ describe('primitive starter routes', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
     assert.equal(res.body.result.componentName, 'ToastShell');
-    assert.equal(await fs.pathExists(res.body.result.files[0].path), false);
+    assert.equal(res.body.result.files[0].path, 'components/ui/toast-shell.tsx');
+    assert.equal(await fs.pathExists(path.join(root, res.body.result.files[0].path)), false);
   });
 
   it('applies a Radix starter by writing the generated file', async () => {
@@ -63,7 +64,7 @@ describe('primitive starter routes', () => {
     const target = path.join(root, 'components', 'ui', 'dialog.tsx');
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
-    assert.equal(res.body.result.written[0], target);
+    assert.equal(res.body.result.written[0], 'components/ui/dialog.tsx');
     assert.match(await fs.readFile(target, 'utf-8'), /@radix-ui\/react-dialog/);
   });
 
@@ -78,7 +79,7 @@ describe('primitive starter routes', () => {
     const target = path.join(root, 'components', 'ui', 'dialog.tsx');
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
-    assert.equal(res.body.result.written[0], target);
+    assert.equal(res.body.result.written[0], 'components/ui/dialog.tsx');
     assert.match(await fs.readFile(target, 'utf-8'), /@base-ui-components\/react\/dialog/);
   });
 
@@ -102,6 +103,30 @@ describe('primitive starter routes', () => {
     const res = await request(app)
       .post('/api/primitive-starters/preview')
       .send({ provider: 'headless-ui' });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+  });
+
+  it('rejects unsafe target paths before service planning', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+
+    const res = await request(app)
+      .post('/api/primitive-starters/preview')
+      .send({ provider: 'blank', targetPath: '../escape.tsx' });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+  });
+
+  it('rejects over-length component names', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+
+    const res = await request(app)
+      .post('/api/primitive-starters/preview')
+      .send({ provider: 'blank', componentName: 'A'.repeat(65) });
 
     assert.equal(res.status, 400);
     assert.equal(res.body.error.code, 'VALIDATION_ERROR');
