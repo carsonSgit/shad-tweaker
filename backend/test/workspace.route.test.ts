@@ -70,10 +70,10 @@ describe('workspace registry routes', () => {
 
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
-    assert.deepEqual(
-      res.body.health.map((entry: { status: string }) => entry.status).sort(),
-      ['healthy', 'unhealthy']
-    );
+    assert.deepEqual(res.body.health.map((entry: { status: string }) => entry.status).sort(), [
+      'healthy',
+      'unhealthy',
+    ]);
     assert.deepEqual(
       res.body.health
         .find((entry: { sourceName: string }) => entry.sourceName === 'Dead Registry')

@@ -60,7 +60,11 @@ function isValidNpmPackageName(value: string): boolean {
   if (value.length === 0 || value.length > 214 || value.includes('\\')) {
     return false;
   }
-  if (/[\x00-\x1F\x7F\s]/.test(value) || value.startsWith('.') || value.startsWith('_')) {
+  if (
+    [...value].some((char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127) ||
+    value.startsWith('.') ||
+    value.startsWith('_')
+  ) {
     return false;
   }
   if (value.startsWith('@')) {
@@ -174,7 +178,10 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
         const stats = await fs.stat(fullPath);
         if (!stats.isDirectory()) {
           issues.push(
-            issue('LOCAL_PATH_NOT_DIRECTORY', `Local folder path is not a directory: ${source.baseUrl}`)
+            issue(
+              'LOCAL_PATH_NOT_DIRECTORY',
+              `Local folder path is not a directory: ${source.baseUrl}`
+            )
           );
         }
       }

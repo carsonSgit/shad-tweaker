@@ -92,10 +92,7 @@ describe('registry service', () => {
 
   it('reports missing remote registry URLs as degraded', async () => {
     const root = await createTempRoot();
-    await upsertRegistrySource(
-      { name: 'No URL', type: 'url-list', enabled: true },
-      root
-    );
+    await upsertRegistrySource({ name: 'No URL', type: 'url-list', enabled: true }, root);
 
     const health = await getRegistrySourceHealth(root);
 
