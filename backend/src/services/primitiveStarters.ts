@@ -115,6 +115,20 @@ function resolveTargetPath(
   return resolvedTargetPath;
 }
 
+function resolveSafeGeneratedPath(baseDir: string, targetPath: string): string {
+  const resolvedBaseDir = path.resolve(baseDir);
+  const resolvedTargetPath = path.resolve(targetPath);
+  const relativePath = path.relative(resolvedBaseDir, resolvedTargetPath);
+
+  if (relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath))) {
+    return resolvedTargetPath;
+  }
+
+  throw new PrimitiveStarterValidationError(
+    `Generated file path must stay inside the component directory: ${targetPath}`
+  );
+}
+
 function variantName(componentName: string): string {
   return `${componentName.charAt(0).toLowerCase()}${componentName.slice(1)}Variants`;
 }
@@ -432,11 +446,13 @@ export async function generatePrimitiveStarter(
   }
 
   const files = generateFiles(template, componentName, targetPath, request.includeCva === true);
+  const componentBaseDir = path.resolve(cwd, manifest.config.componentDirectory);
   const conflicts: string[] = [];
 
   for (const file of files) {
-    if (await fs.pathExists(file.path)) {
-      conflicts.push(file.path);
+    const safePath = resolveSafeGeneratedPath(componentBaseDir, file.path);
+    if (await fs.pathExists(safePath)) {
+      conflicts.push(safePath);
     }
   }
 
@@ -460,17 +476,16 @@ export async function applyPrimitiveStarter(
     );
   }
 
-  const projectRoot = path.resolve(cwd);
+  const manifest = await loadWorkspaceManifest(cwd);
+  const componentBaseDir = path.resolve(cwd, manifest.config.componentDirectory);
   const written: string[] = [];
 
   for (const file of result.files) {
-    if (!file.path.startsWith(projectRoot + path.sep)) {
-      throw new Error(`Refusing to write outside project: ${file.path}`);
-    }
+    const safePath = resolveSafeGeneratedPath(componentBaseDir, file.path);
 
-    await fs.ensureDir(path.dirname(file.path));
-    await fs.writeFile(file.path, file.content, 'utf-8');
-    written.push(file.path);
+    await fs.ensureDir(path.dirname(safePath));
+    await fs.writeFile(safePath, file.content, 'utf-8');
+    written.push(safePath);
   }
 
   return {
