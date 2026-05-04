@@ -56,6 +56,25 @@ function statusFromIssues(issues: RegistrySourceIssue[]): RegistrySourceHealth['
   return issues.length === 0 ? 'healthy' : 'degraded';
 }
 
+function isValidNpmPackageName(value: string): boolean {
+  if (value.length === 0 || value.length > 214 || value.includes('\\')) {
+    return false;
+  }
+  if (/[\x00-\x1F\x7F\s]/.test(value) || value.startsWith('.') || value.startsWith('_')) {
+    return false;
+  }
+  if (value.startsWith('@')) {
+    const parts = value.split('/');
+    return (
+      parts.length === 2 &&
+      parts[0].length > 1 &&
+      parts[1].length > 0 &&
+      parts.every((part) => !part.includes('..'))
+    );
+  }
+  return !value.includes('/') && !value.includes('..');
+}
+
 function normalizeType(value?: string): ComponentPackage['type'] {
   if (value === 'component' || value === 'hook' || value === 'utility' || value === 'page') {
     return value;
@@ -134,6 +153,14 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
 
   if (!source.enabled) {
     issues.push(issue('SOURCE_DISABLED', 'Source is disabled'));
+    return {
+      sourceId: source.id,
+      sourceName: source.name,
+      sourceType: source.type,
+      status: statusFromIssues(issues),
+      checkedAt: new Date().toISOString(),
+      issues,
+    };
   }
 
   if (source.type === 'local-folder') {
@@ -143,12 +170,23 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
       const fullPath = path.resolve(cwd, source.baseUrl);
       if (!(await fs.pathExists(fullPath))) {
         issues.push(issue('LOCAL_PATH_MISSING', `Local folder does not exist: ${source.baseUrl}`));
+      } else {
+        const stats = await fs.stat(fullPath);
+        if (!stats.isDirectory()) {
+          issues.push(
+            issue('LOCAL_PATH_NOT_DIRECTORY', `Local folder path is not a directory: ${source.baseUrl}`)
+          );
+        }
       }
     }
   }
 
-  if ((source.type === 'shadcn-registry' || source.type === 'url-list') && source.registryJsonUrl) {
-    issues.push(...(await checkRemoteUrl(source.registryJsonUrl)));
+  if (source.type === 'shadcn-registry' || source.type === 'url-list') {
+    if (!source.registryJsonUrl) {
+      issues.push(issue('MISSING_REGISTRY_URL', 'Remote registry sources require registryJsonUrl'));
+    } else {
+      issues.push(...(await checkRemoteUrl(source.registryJsonUrl)));
+    }
   }
 
   if (source.type === 'npm-package') {
@@ -156,18 +194,18 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
       issues.push(
         issue('MISSING_PACKAGE_NAME', 'npm package source requires baseUrl package name')
       );
+    } else if (!isValidNpmPackageName(source.baseUrl)) {
+      issues.push(issue('INVALID_PACKAGE_NAME', `Invalid npm package name: ${source.baseUrl}`));
     } else {
       const lookup = `https://registry.npmjs.org/${encodeURIComponent(source.baseUrl)}`;
       issues.push(...(await checkRemoteUrl(lookup)));
     }
-    if (source.enabled) {
-      issues.push(
-        issue(
-          'LISTING_UNSUPPORTED',
-          'npm package sources are not supported by registry item listing yet'
-        )
-      );
-    }
+    issues.push(
+      issue(
+        'LISTING_UNSUPPORTED',
+        'npm package sources are not supported by registry item listing yet'
+      )
+    );
   }
 
   return {
