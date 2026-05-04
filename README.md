@@ -28,6 +28,7 @@ shadcn-tweaker
 | Apply changes | Batch update all selected components |
 | Save templates | Reuse tweak combinations across projects |
 | Auto-backup | Restore original files anytime |
+| Primitive starters | Generate wrapper components from Radix, Base UI, or blank templates |
 
 ## Available Tweaks
 
@@ -66,6 +67,8 @@ This project uses automatic versioning. When submitting pull requests, use conve
 - `BREAKING CHANGE:` for breaking changes (major version bump)
 
 See [docs/VERSIONING.md](docs/VERSIONING.md) for more details.
+
+See [docs/PRIMITIVE-STARTERS.md](docs/PRIMITIVE-STARTERS.md) for primitive wrapper starter APIs.
 
 ## License
 
