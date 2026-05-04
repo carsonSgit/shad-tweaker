@@ -51,6 +51,82 @@ describe('registry service', () => {
     assert.equal(health[0].status, 'degraded');
   });
 
+  it('reports local-folder health issues when path is a file', async () => {
+    const root = await createTempRoot();
+    await fs.outputFile(path.join(root, 'registry.json'), '{}');
+    await upsertRegistrySource(
+      { name: 'Local File', type: 'local-folder', baseUrl: './registry.json', enabled: true },
+      root
+    );
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(health[0].status, 'degraded');
+    assert.deepEqual(
+      health[0].issues.map((entry) => entry.code),
+      ['LOCAL_PATH_NOT_DIRECTORY']
+    );
+  });
+
+  it('reports remote registry health issues without throwing', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource(
+      {
+        name: 'Dead Registry',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/dead.json',
+        enabled: true,
+      },
+      root
+    );
+    globalThis.fetch = async () => new Response('nope', { status: 503 });
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(health[0].status, 'unhealthy');
+    assert.deepEqual(
+      health[0].issues.map((entry) => entry.code),
+      ['HTTP_ERROR']
+    );
+  });
+
+  it('reports missing remote registry URLs as degraded', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource({ name: 'No URL', type: 'url-list', enabled: true }, root);
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(health[0].status, 'degraded');
+    assert.deepEqual(
+      health[0].issues.map((entry) => entry.code),
+      ['MISSING_REGISTRY_URL']
+    );
+  });
+
+  it('reports network errors for remote source health checks', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource(
+      {
+        name: 'Offline Registry',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/offline.json',
+        enabled: true,
+      },
+      root
+    );
+    globalThis.fetch = async () => {
+      throw new Error('connection refused');
+    };
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(health[0].status, 'unhealthy');
+    assert.deepEqual(
+      health[0].issues.map((entry) => entry.code),
+      ['NETWORK_ERROR']
+    );
+  });
+
   it('returns warnings for enabled sources without registryJsonUrl', async () => {
     const root = await createTempRoot();
     await upsertRegistrySource(
@@ -74,6 +150,137 @@ describe('registry service', () => {
     assert.deepEqual(
       health[0].issues.map((entry) => entry.code),
       ['SOURCE_DISABLED']
+    );
+  });
+
+  it('does not fetch disabled remote or npm source health checks', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource(
+      {
+        name: 'Disabled Registry',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/registry.json',
+        enabled: false,
+      },
+      root
+    );
+    await upsertRegistrySource(
+      { name: 'Disabled NPM', type: 'npm-package', baseUrl: 'react', enabled: false },
+      root
+    );
+    let fetchCount = 0;
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      return new Response('{}', { status: 200 });
+    };
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(fetchCount, 0);
+    assert.deepEqual(
+      health.map((entry) => entry.issues.map((issue) => issue.code)),
+      [['SOURCE_DISABLED'], ['SOURCE_DISABLED']]
+    );
+  });
+
+  it('reports npm package lookup health', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource(
+      { name: 'React', type: 'npm-package', baseUrl: 'react', enabled: true },
+      root
+    );
+    globalThis.fetch = async (input) => {
+      assert.equal(input.toString(), 'https://registry.npmjs.org/react');
+      return new Response('{}', { status: 200 });
+    };
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(health[0].status, 'degraded');
+    assert.deepEqual(
+      health[0].issues.map((entry) => entry.code),
+      ['LISTING_UNSUPPORTED']
+    );
+  });
+
+  it('uses npm registry scoped package lookup paths', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource(
+      { name: 'Scoped Package', type: 'npm-package', baseUrl: '@babel/core', enabled: true },
+      root
+    );
+    globalThis.fetch = async (input) => {
+      assert.equal(input.toString(), 'https://registry.npmjs.org/@babel%2Fcore');
+      return new Response('{}', { status: 200 });
+    };
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(health[0].status, 'degraded');
+    assert.deepEqual(
+      health[0].issues.map((entry) => entry.code),
+      ['LISTING_UNSUPPORTED']
+    );
+  });
+
+  it('reports failed npm package lookups as unhealthy', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource(
+      { name: 'Missing Package', type: 'npm-package', baseUrl: 'missing-pkg', enabled: true },
+      root
+    );
+    globalThis.fetch = async () => new Response('missing', { status: 404 });
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(health[0].status, 'unhealthy');
+    assert.deepEqual(
+      health[0].issues.map((entry) => entry.code),
+      ['HTTP_ERROR']
+    );
+  });
+
+  it('reports invalid npm package names as degraded without fetching', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource(
+      { name: 'Bad Package', type: 'npm-package', baseUrl: '../react', enabled: true },
+      root
+    );
+    let fetchCount = 0;
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      return new Response('{}', { status: 200 });
+    };
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(fetchCount, 0);
+    assert.equal(health[0].status, 'degraded');
+    assert.deepEqual(
+      health[0].issues.map((entry) => entry.code),
+      ['INVALID_PACKAGE_NAME']
+    );
+  });
+
+  it('rejects npm package names with invalid characters before fetching', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource(
+      { name: 'Bad Scoped Package', type: 'npm-package', baseUrl: '@!bad!/pkg', enabled: true },
+      root
+    );
+    let fetchCount = 0;
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      return new Response('{}', { status: 200 });
+    };
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(fetchCount, 0);
+    assert.equal(health[0].status, 'degraded');
+    assert.deepEqual(
+      health[0].issues.map((entry) => entry.code),
+      ['INVALID_PACKAGE_NAME']
     );
   });
 

@@ -26,6 +26,7 @@ interface RegistryItemRaw {
 }
 
 const REGISTRY_FETCH_TIMEOUT_MS = 10_000;
+const NPM_PACKAGE_NAME_PART_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
 
 async function fetchRegistryUrl(url: string): Promise<Response> {
   const controller = new AbortController();
@@ -54,6 +55,38 @@ function statusFromIssues(issues: RegistrySourceIssue[]): RegistrySourceHealth['
     return 'unhealthy';
   }
   return issues.length === 0 ? 'healthy' : 'degraded';
+}
+
+function isValidNpmPackageName(value: string): boolean {
+  if (value.length === 0 || value.length > 214 || value.includes('\\')) {
+    return false;
+  }
+  if (
+    [...value].some((char) => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127) ||
+    value.startsWith('.') ||
+    value.startsWith('_')
+  ) {
+    return false;
+  }
+  if (value.startsWith('@')) {
+    const [scope, name, extra] = value.slice(1).split('/');
+    return (
+      extra === undefined &&
+      NPM_PACKAGE_NAME_PART_PATTERN.test(scope) &&
+      NPM_PACKAGE_NAME_PART_PATTERN.test(name) &&
+      !scope.includes('..') &&
+      !name.includes('..')
+    );
+  }
+  return !value.includes('/') && !value.includes('..') && NPM_PACKAGE_NAME_PART_PATTERN.test(value);
+}
+
+function encodeNpmPackageName(value: string): string {
+  if (!value.startsWith('@')) {
+    return encodeURIComponent(value);
+  }
+  const [scope, name] = value.slice(1).split('/', 2) as [string, string];
+  return `@${encodeURIComponent(scope)}%2F${encodeURIComponent(name)}`;
 }
 
 function normalizeType(value?: string): ComponentPackage['type'] {
@@ -134,6 +167,14 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
 
   if (!source.enabled) {
     issues.push(issue('SOURCE_DISABLED', 'Source is disabled'));
+    return {
+      sourceId: source.id,
+      sourceName: source.name,
+      sourceType: source.type,
+      status: statusFromIssues(issues),
+      checkedAt: new Date().toISOString(),
+      issues,
+    };
   }
 
   if (source.type === 'local-folder') {
@@ -143,12 +184,26 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
       const fullPath = path.resolve(cwd, source.baseUrl);
       if (!(await fs.pathExists(fullPath))) {
         issues.push(issue('LOCAL_PATH_MISSING', `Local folder does not exist: ${source.baseUrl}`));
+      } else {
+        const stats = await fs.stat(fullPath);
+        if (!stats.isDirectory()) {
+          issues.push(
+            issue(
+              'LOCAL_PATH_NOT_DIRECTORY',
+              `Local folder path is not a directory: ${source.baseUrl}`
+            )
+          );
+        }
       }
     }
   }
 
-  if ((source.type === 'shadcn-registry' || source.type === 'url-list') && source.registryJsonUrl) {
-    issues.push(...(await checkRemoteUrl(source.registryJsonUrl)));
+  if (source.type === 'shadcn-registry' || source.type === 'url-list') {
+    if (!source.registryJsonUrl) {
+      issues.push(issue('MISSING_REGISTRY_URL', 'Remote registry sources require registryJsonUrl'));
+    } else {
+      issues.push(...(await checkRemoteUrl(source.registryJsonUrl)));
+    }
   }
 
   if (source.type === 'npm-package') {
@@ -156,17 +211,20 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
       issues.push(
         issue('MISSING_PACKAGE_NAME', 'npm package source requires baseUrl package name')
       );
+    } else if (!isValidNpmPackageName(source.baseUrl)) {
+      issues.push(issue('INVALID_PACKAGE_NAME', `Invalid npm package name: ${source.baseUrl}`));
     } else {
-      const lookup = `https://registry.npmjs.org/${encodeURIComponent(source.baseUrl)}`;
-      issues.push(...(await checkRemoteUrl(lookup)));
-    }
-    if (source.enabled) {
-      issues.push(
-        issue(
-          'LISTING_UNSUPPORTED',
-          'npm package sources are not supported by registry item listing yet'
-        )
-      );
+      const lookup = `https://registry.npmjs.org/${encodeNpmPackageName(source.baseUrl)}`;
+      const lookupIssues = await checkRemoteUrl(lookup);
+      issues.push(...lookupIssues);
+      if (lookupIssues.length === 0) {
+        issues.push(
+          issue(
+            'LISTING_UNSUPPORTED',
+            'npm package sources are not supported by registry item listing yet'
+          )
+        );
+      }
     }
   }
 
