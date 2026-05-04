@@ -79,6 +79,13 @@ function isValidNpmPackageName(value: string): boolean {
   return !value.includes('/') && !value.includes('..');
 }
 
+function encodeNpmPackageName(value: string): string {
+  if (!value.startsWith('@')) {
+    return encodeURIComponent(value);
+  }
+  return `@${value.slice(1).replace('/', '%2F')}`;
+}
+
 function normalizeType(value?: string): ComponentPackage['type'] {
   if (value === 'component' || value === 'hook' || value === 'utility' || value === 'page') {
     return value;
@@ -204,7 +211,7 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
     } else if (!isValidNpmPackageName(source.baseUrl)) {
       issues.push(issue('INVALID_PACKAGE_NAME', `Invalid npm package name: ${source.baseUrl}`));
     } else {
-      const lookup = `https://registry.npmjs.org/${encodeURIComponent(source.baseUrl)}`;
+      const lookup = `https://registry.npmjs.org/${encodeNpmPackageName(source.baseUrl)}`;
       issues.push(...(await checkRemoteUrl(lookup)));
     }
     issues.push(

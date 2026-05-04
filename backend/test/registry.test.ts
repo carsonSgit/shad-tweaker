@@ -203,6 +203,26 @@ describe('registry service', () => {
     );
   });
 
+  it('uses npm registry scoped package lookup paths', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource(
+      { name: 'Scoped Package', type: 'npm-package', baseUrl: '@babel/core', enabled: true },
+      root
+    );
+    globalThis.fetch = async (input) => {
+      assert.equal(input.toString(), 'https://registry.npmjs.org/@babel%2Fcore');
+      return new Response('{}', { status: 200 });
+    };
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(health[0].status, 'degraded');
+    assert.deepEqual(
+      health[0].issues.map((entry) => entry.code),
+      ['LISTING_UNSUPPORTED']
+    );
+  });
+
   it('reports failed npm package lookups as unhealthy', async () => {
     const root = await createTempRoot();
     await upsertRegistrySource(
