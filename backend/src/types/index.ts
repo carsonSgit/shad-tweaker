@@ -204,6 +204,44 @@ export interface ApplyImportPlanResult {
   rolledBack?: boolean;
 }
 
+export type PrimitiveStarterProvider = 'blank' | 'radix' | 'base-ui';
+
+export interface PrimitiveStarterTemplate {
+  id: string;
+  provider: PrimitiveStarterProvider;
+  name: string;
+  description: string;
+  defaultComponentName: string;
+  supportsParts: boolean;
+  supportsCva: boolean;
+}
+
+export interface PrimitiveStarterGeneratedFile {
+  path: string;
+  content: string;
+}
+
+export interface PrimitiveStarterRequest {
+  provider: PrimitiveStarterProvider;
+  templateId?: string;
+  componentName?: string;
+  targetPath?: string;
+  includeCva?: boolean;
+  overwrite?: boolean;
+}
+
+export interface PrimitiveStarterResult {
+  template: PrimitiveStarterTemplate;
+  componentName: string;
+  files: PrimitiveStarterGeneratedFile[];
+  conflicts: string[];
+}
+
+export interface PrimitiveStarterApplyResult extends PrimitiveStarterResult {
+  success: true;
+  written: string[];
+}
+
 export interface TokenPatch {
   category: string;
   token: string;
