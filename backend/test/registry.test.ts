@@ -236,7 +236,7 @@ describe('registry service', () => {
     assert.equal(health[0].status, 'unhealthy');
     assert.deepEqual(
       health[0].issues.map((entry) => entry.code),
-      ['HTTP_ERROR', 'LISTING_UNSUPPORTED']
+      ['HTTP_ERROR']
     );
   });
 

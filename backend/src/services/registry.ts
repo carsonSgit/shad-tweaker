@@ -69,13 +69,13 @@ function isValidNpmPackageName(value: string): boolean {
     return false;
   }
   if (value.startsWith('@')) {
-    const parts = value.split('/');
+    const [scope, name, extra] = value.slice(1).split('/');
     return (
-      parts.length === 2 &&
-      parts[0].startsWith('@') &&
-      NPM_PACKAGE_NAME_PART_PATTERN.test(parts[0].slice(1)) &&
-      NPM_PACKAGE_NAME_PART_PATTERN.test(parts[1]) &&
-      parts.every((part) => !part.includes('..'))
+      extra === undefined &&
+      NPM_PACKAGE_NAME_PART_PATTERN.test(scope) &&
+      NPM_PACKAGE_NAME_PART_PATTERN.test(name) &&
+      !scope.includes('..') &&
+      !name.includes('..')
     );
   }
   return !value.includes('/') && !value.includes('..') && NPM_PACKAGE_NAME_PART_PATTERN.test(value);
@@ -85,7 +85,7 @@ function encodeNpmPackageName(value: string): string {
   if (!value.startsWith('@')) {
     return encodeURIComponent(value);
   }
-  const [scope, name = ''] = value.slice(1).split('/', 2);
+  const [scope, name] = value.slice(1).split('/', 2) as [string, string];
   return `@${encodeURIComponent(scope)}%2F${encodeURIComponent(name)}`;
 }
 
@@ -215,13 +215,16 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
       issues.push(issue('INVALID_PACKAGE_NAME', `Invalid npm package name: ${source.baseUrl}`));
     } else {
       const lookup = `https://registry.npmjs.org/${encodeNpmPackageName(source.baseUrl)}`;
-      issues.push(...(await checkRemoteUrl(lookup)));
-      issues.push(
-        issue(
-          'LISTING_UNSUPPORTED',
-          'npm package sources are not supported by registry item listing yet'
-        )
-      );
+      const lookupIssues = await checkRemoteUrl(lookup);
+      issues.push(...lookupIssues);
+      if (lookupIssues.length === 0) {
+        issues.push(
+          issue(
+            'LISTING_UNSUPPORTED',
+            'npm package sources are not supported by registry item listing yet'
+          )
+        );
+      }
     }
   }
 
