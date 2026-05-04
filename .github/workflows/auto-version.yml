@@ -43,24 +43,23 @@ jobs:
 
       - name: Determine version bump type
         id: bump_type
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          # Get PR title and body
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_BODY="${{ github.event.pull_request.body }}"
-
           # Default to patch
           BUMP_TYPE="patch"
 
           # Check for breaking changes (major)
-          if echo "$PR_TITLE" | grep -iE "(BREAKING CHANGE|breaking change|major)"; then
+          if echo "$PR_TITLE" | grep -qiE "(BREAKING CHANGE|major)"; then
             BUMP_TYPE="major"
-          elif echo "$PR_BODY" | grep -iE "BREAKING CHANGE"; then
+          elif echo "$PR_BODY" | grep -qiE "BREAKING CHANGE"; then
             BUMP_TYPE="major"
           # Check for features (minor)
-          elif echo "$PR_TITLE" | grep -iE "^feat|^feature|minor"; then
+          elif echo "$PR_TITLE" | grep -qiE "^(feat|feature)|minor"; then
             BUMP_TYPE="minor"
           # Check for fixes and other changes (patch)
-          elif echo "$PR_TITLE" | grep -iE "^fix|^bugfix|^patch|^chore|^docs|^refactor|^test|^ci"; then
+          elif echo "$PR_TITLE" | grep -qiE "^(fix|bugfix|patch|chore|docs|refactor|test|ci)"; then
             BUMP_TYPE="patch"
           fi
 
