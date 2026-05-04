@@ -1,5 +1,6 @@
 import { type Request, type Response, Router } from 'express';
 import {
+  applyPrimitiveStarter,
   generatePrimitiveStarter,
   listPrimitiveStarterTemplates,
 } from '../services/primitiveStarters.js';
@@ -27,6 +28,7 @@ function validatePreviewRequest(body: unknown): body is PrimitiveStarterRequest 
   if (req.componentName !== undefined && typeof req.componentName !== 'string') return false;
   if (req.targetPath !== undefined && typeof req.targetPath !== 'string') return false;
   if (req.includeCva !== undefined && typeof req.includeCva !== 'boolean') return false;
+  if (req.overwrite !== undefined && typeof req.overwrite !== 'boolean') return false;
 
   return true;
 }
@@ -61,6 +63,34 @@ router.post('/preview', async (req: Request, res: Response) => {
       error: {
         message,
         code: 'PRIMITIVE_STARTER_PREVIEW_ERROR',
+      },
+    });
+  }
+});
+
+router.post('/apply', async (req: Request, res: Response) => {
+  try {
+    if (!validatePreviewRequest(req.body)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: 'Invalid primitive starter apply request.',
+          code: 'VALIDATION_ERROR',
+        },
+      });
+      return;
+    }
+
+    const result = await applyPrimitiveStarter(req.body, getWorkingDirectory());
+    res.json({ success: true, result });
+  } catch (error) {
+    logger.error('Failed to apply primitive starter', error);
+    const message = error instanceof Error ? error.message : 'Failed to apply primitive starter';
+    res.status(400).json({
+      success: false,
+      error: {
+        message,
+        code: 'PRIMITIVE_STARTER_APPLY_ERROR',
       },
     });
   }

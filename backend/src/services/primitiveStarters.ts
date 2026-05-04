@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'fs-extra';
 import type {
+  PrimitiveStarterApplyResult,
   PrimitiveStarterGeneratedFile,
   PrimitiveStarterProvider,
   PrimitiveStarterRequest,
@@ -445,5 +446,35 @@ export async function generatePrimitiveStarter(
     componentName,
     files,
     conflicts,
+  };
+}
+
+export async function applyPrimitiveStarter(
+  request: PrimitiveStarterRequest,
+  cwd: string
+): Promise<PrimitiveStarterApplyResult> {
+  const result = await generatePrimitiveStarter(request, cwd);
+
+  if (result.conflicts.length > 0 && request.overwrite !== true) {
+    throw new Error('Primitive starter target already exists. Pass overwrite to replace it.');
+  }
+
+  const projectRoot = path.resolve(cwd);
+  const written: string[] = [];
+
+  for (const file of result.files) {
+    if (!file.path.startsWith(projectRoot + path.sep)) {
+      throw new Error(`Refusing to write outside project: ${file.path}`);
+    }
+
+    await fs.ensureDir(path.dirname(file.path));
+    await fs.writeFile(file.path, file.content, 'utf-8');
+    written.push(file.path);
+  }
+
+  return {
+    ...result,
+    success: true,
+    written,
   };
 }
