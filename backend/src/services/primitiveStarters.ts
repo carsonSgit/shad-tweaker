@@ -225,6 +225,117 @@ export {
 `;
 }
 
+function baseUiDialogStarterContent(componentName: string): string {
+  return `import * as React from 'react';
+import { Dialog } from '@base-ui-components/react/dialog';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const ${componentName}Root = Dialog.Root;
+const ${componentName}Trigger = Dialog.Trigger;
+const ${componentName}Portal = Dialog.Portal;
+const ${componentName}Close = Dialog.Close;
+
+function ${componentName}Backdrop({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Dialog.Backdrop>) {
+  return (
+    <Dialog.Backdrop
+      data-slot="${toKebabCase(componentName)}-backdrop"
+      className={cn('fixed inset-0 z-50 bg-black/50', className)}
+      {...props}
+    />
+  );
+}
+
+function ${componentName}Popup({
+  className,
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Dialog.Popup>) {
+  return (
+    <${componentName}Portal>
+      <${componentName}Backdrop />
+      <Dialog.Popup
+        data-slot="${toKebabCase(componentName)}-popup"
+        className={cn(
+          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 text-foreground shadow-lg',
+          className
+        )}
+        {...props}
+      >
+        {children}
+        <Dialog.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </Dialog.Close>
+      </Dialog.Popup>
+    </${componentName}Portal>
+  );
+}
+
+function ${componentName}Header({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      data-slot="${toKebabCase(componentName)}-header"
+      className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)}
+      {...props}
+    />
+  );
+}
+
+function ${componentName}Footer({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      data-slot="${toKebabCase(componentName)}-footer"
+      className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)}
+      {...props}
+    />
+  );
+}
+
+function ${componentName}Title({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Dialog.Title>) {
+  return (
+    <Dialog.Title
+      data-slot="${toKebabCase(componentName)}-title"
+      className={cn('font-semibold text-lg leading-none tracking-normal', className)}
+      {...props}
+    />
+  );
+}
+
+function ${componentName}Description({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Dialog.Description>) {
+  return (
+    <Dialog.Description
+      data-slot="${toKebabCase(componentName)}-description"
+      className={cn('text-muted-foreground text-sm', className)}
+      {...props}
+    />
+  );
+}
+
+export {
+  ${componentName}Root,
+  ${componentName}Trigger,
+  ${componentName}Portal,
+  ${componentName}Close,
+  ${componentName}Backdrop,
+  ${componentName}Popup,
+  ${componentName}Header,
+  ${componentName}Footer,
+  ${componentName}Title,
+  ${componentName}Description,
+};
+`;
+}
+
 function generateFiles(
   template: PrimitiveStarterTemplate,
   componentName: string,
@@ -233,6 +344,8 @@ function generateFiles(
   const content =
     template.provider === 'radix'
       ? radixDialogStarterContent(componentName)
+      : template.provider === 'base-ui'
+        ? baseUiDialogStarterContent(componentName)
       : blankStarterContent(componentName);
 
   return [
