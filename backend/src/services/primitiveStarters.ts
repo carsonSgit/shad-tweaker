@@ -96,17 +96,61 @@ function resolveTargetPath(
   return path.resolve(cwd, componentDirectory, relativePath);
 }
 
-function blankStarterContent(componentName: string): string {
+function variantName(componentName: string): string {
+  return `${componentName.charAt(0).toLowerCase()}${componentName.slice(1)}Variants`;
+}
+
+function cvaImport(includeCva: boolean): string {
+  return includeCva ? "import { cva, type VariantProps } from 'class-variance-authority';\n" : '';
+}
+
+function cvaDefinition(componentName: string, baseClasses: string, includeCva: boolean): string {
+  if (!includeCva) return '';
+
+  return `
+const ${variantName(componentName)} = cva('${baseClasses}', {
+  variants: {
+    tone: {
+      default: '',
+      muted: 'bg-muted text-muted-foreground',
+    },
+  },
+  defaultVariants: {
+    tone: 'default',
+  },
+});
+`;
+}
+
+function cvaPropType(componentName: string, includeCva: boolean): string {
+  return includeCva ? ` & VariantProps<typeof ${variantName(componentName)}>` : '';
+}
+
+function cvaDestructure(includeCva: boolean): string {
+  return includeCva ? 'tone,\n  ' : '';
+}
+
+function cnExpression(componentName: string, baseClasses: string, includeCva: boolean): string {
+  return includeCva
+    ? `cn(${variantName(componentName)}({ tone }), className)`
+    : `cn('${baseClasses}', className)`;
+}
+
+function blankStarterContent(componentName: string, includeCva: boolean): string {
+  const baseClasses = 'rounded-md border bg-background p-4 text-foreground shadow-sm';
   return `import * as React from 'react';
-import { cn } from '@/lib/utils';
+${cvaImport(includeCva)}import { cn } from '@/lib/utils';
+${cvaDefinition(componentName, baseClasses, includeCva)}
+export type ${componentName}Props = React.HTMLAttributes<HTMLDivElement>${cvaPropType(componentName, includeCva)};
 
-export interface ${componentName}Props extends React.HTMLAttributes<HTMLDivElement> {}
-
-export function ${componentName}({ className, ...props }: ${componentName}Props) {
+export function ${componentName}({
+  className,
+  ${cvaDestructure(includeCva)}...props
+}: ${componentName}Props) {
   return (
     <div
       data-slot="${toKebabCase(componentName)}"
-      className={cn('rounded-md border bg-background p-4 text-foreground shadow-sm', className)}
+      className={${cnExpression(componentName, baseClasses, includeCva)}}
       {...props}
     />
   );
@@ -114,16 +158,20 @@ export function ${componentName}({ className, ...props }: ${componentName}Props)
 `;
 }
 
-function radixDialogStarterContent(componentName: string): string {
+function radixDialogStarterContent(componentName: string, includeCva: boolean): string {
+  const contentName = `${componentName}Content`;
+  const contentClasses =
+    'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 text-foreground shadow-lg';
   return `import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+${cvaImport(includeCva)}import { cn } from '@/lib/utils';
 
 const ${componentName}Root = DialogPrimitive.Root;
 const ${componentName}Trigger = DialogPrimitive.Trigger;
 const ${componentName}Portal = DialogPrimitive.Portal;
 const ${componentName}Close = DialogPrimitive.Close;
+${cvaDefinition(contentName, contentClasses, includeCva)}
 
 function ${componentName}Overlay({
   className,
@@ -141,17 +189,14 @@ function ${componentName}Overlay({
 function ${componentName}Content({
   className,
   children,
-  ...props
-}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) {
+  ${cvaDestructure(includeCva)}...props
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>${cvaPropType(contentName, includeCva)}) {
   return (
     <${componentName}Portal>
       <${componentName}Overlay />
       <DialogPrimitive.Content
         data-slot="${toKebabCase(componentName)}-content"
-        className={cn(
-          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 text-foreground shadow-lg',
-          className
-        )}
+        className={${cnExpression(contentName, contentClasses, includeCva)}}
         {...props}
       >
         {children}
@@ -225,16 +270,20 @@ export {
 `;
 }
 
-function baseUiDialogStarterContent(componentName: string): string {
+function baseUiDialogStarterContent(componentName: string, includeCva: boolean): string {
+  const popupName = `${componentName}Popup`;
+  const popupClasses =
+    'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 text-foreground shadow-lg';
   return `import * as React from 'react';
 import { Dialog } from '@base-ui-components/react/dialog';
 import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+${cvaImport(includeCva)}import { cn } from '@/lib/utils';
 
 const ${componentName}Root = Dialog.Root;
 const ${componentName}Trigger = Dialog.Trigger;
 const ${componentName}Portal = Dialog.Portal;
 const ${componentName}Close = Dialog.Close;
+${cvaDefinition(popupName, popupClasses, includeCva)}
 
 function ${componentName}Backdrop({
   className,
@@ -252,17 +301,14 @@ function ${componentName}Backdrop({
 function ${componentName}Popup({
   className,
   children,
-  ...props
-}: React.ComponentPropsWithoutRef<typeof Dialog.Popup>) {
+  ${cvaDestructure(includeCva)}...props
+}: React.ComponentPropsWithoutRef<typeof Dialog.Popup>${cvaPropType(popupName, includeCva)}) {
   return (
     <${componentName}Portal>
       <${componentName}Backdrop />
       <Dialog.Popup
         data-slot="${toKebabCase(componentName)}-popup"
-        className={cn(
-          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 text-foreground shadow-lg',
-          className
-        )}
+        className={${cnExpression(popupName, popupClasses, includeCva)}}
         {...props}
       >
         {children}
@@ -339,14 +385,15 @@ export {
 function generateFiles(
   template: PrimitiveStarterTemplate,
   componentName: string,
-  targetPath: string
+  targetPath: string,
+  includeCva: boolean
 ): PrimitiveStarterGeneratedFile[] {
   const content =
     template.provider === 'radix'
-      ? radixDialogStarterContent(componentName)
+      ? radixDialogStarterContent(componentName, includeCva)
       : template.provider === 'base-ui'
-        ? baseUiDialogStarterContent(componentName)
-      : blankStarterContent(componentName);
+        ? baseUiDialogStarterContent(componentName, includeCva)
+        : blankStarterContent(componentName, includeCva);
 
   return [
     {
@@ -384,7 +431,7 @@ export async function generatePrimitiveStarter(
     throw new Error('targetPath must be a safe project-relative path.');
   }
 
-  const files = generateFiles(template, componentName, targetPath);
+  const files = generateFiles(template, componentName, targetPath, request.includeCva === true);
   const conflicts: string[] = [];
 
   for (const file of files) {
