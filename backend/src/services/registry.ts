@@ -26,6 +26,7 @@ interface RegistryItemRaw {
 }
 
 const REGISTRY_FETCH_TIMEOUT_MS = 10_000;
+const NPM_PACKAGE_NAME_PART_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
 
 async function fetchRegistryUrl(url: string): Promise<Response> {
   const controller = new AbortController();
@@ -71,19 +72,21 @@ function isValidNpmPackageName(value: string): boolean {
     const parts = value.split('/');
     return (
       parts.length === 2 &&
-      parts[0].length > 1 &&
-      parts[1].length > 0 &&
+      parts[0].startsWith('@') &&
+      NPM_PACKAGE_NAME_PART_PATTERN.test(parts[0].slice(1)) &&
+      NPM_PACKAGE_NAME_PART_PATTERN.test(parts[1]) &&
       parts.every((part) => !part.includes('..'))
     );
   }
-  return !value.includes('/') && !value.includes('..');
+  return !value.includes('/') && !value.includes('..') && NPM_PACKAGE_NAME_PART_PATTERN.test(value);
 }
 
 function encodeNpmPackageName(value: string): string {
   if (!value.startsWith('@')) {
     return encodeURIComponent(value);
   }
-  return `@${value.slice(1).replace('/', '%2F')}`;
+  const [scope, name = ''] = value.slice(1).split('/', 2);
+  return `@${encodeURIComponent(scope)}%2F${encodeURIComponent(name)}`;
 }
 
 function normalizeType(value?: string): ComponentPackage['type'] {
@@ -213,13 +216,13 @@ async function healthForSource(source: RegistrySource, cwd: string): Promise<Reg
     } else {
       const lookup = `https://registry.npmjs.org/${encodeNpmPackageName(source.baseUrl)}`;
       issues.push(...(await checkRemoteUrl(lookup)));
+      issues.push(
+        issue(
+          'LISTING_UNSUPPORTED',
+          'npm package sources are not supported by registry item listing yet'
+        )
+      );
     }
-    issues.push(
-      issue(
-        'LISTING_UNSUPPORTED',
-        'npm package sources are not supported by registry item listing yet'
-      )
-    );
   }
 
   return {

@@ -258,7 +258,29 @@ describe('registry service', () => {
     assert.equal(health[0].status, 'degraded');
     assert.deepEqual(
       health[0].issues.map((entry) => entry.code),
-      ['INVALID_PACKAGE_NAME', 'LISTING_UNSUPPORTED']
+      ['INVALID_PACKAGE_NAME']
+    );
+  });
+
+  it('rejects npm package names with invalid characters before fetching', async () => {
+    const root = await createTempRoot();
+    await upsertRegistrySource(
+      { name: 'Bad Scoped Package', type: 'npm-package', baseUrl: '@!bad!/pkg', enabled: true },
+      root
+    );
+    let fetchCount = 0;
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      return new Response('{}', { status: 200 });
+    };
+
+    const health = await getRegistrySourceHealth(root);
+
+    assert.equal(fetchCount, 0);
+    assert.equal(health[0].status, 'degraded');
+    assert.deepEqual(
+      health[0].issues.map((entry) => entry.code),
+      ['INVALID_PACKAGE_NAME']
     );
   });
 
