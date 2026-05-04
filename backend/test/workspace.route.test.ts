@@ -47,6 +47,41 @@ describe('workspace registry routes', () => {
     assert.equal(Array.isArray(res.body.health), true);
   });
 
+  it('returns mixed source health without failing the health route', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+    await fs.ensureDir(path.join(root, 'local-registry'));
+    await upsertRegistrySource(
+      { name: 'Local', type: 'local-folder', baseUrl: './local-registry', enabled: true },
+      root
+    );
+    await upsertRegistrySource(
+      {
+        name: 'Dead Registry',
+        type: 'shadcn-registry',
+        registryJsonUrl: 'https://example.com/dead.json',
+        enabled: true,
+      },
+      root
+    );
+    globalThis.fetch = async () => new Response('nope', { status: 503 });
+
+    const res = await request(app).get('/api/workspace/registry-sources/health');
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.deepEqual(
+      res.body.health.map((entry: { status: string }) => entry.status).sort(),
+      ['healthy', 'unhealthy']
+    );
+    assert.deepEqual(
+      res.body.health
+        .find((entry: { sourceName: string }) => entry.sourceName === 'Dead Registry')
+        .issues.map((issue: { code: string }) => issue.code),
+      ['HTTP_ERROR']
+    );
+  });
+
   it('returns 404 for unknown registry item', async () => {
     const root = await createTempRoot();
     process.env.SHADCN_TWEAKER_CWD = root;
