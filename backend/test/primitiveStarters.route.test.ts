@@ -49,7 +49,10 @@ describe('primitive starter routes', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
     assert.equal(res.body.result.componentName, 'ToastShell');
-    assert.equal(await fs.pathExists(path.join(root, 'components', 'ui', 'toast-shell.tsx')), false);
+    assert.equal(
+      await fs.pathExists(path.join(root, 'components', 'ui', 'toast-shell.tsx')),
+      false
+    );
   });
 
   it('applies a starter by writing the generated file', async () => {

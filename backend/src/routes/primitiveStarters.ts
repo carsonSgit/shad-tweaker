@@ -5,10 +5,7 @@ import {
   listPrimitiveStarterTemplates,
 } from '../services/primitiveStarters.js';
 import { getWorkingDirectory } from '../services/workspace.js';
-import type {
-  PrimitiveStarterProvider,
-  PrimitiveStarterRequest,
-} from '../types/index.js';
+import type { PrimitiveStarterProvider, PrimitiveStarterRequest } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { isSafeRegistryIdentifier } from '../utils/validation.js';
 
@@ -19,7 +16,10 @@ function validatePreviewRequest(body: unknown): body is PrimitiveStarterRequest 
   if (typeof body !== 'object' || body === null) return false;
   const req = body as Record<string, unknown>;
 
-  if (typeof req.provider !== 'string' || !PROVIDERS.includes(req.provider as PrimitiveStarterProvider)) {
+  if (
+    typeof req.provider !== 'string' ||
+    !PROVIDERS.includes(req.provider as PrimitiveStarterProvider)
+  ) {
     return false;
   }
   if (req.templateId !== undefined) {

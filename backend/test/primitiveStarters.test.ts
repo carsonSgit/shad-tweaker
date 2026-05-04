@@ -85,7 +85,10 @@ describe('primitive starter service', () => {
     const target = path.join(root, 'components', 'ui', 'dialog.tsx');
     await fs.outputFile(target, 'existing');
 
-    const preview = await generatePrimitiveStarter({ provider: 'blank', componentName: 'Dialog' }, root);
+    const preview = await generatePrimitiveStarter(
+      { provider: 'blank', componentName: 'Dialog' },
+      root
+    );
     assert.deepEqual(preview.conflicts, [target]);
 
     await assert.rejects(
