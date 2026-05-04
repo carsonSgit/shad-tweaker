@@ -114,19 +114,131 @@ export function ${componentName}({ className, ...props }: ${componentName}Props)
 `;
 }
 
+function radixDialogStarterContent(componentName: string): string {
+  return `import * as React from 'react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const ${componentName}Root = DialogPrimitive.Root;
+const ${componentName}Trigger = DialogPrimitive.Trigger;
+const ${componentName}Portal = DialogPrimitive.Portal;
+const ${componentName}Close = DialogPrimitive.Close;
+
+function ${componentName}Overlay({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>) {
+  return (
+    <DialogPrimitive.Overlay
+      data-slot="${toKebabCase(componentName)}-overlay"
+      className={cn('fixed inset-0 z-50 bg-black/50', className)}
+      {...props}
+    />
+  );
+}
+
+function ${componentName}Content({
+  className,
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) {
+  return (
+    <${componentName}Portal>
+      <${componentName}Overlay />
+      <DialogPrimitive.Content
+        data-slot="${toKebabCase(componentName)}-content"
+        className={cn(
+          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 text-foreground shadow-lg',
+          className
+        )}
+        {...props}
+      >
+        {children}
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </${componentName}Portal>
+  );
+}
+
+function ${componentName}Header({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      data-slot="${toKebabCase(componentName)}-header"
+      className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)}
+      {...props}
+    />
+  );
+}
+
+function ${componentName}Footer({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      data-slot="${toKebabCase(componentName)}-footer"
+      className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)}
+      {...props}
+    />
+  );
+}
+
+function ${componentName}Title({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>) {
+  return (
+    <DialogPrimitive.Title
+      data-slot="${toKebabCase(componentName)}-title"
+      className={cn('font-semibold text-lg leading-none tracking-normal', className)}
+      {...props}
+    />
+  );
+}
+
+function ${componentName}Description({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>) {
+  return (
+    <DialogPrimitive.Description
+      data-slot="${toKebabCase(componentName)}-description"
+      className={cn('text-muted-foreground text-sm', className)}
+      {...props}
+    />
+  );
+}
+
+export {
+  ${componentName}Root,
+  ${componentName}Trigger,
+  ${componentName}Portal,
+  ${componentName}Close,
+  ${componentName}Overlay,
+  ${componentName}Content,
+  ${componentName}Header,
+  ${componentName}Footer,
+  ${componentName}Title,
+  ${componentName}Description,
+};
+`;
+}
+
 function generateFiles(
   template: PrimitiveStarterTemplate,
   componentName: string,
   targetPath: string
 ): PrimitiveStarterGeneratedFile[] {
-  if (template.provider !== 'blank') {
-    throw new Error(`Unsupported primitive starter provider: ${template.provider}`);
-  }
+  const content =
+    template.provider === 'radix'
+      ? radixDialogStarterContent(componentName)
+      : blankStarterContent(componentName);
 
   return [
     {
       path: targetPath,
-      content: blankStarterContent(componentName),
+      content,
     },
   ];
 }
