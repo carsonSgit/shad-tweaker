@@ -11,6 +11,18 @@ import type {
 import { isSafeProjectRelativePath } from '../utils/paths.js';
 import { loadWorkspaceManifest } from './workspace.js';
 
+export class PrimitiveStarterTemplateNotFoundError extends Error {
+  readonly code = 'PRIMITIVE_STARTER_TEMPLATE_NOT_FOUND';
+}
+
+export class PrimitiveStarterValidationError extends Error {
+  readonly code = 'PRIMITIVE_STARTER_VALIDATION_ERROR';
+}
+
+export class PrimitiveStarterConflictError extends Error {
+  readonly code = 'PRIMITIVE_STARTER_CONFLICT';
+}
+
 export const PRIMITIVE_STARTER_TEMPLATES: PrimitiveStarterTemplate[] = [
   {
     id: 'blank-component',
@@ -94,7 +106,13 @@ function resolveTargetPath(
   const relativePath = targetPath ?? `${toKebabCase(componentName)}.tsx`;
   if (!relativePath || !isSafeProjectRelativePath(relativePath)) return null;
 
-  return path.resolve(cwd, componentDirectory, relativePath);
+  const baseDir = path.resolve(cwd, componentDirectory);
+  const resolvedTargetPath = path.resolve(baseDir, relativePath);
+  if (resolvedTargetPath !== baseDir && !resolvedTargetPath.startsWith(baseDir + path.sep)) {
+    return null;
+  }
+
+  return resolvedTargetPath;
 }
 
 function variantName(componentName: string): string {
@@ -135,6 +153,61 @@ function cnExpression(componentName: string, baseClasses: string, includeCva: bo
   return includeCva
     ? `cn(${variantName(componentName)}({ tone }), className)`
     : `cn('${baseClasses}', className)`;
+}
+
+function sharedDialogParts(
+  componentName: string,
+  titleElement: string,
+  descriptionElement: string,
+  titlePropsType: string,
+  descriptionPropsType: string
+): string {
+  return `function ${componentName}Header({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      data-slot="${toKebabCase(componentName)}-header"
+      className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)}
+      {...props}
+    />
+  );
+}
+
+function ${componentName}Footer({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      data-slot="${toKebabCase(componentName)}-footer"
+      className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)}
+      {...props}
+    />
+  );
+}
+
+function ${componentName}Title({
+  className,
+  ...props
+}: ${titlePropsType}) {
+  return (
+    <${titleElement}
+      data-slot="${toKebabCase(componentName)}-title"
+      className={cn('font-semibold text-lg leading-none tracking-normal', className)}
+      {...props}
+    />
+  );
+}
+
+function ${componentName}Description({
+  className,
+  ...props
+}: ${descriptionPropsType}) {
+  return (
+    <${descriptionElement}
+      data-slot="${toKebabCase(componentName)}-description"
+      className={cn('text-muted-foreground text-sm', className)}
+      {...props}
+    />
+  );
+}
+`;
 }
 
 function blankStarterContent(componentName: string, includeCva: boolean): string {
@@ -210,51 +283,13 @@ function ${componentName}Content({
   );
 }
 
-function ${componentName}Header({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      data-slot="${toKebabCase(componentName)}-header"
-      className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)}
-      {...props}
-    />
-  );
-}
-
-function ${componentName}Footer({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      data-slot="${toKebabCase(componentName)}-footer"
-      className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)}
-      {...props}
-    />
-  );
-}
-
-function ${componentName}Title({
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>) {
-  return (
-    <DialogPrimitive.Title
-      data-slot="${toKebabCase(componentName)}-title"
-      className={cn('font-semibold text-lg leading-none tracking-normal', className)}
-      {...props}
-    />
-  );
-}
-
-function ${componentName}Description({
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>) {
-  return (
-    <DialogPrimitive.Description
-      data-slot="${toKebabCase(componentName)}-description"
-      className={cn('text-muted-foreground text-sm', className)}
-      {...props}
-    />
-  );
-}
+${sharedDialogParts(
+  componentName,
+  'DialogPrimitive.Title',
+  'DialogPrimitive.Description',
+  'React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>',
+  'React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>'
+)}
 
 export {
   ${componentName}Root,
@@ -322,51 +357,13 @@ function ${componentName}Popup({
   );
 }
 
-function ${componentName}Header({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      data-slot="${toKebabCase(componentName)}-header"
-      className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)}
-      {...props}
-    />
-  );
-}
-
-function ${componentName}Footer({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      data-slot="${toKebabCase(componentName)}-footer"
-      className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)}
-      {...props}
-    />
-  );
-}
-
-function ${componentName}Title({
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<typeof Dialog.Title>) {
-  return (
-    <Dialog.Title
-      data-slot="${toKebabCase(componentName)}-title"
-      className={cn('font-semibold text-lg leading-none tracking-normal', className)}
-      {...props}
-    />
-  );
-}
-
-function ${componentName}Description({
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<typeof Dialog.Description>) {
-  return (
-    <Dialog.Description
-      data-slot="${toKebabCase(componentName)}-description"
-      className={cn('text-muted-foreground text-sm', className)}
-      {...props}
-    />
-  );
-}
+${sharedDialogParts(
+  componentName,
+  'Dialog.Title',
+  'Dialog.Description',
+  'React.ComponentPropsWithoutRef<typeof Dialog.Title>',
+  'React.ComponentPropsWithoutRef<typeof Dialog.Description>'
+)}
 
 export {
   ${componentName}Root,
@@ -389,12 +386,12 @@ function generateFiles(
   targetPath: string,
   includeCva: boolean
 ): PrimitiveStarterGeneratedFile[] {
-  const content =
-    template.provider === 'radix'
-      ? radixDialogStarterContent(componentName, includeCva)
-      : template.provider === 'base-ui'
-        ? baseUiDialogStarterContent(componentName, includeCva)
-        : blankStarterContent(componentName, includeCva);
+  const generators: Record<PrimitiveStarterProvider, (name: string, cva: boolean) => string> = {
+    blank: blankStarterContent,
+    radix: radixDialogStarterContent,
+    'base-ui': baseUiDialogStarterContent,
+  };
+  const content = generators[template.provider](componentName, includeCva);
 
   return [
     {
@@ -410,7 +407,7 @@ export async function generatePrimitiveStarter(
 ): Promise<PrimitiveStarterResult> {
   const template = findPrimitiveStarterTemplate(request.provider, request.templateId);
   if (!template) {
-    throw new Error('Primitive starter template not found.');
+    throw new PrimitiveStarterTemplateNotFoundError('Primitive starter template not found.');
   }
 
   const manifest = await loadWorkspaceManifest(cwd);
@@ -419,7 +416,9 @@ export async function generatePrimitiveStarter(
     template.defaultComponentName
   );
   if (!componentName) {
-    throw new Error('componentName must produce a valid PascalCase component name.');
+    throw new PrimitiveStarterValidationError(
+      'componentName must produce a valid PascalCase component name.'
+    );
   }
 
   const targetPath = resolveTargetPath(
@@ -429,7 +428,7 @@ export async function generatePrimitiveStarter(
     request.targetPath
   );
   if (!targetPath) {
-    throw new Error('targetPath must be a safe project-relative path.');
+    throw new PrimitiveStarterValidationError('targetPath must be a safe project-relative path.');
   }
 
   const files = generateFiles(template, componentName, targetPath, request.includeCva === true);
@@ -456,7 +455,9 @@ export async function applyPrimitiveStarter(
   const result = await generatePrimitiveStarter(request, cwd);
 
   if (result.conflicts.length > 0 && request.overwrite !== true) {
-    throw new Error('Primitive starter target already exists. Pass overwrite to replace it.');
+    throw new PrimitiveStarterConflictError(
+      'Primitive starter target already exists. Pass overwrite to replace it.'
+    );
   }
 
   const projectRoot = path.resolve(cwd);

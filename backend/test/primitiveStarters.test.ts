@@ -41,7 +41,10 @@ describe('primitive starter service', () => {
   it('generates a Radix dialog wrapper with primitive parts', async () => {
     const root = await createTempRoot();
 
-    const result = await generatePrimitiveStarter({ provider: 'radix' }, root);
+    const result = await generatePrimitiveStarter(
+      { provider: 'radix', templateId: 'radix-dialog' },
+      root
+    );
 
     assert.match(result.files[0].content, /@radix-ui\/react-dialog/);
     assert.match(result.files[0].content, /DialogPrimitive\.Overlay/);
@@ -95,5 +98,20 @@ describe('primitive starter service', () => {
       applyPrimitiveStarter({ provider: 'blank', componentName: 'Dialog' }, root),
       /already exists/
     );
+  });
+
+  it('overwrites an existing target when requested', async () => {
+    const root = await createTempRoot();
+    const target = path.join(root, 'components', 'ui', 'dialog.tsx');
+    await fs.outputFile(target, 'existing');
+
+    const result = await applyPrimitiveStarter(
+      { provider: 'blank', componentName: 'Dialog', overwrite: true },
+      root
+    );
+
+    assert.deepEqual(result.written, [target]);
+    assert.match(await fs.readFile(target, 'utf-8'), /export function Dialog/);
+    assert.doesNotMatch(await fs.readFile(target, 'utf-8'), /existing/);
   });
 });

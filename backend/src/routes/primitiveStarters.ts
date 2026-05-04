@@ -3,6 +3,9 @@ import {
   applyPrimitiveStarter,
   generatePrimitiveStarter,
   listPrimitiveStarterTemplates,
+  PrimitiveStarterConflictError,
+  PrimitiveStarterTemplateNotFoundError,
+  PrimitiveStarterValidationError,
 } from '../services/primitiveStarters.js';
 import { getWorkingDirectory } from '../services/workspace.js';
 import type { PrimitiveStarterProvider, PrimitiveStarterRequest } from '../types/index.js';
@@ -12,25 +15,52 @@ import { isSafeRegistryIdentifier } from '../utils/validation.js';
 const router = Router();
 const PROVIDERS = ['blank', 'radix', 'base-ui'] as const satisfies PrimitiveStarterProvider[];
 
-function validatePreviewRequest(body: unknown): body is PrimitiveStarterRequest {
+function validateStarterRequest(body: unknown): body is PrimitiveStarterRequest {
   if (typeof body !== 'object' || body === null) return false;
-  const req = body as Record<string, unknown>;
+  const bodyRecord = body as Record<string, unknown>;
 
   if (
-    typeof req.provider !== 'string' ||
-    !PROVIDERS.includes(req.provider as PrimitiveStarterProvider)
+    typeof bodyRecord.provider !== 'string' ||
+    !PROVIDERS.includes(bodyRecord.provider as PrimitiveStarterProvider)
   ) {
     return false;
   }
-  if (req.templateId !== undefined) {
-    return typeof req.templateId === 'string' && isSafeRegistryIdentifier(req.templateId);
+  if (bodyRecord.templateId !== undefined) {
+    if (
+      typeof bodyRecord.templateId !== 'string' ||
+      !isSafeRegistryIdentifier(bodyRecord.templateId)
+    ) {
+      return false;
+    }
   }
-  if (req.componentName !== undefined && typeof req.componentName !== 'string') return false;
-  if (req.targetPath !== undefined && typeof req.targetPath !== 'string') return false;
-  if (req.includeCva !== undefined && typeof req.includeCva !== 'boolean') return false;
-  if (req.overwrite !== undefined && typeof req.overwrite !== 'boolean') return false;
+  if (bodyRecord.componentName !== undefined && typeof bodyRecord.componentName !== 'string') {
+    return false;
+  }
+  if (bodyRecord.targetPath !== undefined && typeof bodyRecord.targetPath !== 'string') {
+    return false;
+  }
+  if (bodyRecord.includeCva !== undefined && typeof bodyRecord.includeCva !== 'boolean') {
+    return false;
+  }
+  if (bodyRecord.overwrite !== undefined && typeof bodyRecord.overwrite !== 'boolean') {
+    return false;
+  }
 
   return true;
+}
+
+function starterErrorResponse(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : fallback;
+  if (error instanceof PrimitiveStarterTemplateNotFoundError) {
+    return { status: 404, message, code: error.code };
+  }
+  if (error instanceof PrimitiveStarterValidationError) {
+    return { status: 400, message, code: error.code };
+  }
+  if (error instanceof PrimitiveStarterConflictError) {
+    return { status: 409, message, code: error.code };
+  }
+  return { status: 500, message, code: 'PRIMITIVE_STARTER_ERROR' };
 }
 
 router.get('/', (_req: Request, res: Response) => {
@@ -42,7 +72,7 @@ router.get('/', (_req: Request, res: Response) => {
 
 router.post('/preview', async (req: Request, res: Response) => {
   try {
-    if (!validatePreviewRequest(req.body)) {
+    if (!validateStarterRequest(req.body)) {
       res.status(400).json({
         success: false,
         error: {
@@ -57,12 +87,12 @@ router.post('/preview', async (req: Request, res: Response) => {
     res.json({ success: true, result });
   } catch (error) {
     logger.error('Failed to preview primitive starter', error);
-    const message = error instanceof Error ? error.message : 'Failed to preview primitive starter';
-    res.status(400).json({
+    const response = starterErrorResponse(error, 'Failed to preview primitive starter');
+    res.status(response.status).json({
       success: false,
       error: {
-        message,
-        code: 'PRIMITIVE_STARTER_PREVIEW_ERROR',
+        message: response.message,
+        code: response.code,
       },
     });
   }
@@ -70,7 +100,7 @@ router.post('/preview', async (req: Request, res: Response) => {
 
 router.post('/apply', async (req: Request, res: Response) => {
   try {
-    if (!validatePreviewRequest(req.body)) {
+    if (!validateStarterRequest(req.body)) {
       res.status(400).json({
         success: false,
         error: {
@@ -85,12 +115,12 @@ router.post('/apply', async (req: Request, res: Response) => {
     res.json({ success: true, result });
   } catch (error) {
     logger.error('Failed to apply primitive starter', error);
-    const message = error instanceof Error ? error.message : 'Failed to apply primitive starter';
-    res.status(400).json({
+    const response = starterErrorResponse(error, 'Failed to apply primitive starter');
+    res.status(response.status).json({
       success: false,
       error: {
-        message,
-        code: 'PRIMITIVE_STARTER_APPLY_ERROR',
+        message: response.message,
+        code: response.code,
       },
     });
   }

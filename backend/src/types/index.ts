@@ -238,6 +238,7 @@ export interface PrimitiveStarterResult {
 }
 
 export interface PrimitiveStarterApplyResult extends PrimitiveStarterResult {
+  /** Service-layer success mirrors the API response shape; failures throw typed errors. */
   success: boolean;
   written: string[];
 }

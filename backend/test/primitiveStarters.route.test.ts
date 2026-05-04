@@ -49,13 +49,10 @@ describe('primitive starter routes', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
     assert.equal(res.body.result.componentName, 'ToastShell');
-    assert.equal(
-      await fs.pathExists(path.join(root, 'components', 'ui', 'toast-shell.tsx')),
-      false
-    );
+    assert.equal(await fs.pathExists(res.body.result.files[0].path), false);
   });
 
-  it('applies a starter by writing the generated file', async () => {
+  it('applies a Radix starter by writing the generated file', async () => {
     const root = await createTempRoot();
     process.env.SHADCN_TWEAKER_CWD = root;
 
@@ -70,6 +67,21 @@ describe('primitive starter routes', () => {
     assert.match(await fs.readFile(target, 'utf-8'), /@radix-ui\/react-dialog/);
   });
 
+  it('applies a Base UI starter by writing the generated file', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+
+    const res = await request(app)
+      .post('/api/primitive-starters/apply')
+      .send({ provider: 'base-ui', componentName: 'Dialog' });
+
+    const target = path.join(root, 'components', 'ui', 'dialog.tsx');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.result.written[0], target);
+    assert.match(await fs.readFile(target, 'utf-8'), /@base-ui-components\/react\/dialog/);
+  });
+
   it('reports existing files as apply conflicts without overwrite', async () => {
     const root = await createTempRoot();
     process.env.SHADCN_TWEAKER_CWD = root;
@@ -79,8 +91,8 @@ describe('primitive starter routes', () => {
       .post('/api/primitive-starters/apply')
       .send({ provider: 'blank', componentName: 'Dialog' });
 
-    assert.equal(res.status, 400);
-    assert.equal(res.body.error.code, 'PRIMITIVE_STARTER_APPLY_ERROR');
+    assert.equal(res.status, 409);
+    assert.equal(res.body.error.code, 'PRIMITIVE_STARTER_CONFLICT');
   });
 
   it('rejects invalid providers', async () => {
@@ -93,5 +105,31 @@ describe('primitive starter routes', () => {
 
     assert.equal(res.status, 400);
     assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+  });
+
+  it('validates fields after a valid templateId is provided', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+
+    const res = await request(app).post('/api/primitive-starters/preview').send({
+      provider: 'blank',
+      templateId: 'blank-component',
+      componentName: 123,
+    });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+  });
+
+  it('returns 404 for unknown starter templates', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_TWEAKER_CWD = root;
+
+    const res = await request(app)
+      .post('/api/primitive-starters/preview')
+      .send({ provider: 'blank', templateId: 'missing-template' });
+
+    assert.equal(res.status, 404);
+    assert.equal(res.body.error.code, 'PRIMITIVE_STARTER_TEMPLATE_NOT_FOUND');
   });
 });
