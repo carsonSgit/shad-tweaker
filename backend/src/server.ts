@@ -5,6 +5,7 @@ import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
 import importsRouter from './routes/imports.js';
 import parserRouter from './routes/parser.js';
+import primitiveStartersRouter from './routes/primitiveStarters.js';
 import templatesRouter from './routes/templates.js';
 import workspaceRouter from './routes/workspace.js';
 import { initializeDefaultTemplates } from './services/template.js';
@@ -49,6 +50,7 @@ app.use('/api/templates', templatesRouter);
 app.use('/api/workspace', workspaceRouter);
 app.use('/api/parser', parserRouter);
 app.use('/api/imports', importsRouter);
+app.use('/api/primitive-starters', primitiveStartersRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', err);
@@ -95,6 +97,9 @@ async function start() {
       logger.info('  POST /api/parser/analyze - Analyze component structure');
       logger.info('  POST /api/imports/plan - Generate import plan');
       logger.info('  POST /api/imports/apply - Apply approved import plan');
+      logger.info('  GET  /api/primitive-starters - List primitive starter templates');
+      logger.info('  POST /api/primitive-starters/preview - Preview primitive starter files');
+      logger.info('  POST /api/primitive-starters/apply - Apply primitive starter files');
       logger.info('  GET  /api/templates - List templates');
       logger.info('  POST /api/templates - Create template');
       logger.info('  DELETE /api/templates/:id - Delete template');
