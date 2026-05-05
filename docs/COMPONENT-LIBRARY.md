@@ -38,4 +38,4 @@ POST /api/components/library/:identifier/reset
 GET  /api/components/library/:identifier/compare
 ```
 
-Rename and fork accept `{ "name": "new component name" }`. Detach removes source ownership metadata. Reset and compare use source metadata when the component was imported with a safe local source path.
+Rename and fork accept `{ "name": "new component name" }`. Detach removes source ownership metadata. Reset and compare use source metadata when the component was imported with a safe local source path. Compare returns a unified `diff` plus `localContent` and `sourceContent` snapshots for callers that need the raw text.

@@ -132,7 +132,7 @@ export interface WorkspaceComponent {
   metadata?: ComponentMetadata;
 }
 
-export type ComponentDependencyStatus = 'none' | 'ok' | 'missing';
+export type ComponentDependencyStatus = 'none' | 'ok';
 
 export interface ComponentLibraryInventoryItem {
   name: string;
@@ -167,6 +167,8 @@ export interface ComponentLibraryCompareResult {
   sourcePath?: string;
   changed: boolean;
   diff: string;
+  localContent?: string;
+  sourceContent?: string;
 }
 
 export interface ComponentLibraryActionResult {

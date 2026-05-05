@@ -87,6 +87,15 @@ describe('component library routes', () => {
     assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_NOT_FOUND');
   });
 
+  it('rejects traversal-shaped component detail identifiers', async () => {
+    await createTempRoot();
+
+    const res = await request(app).get('/api/components/library/detail/..%5Csecret');
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_VALIDATION_ERROR');
+  });
+
   it('renames a component through the route', async () => {
     const root = await createTempRoot();
     await fs.writeFile(
@@ -121,7 +130,7 @@ describe('component library routes', () => {
     assert.equal(compare.body.compare.changed, true);
   });
 
-  it('validates ownership action names', async () => {
+  it('returns 400 when rename body omits a name', async () => {
     await createTempRoot();
 
     const res = await request(app).post('/api/components/library/missing/rename').send({});

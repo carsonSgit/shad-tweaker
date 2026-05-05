@@ -99,6 +99,38 @@ export function Card() {
     assert.match(byName.content, /function Card/);
   });
 
+  it('rejects traversal-shaped component identifiers', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'card', `export function Card() { return <section />; }`);
+
+    await assert.rejects(
+      getComponentLibraryDetail(root, '../card.tsx'),
+      /identifier must stay inside/
+    );
+  });
+
+  it('excludes path aliases and shared utilities from dependencies', async () => {
+    const root = await createTempRoot();
+    await writeComponent(
+      root,
+      'input',
+      `import path from 'node:path';
+import { cn } from '@/lib/utils';
+import { helper } from '~/components/helper';
+import * as Dialog from '@radix-ui/react-dialog';
+import { cva } from 'class-variance-authority';
+export function Input() { return <Dialog.Root />; }
+`
+    );
+
+    const detail = await getComponentLibraryDetail(root, 'input');
+
+    assert.deepEqual(
+      detail.dependencies.map((dependency) => dependency.name),
+      ['@radix-ui/react-dialog']
+    );
+  });
+
   it('reports duplicate names, exports, and dependencies', async () => {
     const root = await createTempRoot();
     await writeComponent(
@@ -148,6 +180,22 @@ export function Control() {
     assert.equal(await fs.pathExists(path.join(root, 'components/ui/status-badge.tsx')), true);
   });
 
+  it('rejects rename conflicts without moving the original file', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'badge', `export function Badge() { return <span />; }`);
+    await writeComponent(
+      root,
+      'status-badge',
+      `export function StatusBadge() { return <span />; }`
+    );
+
+    await assert.rejects(
+      renameComponentLibraryItem(root, 'badge', 'status badge'),
+      /already exists/
+    );
+    assert.equal(await fs.pathExists(path.join(root, 'components/ui/badge.tsx')), true);
+  });
+
   it('forks a component file without changing the original', async () => {
     const root = await createTempRoot();
     await writeComponent(root, 'alert', `export function Alert() { return <div />; }`);
@@ -157,6 +205,21 @@ export function Control() {
     assert.equal(result.newPath, 'components/ui/alert-minimal.tsx');
     assert.equal(await fs.pathExists(path.join(root, 'components/ui/alert.tsx')), true);
     assert.equal(await fs.pathExists(path.join(root, 'components/ui/alert-minimal.tsx')), true);
+  });
+
+  it('rejects fork conflicts', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'alert', `export function Alert() { return <div />; }`);
+    await writeComponent(
+      root,
+      'alert-minimal',
+      `export function AlertMinimal() { return <div />; }`
+    );
+
+    await assert.rejects(
+      forkComponentLibraryItem(root, 'alert', 'alert minimal'),
+      /already exists/
+    );
   });
 
   it('detaches source metadata from a manifest component', async () => {
@@ -203,6 +266,48 @@ export function Control() {
 
     assert.equal(result.changed, true);
     assert.match(result.diff, /function Sheet/);
+  });
+
+  it('returns an empty diff for identical source-backed components', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'sheet', `export function Sheet() { return <div />; }`);
+    await fs.ensureDir(path.join(root, 'registry'));
+    await fs.writeFile(
+      path.join(root, 'registry/sheet.tsx'),
+      `export function Sheet() { return <div />; }`
+    );
+    await fs.ensureDir(path.join(root, '.shadcn-tweaker'));
+    await fs.writeJson(path.join(root, '.shadcn-tweaker/manifest.json'), {
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      config: {
+        componentDirectory: './components/ui',
+        backupRetentionDays: 30,
+        maxBackups: 20,
+        autoBackup: true,
+        validateAfterEdit: true,
+        port: 3001,
+      },
+      components: [
+        {
+          id: 'sheet',
+          name: 'sheet',
+          path: 'components/ui/sheet.tsx',
+          source: { originalPackageName: 'registry/sheet.tsx' },
+        },
+      ],
+      sources: [],
+      packages: [],
+      tokenSets: [],
+      presets: [],
+      backups: [],
+    });
+
+    const result = await compareComponentLibraryItem(root, 'sheet');
+
+    assert.equal(result.changed, false);
+    assert.equal(result.diff, '');
   });
 
   it('rejects reset when no source path is recorded', async () => {

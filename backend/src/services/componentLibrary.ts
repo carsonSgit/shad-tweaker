@@ -1,4 +1,6 @@
+import { open } from 'node:fs/promises';
 import path from 'node:path';
+import { createPatch } from 'diff';
 import fs from 'fs-extra';
 import type {
   ComponentLibraryActionResult,
@@ -21,6 +23,7 @@ const PRIMITIVE_PATTERNS = [
   { pattern: /@base-ui-components\/react\/([a-z0-9-]+)/, label: 'base-ui' },
   { pattern: /@headlessui\/react/, label: 'headless-ui' },
 ];
+const SHARED_DEPENDENCIES = new Set(['class-variance-authority', 'clsx', 'tailwind-merge']);
 
 export class ComponentLibraryNotFoundError extends Error {
   readonly code = 'COMPONENT_LIBRARY_NOT_FOUND';
@@ -40,6 +43,11 @@ interface ComponentFile {
   content: string;
   stats: fs.Stats;
   manifestComponent?: WorkspaceComponent;
+}
+
+interface WorkspaceContext {
+  componentDirectory: string;
+  manifestComponents: WorkspaceComponent[];
 }
 
 function toComponentName(filePath: string): string {
@@ -75,11 +83,16 @@ function ensureSafeRelativePath(value: string): string {
   return normalized;
 }
 
-async function getComponentDirectory(cwd: string): Promise<string> {
+async function getWorkspaceContext(cwd: string): Promise<WorkspaceContext> {
   const manifest = await loadWorkspaceManifest(cwd);
   const configured = manifest.config.componentDirectory;
   const found = await findComponentDirectory(cwd, configured);
-  if (found) return found;
+  if (found) {
+    return {
+      componentDirectory: found,
+      manifestComponents: manifest.components,
+    };
+  }
 
   throw new ComponentLibraryNotFoundError('No component directory found.');
 }
@@ -96,24 +109,30 @@ function matchManifestComponent(
 }
 
 async function readComponentFiles(cwd: string): Promise<ComponentFile[]> {
-  const componentDirectory = await getComponentDirectory(cwd);
-  const manifest = await loadWorkspaceManifest(cwd);
+  const { componentDirectory, manifestComponents } = await getWorkspaceContext(cwd);
   const entries = await fs.readdir(componentDirectory);
   const files: ComponentFile[] = [];
 
   for (const entry of entries) {
     const absolutePath = path.join(componentDirectory, entry);
-    const stats = await fs.stat(absolutePath);
-    if (!stats.isFile() || !SUPPORTED_COMPONENT_EXTENSIONS.has(path.extname(entry))) continue;
+    if (!SUPPORTED_COMPONENT_EXTENSIONS.has(path.extname(entry))) continue;
 
-    const relativePath = path.relative(cwd, absolutePath).replace(/\\/g, '/');
-    files.push({
-      absolutePath,
-      relativePath,
-      content: await fs.readFile(absolutePath, 'utf-8'),
-      stats,
-      manifestComponent: matchManifestComponent(manifest.components, relativePath, absolutePath),
-    });
+    const handle = await open(absolutePath, 'r');
+    try {
+      const stats = await handle.stat();
+      if (!stats.isFile()) continue;
+
+      const relativePath = path.relative(cwd, absolutePath).replace(/\\/g, '/');
+      files.push({
+        absolutePath,
+        relativePath,
+        content: await handle.readFile('utf-8'),
+        stats,
+        manifestComponent: matchManifestComponent(manifestComponents, relativePath, absolutePath),
+      });
+    } finally {
+      await handle.close();
+    }
   }
 
   return files.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
@@ -139,12 +158,21 @@ function getDependencies(
   const packageImports = [...content.matchAll(/from\s+['"]([^.'"][^'"]*)['"]/g)].map(
     (match) => match[1]
   );
-  const parsedDependencies = packageImports.map((name) => ({
+  const parsedDependencies = packageImports.filter(isPackageImport).map((name) => ({
     name,
     type: 'package' as const,
   }));
   return [...dependencies, ...parsedDependencies].filter(
     (dependency, index, all) => all.findIndex((item) => item.name === dependency.name) === index
+  );
+}
+
+function isPackageImport(value: string): boolean {
+  return (
+    !value.startsWith('@/') &&
+    !value.startsWith('~/') &&
+    !value.startsWith('node:') &&
+    !SHARED_DEPENDENCIES.has(value)
   );
 }
 
@@ -187,22 +215,7 @@ export async function getComponentLibraryDetail(
   cwd: string,
   identifier: string
 ): Promise<ComponentLibraryDetail> {
-  const normalizedPath = isSafeProjectRelativePath(identifier)
-    ? identifier.replace(/\\/g, '/').replace(/^\.\//, '')
-    : '';
-  const files = await readComponentFiles(cwd);
-  const file = files.find(
-    (candidate) =>
-      candidate.relativePath === normalizedPath ||
-      toComponentName(candidate.relativePath) === identifier ||
-      candidate.manifestComponent?.name === identifier
-  );
-
-  if (!file) {
-    throw new ComponentLibraryNotFoundError(`Component not found: ${identifier}`);
-  }
-
-  return toDetail(file);
+  return toDetail(await resolveDetailFile(cwd, identifier));
 }
 
 export async function findComponentLibraryDuplicates(
@@ -250,16 +263,17 @@ function suggestedNames(value: string): string[] {
 
 async function resolveDetailFile(cwd: string, identifier: string): Promise<ComponentFile> {
   const files = await readComponentFiles(cwd);
-  const normalized = isSafeProjectRelativePath(identifier)
-    ? identifier.replace(/\\/g, '/').replace(/^\.\//, '')
-    : '';
+  if (!isSafeProjectRelativePath(identifier)) {
+    throw new ComponentLibraryValidationError('Component identifier must stay inside the project.');
+  }
+  const normalized = identifier.replace(/\\/g, '/').replace(/^\.\//, '');
   const file = files.find(
     (candidate) =>
       candidate.relativePath === normalized ||
       toComponentName(candidate.relativePath) === identifier ||
       candidate.manifestComponent?.name === identifier
   );
-  if (!file) throw new ComponentLibraryNotFoundError(`Component not found: ${identifier}`);
+  if (!file) throw new ComponentLibraryNotFoundError('Component not found.');
   return file;
 }
 
@@ -279,8 +293,18 @@ export async function renameComponentLibraryItem(
     throw new ComponentLibraryConflictError(`Component already exists: ${newRelativePath}`);
   }
 
-  await fs.move(file.absolutePath, newAbsolutePath, { overwrite: false });
   await updateManifestComponentPath(cwd, file.relativePath, newRelativePath, normalizedName);
+  try {
+    await fs.move(file.absolutePath, newAbsolutePath, { overwrite: false });
+  } catch (error) {
+    await updateManifestComponentPath(
+      cwd,
+      newRelativePath,
+      file.relativePath,
+      toComponentName(file.relativePath)
+    );
+    throw error;
+  }
 
   return {
     success: true,
@@ -307,6 +331,7 @@ export async function forkComponentLibraryItem(
   }
 
   await fs.copyFile(file.absolutePath, newAbsolutePath);
+  await addForkedManifestComponent(cwd, file, newRelativePath, normalizedName);
 
   return {
     success: true,
@@ -371,7 +396,9 @@ export async function compareComponentLibraryItem(
       name: toComponentName(file.relativePath),
       path: file.relativePath,
       changed: true,
-      diff: file.content,
+      diff: createPatch(file.relativePath, '', file.content, 'source', 'local'),
+      localContent: file.content,
+      sourceContent: '',
     };
   }
 
@@ -385,8 +412,40 @@ export async function compareComponentLibraryItem(
     path: file.relativePath,
     sourcePath,
     changed: sourceContent !== file.content,
-    diff: sourceContent === file.content ? '' : file.content,
+    diff:
+      sourceContent === file.content
+        ? ''
+        : createPatch(file.relativePath, sourceContent, file.content, 'source', 'local'),
+    localContent: file.content,
+    sourceContent,
   };
+}
+
+async function addForkedManifestComponent(
+  cwd: string,
+  file: ComponentFile,
+  newPath: string,
+  newName: string
+): Promise<void> {
+  if (!file.manifestComponent) return;
+
+  const manifest = await loadWorkspaceManifest(cwd);
+  manifest.components = [
+    ...manifest.components,
+    {
+      ...file.manifestComponent,
+      id: newName,
+      name: newName,
+      path: newPath,
+      source: file.manifestComponent.source
+        ? {
+            ...file.manifestComponent.source,
+            localComponentName: newName,
+          }
+        : undefined,
+    },
+  ];
+  await saveWorkspaceManifest(manifest, cwd);
 }
 
 async function updateManifestComponentPath(
