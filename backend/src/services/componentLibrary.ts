@@ -131,7 +131,10 @@ function getTokenUsage(content: string): string[] {
   return [...new Set(content.match(TOKEN_PATTERN) ?? [])].sort();
 }
 
-function getDependencies(content: string, manifestComponent?: WorkspaceComponent): RegistryDependency[] {
+function getDependencies(
+  content: string,
+  manifestComponent?: WorkspaceComponent
+): RegistryDependency[] {
   const dependencies = manifestComponent?.source?.dependencies ?? [];
   const packageImports = [...content.matchAll(/from\s+['"]([^.'"][^'"]*)['"]/g)].map(
     (match) => match[1]
@@ -211,7 +214,8 @@ export async function findComponentLibraryDuplicates(
 
   for (const detail of details) {
     addDuplicateCandidate(groups, 'name', detail.name, detail.path);
-    for (const exportName of detail.exports) addDuplicateCandidate(groups, 'export', exportName, detail.path);
+    for (const exportName of detail.exports)
+      addDuplicateCandidate(groups, 'export', exportName, detail.path);
     for (const dependency of detail.dependencies) {
       addDuplicateCandidate(groups, 'dependency', dependency.name, detail.path);
     }

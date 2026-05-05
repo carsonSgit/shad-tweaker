@@ -123,11 +123,12 @@ export function Control() {
 
     const duplicates = await findComponentLibraryDuplicates(root);
 
-    assert.ok(duplicates.some((duplicate) => duplicate.type === 'export' && duplicate.value === 'Control'));
+    assert.ok(
+      duplicates.some((duplicate) => duplicate.type === 'export' && duplicate.value === 'Control')
+    );
     assert.ok(
       duplicates.some(
-        (duplicate) =>
-          duplicate.type === 'dependency' && duplicate.value === '@radix-ui/react-slot'
+        (duplicate) => duplicate.type === 'dependency' && duplicate.value === '@radix-ui/react-slot'
       )
     );
     assert.deepEqual(
@@ -209,9 +210,6 @@ export function Control() {
     const root = await createTempRoot();
     await writeComponent(root, 'menu', `export function Menu() { return <div />; }`);
 
-    await assert.rejects(
-      resetComponentLibraryItem(root, 'menu'),
-      /reset source path/
-    );
+    await assert.rejects(resetComponentLibraryItem(root, 'menu'), /reset source path/);
   });
 });

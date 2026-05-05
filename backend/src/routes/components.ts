@@ -72,7 +72,9 @@ router.get('/library/duplicates', async (_req: Request, res: Response) => {
 
 router.get('/library/detail/:identifier', async (req: Request, res: Response) => {
   try {
-    res.json({ component: await getComponentLibraryDetail(getWorkingDirectory(), req.params.identifier) });
+    res.json({
+      component: await getComponentLibraryDetail(getWorkingDirectory(), req.params.identifier),
+    });
   } catch (error) {
     logger.error(`Failed to get component library detail: ${req.params.identifier}`, error);
     const response = componentLibraryErrorResponse(error, 'Failed to get component detail');
@@ -122,7 +124,9 @@ router.post('/library/:identifier/fork', async (req: Request, res: Response) => 
 
 router.post('/library/:identifier/detach', async (req: Request, res: Response) => {
   try {
-    res.json({ result: await detachComponentLibraryItem(getWorkingDirectory(), req.params.identifier) });
+    res.json({
+      result: await detachComponentLibraryItem(getWorkingDirectory(), req.params.identifier),
+    });
   } catch (error) {
     logger.error(`Failed to detach component: ${req.params.identifier}`, error);
     const response = componentLibraryErrorResponse(error, 'Failed to detach component');
@@ -132,7 +136,9 @@ router.post('/library/:identifier/detach', async (req: Request, res: Response) =
 
 router.post('/library/:identifier/reset', async (req: Request, res: Response) => {
   try {
-    res.json({ result: await resetComponentLibraryItem(getWorkingDirectory(), req.params.identifier) });
+    res.json({
+      result: await resetComponentLibraryItem(getWorkingDirectory(), req.params.identifier),
+    });
   } catch (error) {
     logger.error(`Failed to reset component: ${req.params.identifier}`, error);
     const response = componentLibraryErrorResponse(error, 'Failed to reset component');
@@ -142,7 +148,9 @@ router.post('/library/:identifier/reset', async (req: Request, res: Response) =>
 
 router.get('/library/:identifier/compare', async (req: Request, res: Response) => {
   try {
-    res.json({ compare: await compareComponentLibraryItem(getWorkingDirectory(), req.params.identifier) });
+    res.json({
+      compare: await compareComponentLibraryItem(getWorkingDirectory(), req.params.identifier),
+    });
   } catch (error) {
     logger.error(`Failed to compare component: ${req.params.identifier}`, error);
     const response = componentLibraryErrorResponse(error, 'Failed to compare component');
