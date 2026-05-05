@@ -86,4 +86,47 @@ describe('component library routes', () => {
     assert.equal(res.status, 404);
     assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_NOT_FOUND');
   });
+
+  it('renames a component through the route', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/badge.tsx'),
+      `export function Badge() { return <span />; }`
+    );
+
+    const res = await request(app)
+      .post('/api/components/library/badge/rename')
+      .send({ name: 'status badge' });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.result.newPath, 'components/ui/status-badge.tsx');
+    assert.equal(await fs.pathExists(path.join(root, 'components/ui/status-badge.tsx')), true);
+  });
+
+  it('forks and compares components through routes', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/alert.tsx'),
+      `export function Alert() { return <div />; }`
+    );
+
+    const fork = await request(app)
+      .post('/api/components/library/alert/fork')
+      .send({ name: 'alert acme' });
+    const compare = await request(app).get('/api/components/library/alert/compare');
+
+    assert.equal(fork.status, 200);
+    assert.equal(fork.body.result.newPath, 'components/ui/alert-acme.tsx');
+    assert.equal(compare.status, 200);
+    assert.equal(compare.body.compare.changed, true);
+  });
+
+  it('validates ownership action names', async () => {
+    await createTempRoot();
+
+    const res = await request(app).post('/api/components/library/missing/rename').send({});
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_VALIDATION_ERROR');
+  });
 });
