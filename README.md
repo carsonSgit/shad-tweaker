@@ -69,6 +69,7 @@ This project uses automatic versioning. When submitting pull requests, use conve
 See [docs/VERSIONING.md](docs/VERSIONING.md) for more details.
 
 See [docs/PRIMITIVE-STARTERS.md](docs/PRIMITIVE-STARTERS.md) for primitive wrapper starter APIs.
+See [docs/COMPONENT-LIBRARY.md](docs/COMPONENT-LIBRARY.md) for local component inventory and ownership APIs.
 
 ## License
 
