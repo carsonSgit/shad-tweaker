@@ -4,9 +4,14 @@ import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import fs from 'fs-extra';
 import {
+  compareComponentLibraryItem,
+  detachComponentLibraryItem,
   findComponentLibraryDuplicates,
+  forkComponentLibraryItem,
   getComponentLibraryDetail,
   listComponentLibrary,
+  renameComponentLibraryItem,
+  resetComponentLibraryItem,
 } from '../src/services/componentLibrary.js';
 
 const tempRoots: string[] = [];
@@ -128,6 +133,85 @@ export function Control() {
     assert.deepEqual(
       duplicates.find((duplicate) => duplicate.value === 'Control')?.suggestedNames,
       ['control-linear', 'control-minimal', 'control-acme']
+    );
+  });
+
+  it('renames a component file safely', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'badge', `export function Badge() { return <span />; }`);
+
+    const result = await renameComponentLibraryItem(root, 'badge', 'status badge');
+
+    assert.equal(result.previousPath, 'components/ui/badge.tsx');
+    assert.equal(result.newPath, 'components/ui/status-badge.tsx');
+    assert.equal(await fs.pathExists(path.join(root, 'components/ui/badge.tsx')), false);
+    assert.equal(await fs.pathExists(path.join(root, 'components/ui/status-badge.tsx')), true);
+  });
+
+  it('forks a component file without changing the original', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'alert', `export function Alert() { return <div />; }`);
+
+    const result = await forkComponentLibraryItem(root, 'alert', 'alert minimal');
+
+    assert.equal(result.newPath, 'components/ui/alert-minimal.tsx');
+    assert.equal(await fs.pathExists(path.join(root, 'components/ui/alert.tsx')), true);
+    assert.equal(await fs.pathExists(path.join(root, 'components/ui/alert-minimal.tsx')), true);
+  });
+
+  it('detaches source metadata from a manifest component', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'toast', `export function Toast() { return <div />; }`);
+    await fs.ensureDir(path.join(root, '.shadcn-tweaker'));
+    await fs.writeJson(path.join(root, '.shadcn-tweaker/manifest.json'), {
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      config: {
+        componentDirectory: './components/ui',
+        backupRetentionDays: 30,
+        maxBackups: 20,
+        autoBackup: true,
+        validateAfterEdit: true,
+        port: 3001,
+      },
+      components: [
+        {
+          id: 'toast',
+          name: 'toast',
+          path: 'components/ui/toast.tsx',
+          source: { originRegistry: 'acme' },
+        },
+      ],
+      sources: [],
+      packages: [],
+      tokenSets: [],
+      presets: [],
+      backups: [],
+    });
+
+    const result = await detachComponentLibraryItem(root, 'toast');
+
+    assert.equal(result.component.sourceRegistry, undefined);
+  });
+
+  it('compares components without source metadata as changed', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'sheet', `export function Sheet() { return <div />; }`);
+
+    const result = await compareComponentLibraryItem(root, 'sheet');
+
+    assert.equal(result.changed, true);
+    assert.match(result.diff, /function Sheet/);
+  });
+
+  it('rejects reset when no source path is recorded', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'menu', `export function Menu() { return <div />; }`);
+
+    await assert.rejects(
+      resetComponentLibraryItem(root, 'menu'),
+      /reset source path/
     );
   });
 });
