@@ -143,7 +143,6 @@ export interface ComponentLibraryInventoryItem {
   lastModified: string;
   dependencyStatus: ComponentDependencyStatus;
   tokenUsage: string[];
-  filePath: string;
 }
 
 export interface ComponentLibraryDetail extends ComponentLibraryInventoryItem {

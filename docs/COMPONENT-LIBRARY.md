@@ -17,7 +17,7 @@ Returns local components with:
 - `lastModified`
 - `dependencyStatus`
 - `tokenUsage`
-- `filePath`
+- `path`
 
 ## Detail And Duplicates
 

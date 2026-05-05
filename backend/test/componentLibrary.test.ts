@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { afterEach, describe, it } from 'node:test';
+import { after, afterEach, describe, it } from 'node:test';
 import fs from 'fs-extra';
 import {
   compareComponentLibraryItem,
@@ -16,7 +16,11 @@ import {
 
 const tempRoots: string[] = [];
 const originalCwd = process.env.SHADCN_TWEAKER_CWD;
-const testWorkspaceBase = path.join(process.cwd(), '.shadcn-tweaker-test-workspaces');
+const testWorkspaceBase = path.join(
+  process.cwd(),
+  '.shadcn-tweaker-test-workspaces',
+  'component-library-service'
+);
 
 async function createTempRoot(): Promise<string> {
   const root = path.join(testWorkspaceBase, randomUUID());
@@ -38,6 +42,10 @@ afterEach(async () => {
     process.env.SHADCN_TWEAKER_CWD = originalCwd;
   }
   await Promise.all(tempRoots.splice(0).map((root) => fs.remove(root)));
+});
+
+after(async () => {
+  await fs.remove(testWorkspaceBase);
 });
 
 describe('component library service', () => {
@@ -63,7 +71,7 @@ export function Button() {
 
     assert.equal(inventory.length, 1);
     assert.equal(inventory[0].name, 'button');
-    assert.equal(inventory[0].filePath, 'components/ui/button.tsx');
+    assert.equal(inventory[0].path, 'components/ui/button.tsx');
     assert.equal(inventory[0].primitiveBase, 'radix:dialog');
     assert.equal(inventory[0].variantCount, 1);
     assert.equal(inventory[0].dependencyStatus, 'ok');
@@ -207,6 +215,44 @@ export function Control() {
     assert.equal(await fs.pathExists(path.join(root, 'components/ui/alert-minimal.tsx')), true);
   });
 
+  it('registers forked components with source metadata when the original is manifest-owned', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'alert', `export function Alert() { return <div />; }`);
+    await fs.ensureDir(path.join(root, '.shadcn-tweaker'));
+    await fs.writeJson(path.join(root, '.shadcn-tweaker/manifest.json'), {
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      config: {
+        componentDirectory: './components/ui',
+        backupRetentionDays: 30,
+        maxBackups: 20,
+        autoBackup: true,
+        validateAfterEdit: true,
+        port: 3001,
+      },
+      components: [
+        {
+          id: 'alert',
+          name: 'alert',
+          path: 'components/ui/alert.tsx',
+          source: { originRegistry: 'acme', localComponentName: 'alert' },
+        },
+      ],
+      sources: [],
+      packages: [],
+      tokenSets: [],
+      presets: [],
+      backups: [],
+    });
+
+    await forkComponentLibraryItem(root, 'alert', 'alert minimal');
+    const forked = await getComponentLibraryDetail(root, 'alert-minimal');
+
+    assert.equal(forked.sourceRegistry, 'acme');
+    assert.equal(forked.localComponentName, 'alert-minimal');
+  });
+
   it('rejects fork conflicts', async () => {
     const root = await createTempRoot();
     await writeComponent(root, 'alert', `export function Alert() { return <div />; }`);
@@ -255,6 +301,16 @@ export function Control() {
 
     const result = await detachComponentLibraryItem(root, 'toast');
 
+    assert.equal(result.component.sourceRegistry, undefined);
+  });
+
+  it('allows detach when a component has no manifest entry', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'toast', `export function Toast() { return <div />; }`);
+
+    const result = await detachComponentLibraryItem(root, 'toast');
+
+    assert.equal(result.component.name, 'toast');
     assert.equal(result.component.sourceRegistry, undefined);
   });
 
@@ -315,5 +371,14 @@ export function Control() {
     await writeComponent(root, 'menu', `export function Menu() { return <div />; }`);
 
     await assert.rejects(resetComponentLibraryItem(root, 'menu'), /reset source path/);
+  });
+
+  it('keeps acronym runs together when normalizing names', async () => {
+    const root = await createTempRoot();
+    await writeComponent(root, 'button', `export function Button() { return <button />; }`);
+
+    const result = await renameComponentLibraryItem(root, 'button', 'HTMLButton');
+
+    assert.equal(result.newPath, 'components/ui/html-button.tsx');
   });
 });

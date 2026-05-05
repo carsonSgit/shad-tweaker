@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { afterEach, describe, it } from 'node:test';
+import { after, afterEach, describe, it } from 'node:test';
 import express from 'express';
 import fs from 'fs-extra';
 import request from 'supertest';
@@ -12,7 +12,11 @@ app.use(express.json());
 app.use('/api/components', componentsRouter);
 
 const tempRoots: string[] = [];
-const testWorkspaceBase = path.join(process.cwd(), '.shadcn-tweaker-test-workspaces');
+const testWorkspaceBase = path.join(
+  process.cwd(),
+  '.shadcn-tweaker-test-workspaces',
+  'component-library-routes'
+);
 
 async function createTempRoot(): Promise<string> {
   const root = path.join(testWorkspaceBase, randomUUID());
@@ -25,6 +29,10 @@ async function createTempRoot(): Promise<string> {
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((root) => fs.remove(root)));
   delete process.env.SHADCN_TWEAKER_CWD;
+});
+
+after(async () => {
+  await fs.remove(testWorkspaceBase);
 });
 
 describe('component library routes', () => {

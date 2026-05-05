@@ -57,7 +57,9 @@ function toComponentName(filePath: string): string {
 function toKebabCase(value: string): string {
   return value
     .trim()
-    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([a-z0-9])([A-Z])|([A-Z]+)([A-Z][a-z])/g, (_match, lower, upper, acronym, word) =>
+      lower ? `${lower}-${upper}` : `${acronym}-${word}`
+    )
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter(Boolean)
@@ -189,7 +191,6 @@ function toInventoryItem(file: ComponentFile): ComponentLibraryInventoryItem {
     lastModified: file.stats.mtime.toISOString(),
     dependencyStatus: dependencies.length > 0 ? 'ok' : 'none',
     tokenUsage: getTokenUsage(file.content),
-    filePath: file.relativePath,
   };
 }
 
