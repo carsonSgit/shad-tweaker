@@ -55,15 +55,56 @@ function toComponentName(filePath: string): string {
 }
 
 function toKebabCase(value: string): string {
-  return value
-    .trim()
-    .replace(/([a-z0-9])([A-Z])|([A-Z]+)([A-Z][a-z])/g, (_match, lower, upper, acronym, word) =>
-      lower ? `${lower}-${upper}` : `${acronym}-${word}`
-    )
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean)
-    .join('-');
+  const trimmed = value.trim();
+  const parts: string[] = [];
+  let current = '';
+
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const char = trimmed[index];
+    const previous = trimmed[index - 1] ?? '';
+    const next = trimmed[index + 1] ?? '';
+
+    if (!isAsciiAlphaNumeric(char)) {
+      if (current) {
+        parts.push(current);
+        current = '';
+      }
+      continue;
+    }
+
+    if (
+      current &&
+      isAsciiUpper(char) &&
+      (isAsciiLower(previous) ||
+        isAsciiDigit(previous) ||
+        (isAsciiUpper(previous) && isAsciiLower(next)))
+    ) {
+      parts.push(current);
+      current = '';
+    }
+
+    current += char.toLowerCase();
+  }
+
+  if (current) parts.push(current);
+
+  return parts.join('-');
+}
+
+function isAsciiAlphaNumeric(value: string): boolean {
+  return isAsciiLower(value) || isAsciiUpper(value) || isAsciiDigit(value);
+}
+
+function isAsciiLower(value: string): boolean {
+  return value >= 'a' && value <= 'z';
+}
+
+function isAsciiUpper(value: string): boolean {
+  return value >= 'A' && value <= 'Z';
+}
+
+function isAsciiDigit(value: string): boolean {
+  return value >= '0' && value <= '9';
 }
 
 function normalizeComponentName(value: string): string {
