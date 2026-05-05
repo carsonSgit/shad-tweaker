@@ -3,9 +3,14 @@ import {
   ComponentLibraryConflictError,
   ComponentLibraryNotFoundError,
   ComponentLibraryValidationError,
+  compareComponentLibraryItem,
+  detachComponentLibraryItem,
   findComponentLibraryDuplicates,
+  forkComponentLibraryItem,
   getComponentLibraryDetail,
   listComponentLibrary,
+  renameComponentLibraryItem,
+  resetComponentLibraryItem,
 } from '../services/componentLibrary.js';
 import {
   getCachedComponents,
@@ -78,6 +83,70 @@ router.get('/library/detail/:identifier', async (req: Request, res: Response) =>
         code: response.code,
       },
     });
+  }
+});
+
+function readName(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const name = (body as { name?: unknown }).name;
+  return typeof name === 'string' ? name : null;
+}
+
+router.post('/library/:identifier/rename', async (req: Request, res: Response) => {
+  try {
+    const name = readName(req.body);
+    if (!name) throw new ComponentLibraryValidationError('Name is required.');
+    res.json({
+      result: await renameComponentLibraryItem(getWorkingDirectory(), req.params.identifier, name),
+    });
+  } catch (error) {
+    logger.error(`Failed to rename component: ${req.params.identifier}`, error);
+    const response = componentLibraryErrorResponse(error, 'Failed to rename component');
+    res.status(response.status).json({ success: false, error: response });
+  }
+});
+
+router.post('/library/:identifier/fork', async (req: Request, res: Response) => {
+  try {
+    const name = readName(req.body);
+    if (!name) throw new ComponentLibraryValidationError('Name is required.');
+    res.json({
+      result: await forkComponentLibraryItem(getWorkingDirectory(), req.params.identifier, name),
+    });
+  } catch (error) {
+    logger.error(`Failed to fork component: ${req.params.identifier}`, error);
+    const response = componentLibraryErrorResponse(error, 'Failed to fork component');
+    res.status(response.status).json({ success: false, error: response });
+  }
+});
+
+router.post('/library/:identifier/detach', async (req: Request, res: Response) => {
+  try {
+    res.json({ result: await detachComponentLibraryItem(getWorkingDirectory(), req.params.identifier) });
+  } catch (error) {
+    logger.error(`Failed to detach component: ${req.params.identifier}`, error);
+    const response = componentLibraryErrorResponse(error, 'Failed to detach component');
+    res.status(response.status).json({ success: false, error: response });
+  }
+});
+
+router.post('/library/:identifier/reset', async (req: Request, res: Response) => {
+  try {
+    res.json({ result: await resetComponentLibraryItem(getWorkingDirectory(), req.params.identifier) });
+  } catch (error) {
+    logger.error(`Failed to reset component: ${req.params.identifier}`, error);
+    const response = componentLibraryErrorResponse(error, 'Failed to reset component');
+    res.status(response.status).json({ success: false, error: response });
+  }
+});
+
+router.get('/library/:identifier/compare', async (req: Request, res: Response) => {
+  try {
+    res.json({ compare: await compareComponentLibraryItem(getWorkingDirectory(), req.params.identifier) });
+  } catch (error) {
+    logger.error(`Failed to compare component: ${req.params.identifier}`, error);
+    const response = componentLibraryErrorResponse(error, 'Failed to compare component');
+    res.status(response.status).json({ success: false, error: response });
   }
 });
 
