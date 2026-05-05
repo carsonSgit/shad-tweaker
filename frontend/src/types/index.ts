@@ -18,7 +18,7 @@ export interface ComponentDetail extends Component {
   classes: string[];
 }
 
-export type ComponentDependencyStatus = 'none' | 'ok' | 'missing';
+export type ComponentDependencyStatus = 'none' | 'ok';
 
 export interface ComponentLibraryInventoryItem {
   name: string;
@@ -53,6 +53,8 @@ export interface ComponentLibraryCompareResult {
   sourcePath?: string;
   changed: boolean;
   diff: string;
+  localContent?: string;
+  sourceContent?: string;
 }
 
 export interface Preview {

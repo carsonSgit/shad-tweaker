@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import * as api from '../api/client.js';
-import type { Component, Screen } from '../types/index.js';
+import type { Component, ComponentLibraryInventoryItem, Screen } from '../types/index.js';
 
 export function useComponents() {
   const [components, setComponents] = useState<Component[]>([]);
@@ -14,13 +14,25 @@ export function useComponents() {
     setError(null);
     hasScannedRef.current = true;
     const result = await api.scanComponents();
-    setLoading(false);
 
     if (result.success && result.data) {
-      setComponents(result.data.components);
+      const inventory = await api.getComponentLibraryInventory();
+      const inventoryByPath = new Map(
+        (inventory.success && inventory.data ? inventory.data.components : []).map((component) => [
+          component.path,
+          component,
+        ])
+      );
+      setComponents(
+        result.data.components.map((component) => ({
+          ...component,
+          ...inventoryByPath.get(component.path),
+        })) as Array<Component & Partial<ComponentLibraryInventoryItem>>
+      );
     } else {
       setError(result.error?.message || 'Failed to scan components');
     }
+    setLoading(false);
     return result;
   }, []);
 

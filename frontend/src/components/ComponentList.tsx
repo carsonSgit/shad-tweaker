@@ -149,6 +149,7 @@ export function ComponentList({
           const actualIdx = startIdx + idx;
           const isSelected = selectedPaths.has(component.path);
           const isCursor = actualIdx === cursor;
+          const libraryMetadata = getLibraryMetadata(component);
 
           return (
             <Box key={component.path}>
@@ -179,19 +180,18 @@ export function ComponentList({
               {/* Metadata */}
               <Text color={THEME.muted}>{component.metadata.lines} ln</Text>
 
-              {getLibraryMetadata(component).sourceRegistry && (
-                <Text color={THEME.secondary}> {getLibraryMetadata(component).sourceRegistry}</Text>
+              {libraryMetadata.sourceRegistry && (
+                <Text color={THEME.secondary}> {libraryMetadata.sourceRegistry}</Text>
               )}
 
-              {getLibraryMetadata(component).primitiveBase && (
-                <Text color={THEME.muted}> {getLibraryMetadata(component).primitiveBase}</Text>
+              {libraryMetadata.primitiveBase && (
+                <Text color={THEME.muted}> {libraryMetadata.primitiveBase}</Text>
               )}
 
-              {typeof getLibraryMetadata(component).variantCount === 'number' &&
-                getLibraryMetadata(component).variantCount > 0 && (
+              {typeof libraryMetadata.variantCount === 'number' &&
+                libraryMetadata.variantCount > 0 && (
                   <Text color={THEME.primary}>
-                    {' '}
-                    {getLibraryMetadata(component).variantCount} variants
+                    {' '}{libraryMetadata.variantCount} variants
                   </Text>
                 )}
 
