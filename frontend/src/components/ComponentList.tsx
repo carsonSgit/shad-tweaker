@@ -2,7 +2,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useMemo, useState } from 'react';
 import { SYMBOLS, THEME } from '../App.js';
-import type { Component, Screen } from '../types/index.js';
+import type { Component, ComponentLibraryInventoryItem, Screen } from '../types/index.js';
 
 interface ComponentListProps {
   components: Component[];
@@ -40,6 +40,10 @@ export function ComponentList({
   const visibleCount = 10;
   const startIdx = Math.max(0, Math.min(cursor - 4, filteredComponents.length - visibleCount));
   const visibleComponents = filteredComponents.slice(startIdx, startIdx + visibleCount);
+
+  function getLibraryMetadata(component: Component): Partial<ComponentLibraryInventoryItem> {
+    return component as Component & Partial<ComponentLibraryInventoryItem>;
+  }
 
   useInput((input, key) => {
     if (searchMode) {
@@ -174,6 +178,22 @@ export function ComponentList({
 
               {/* Metadata */}
               <Text color={THEME.muted}>{component.metadata.lines} ln</Text>
+
+              {getLibraryMetadata(component).sourceRegistry && (
+                <Text color={THEME.secondary}> {getLibraryMetadata(component).sourceRegistry}</Text>
+              )}
+
+              {getLibraryMetadata(component).primitiveBase && (
+                <Text color={THEME.muted}> {getLibraryMetadata(component).primitiveBase}</Text>
+              )}
+
+              {typeof getLibraryMetadata(component).variantCount === 'number' &&
+                getLibraryMetadata(component).variantCount > 0 && (
+                  <Text color={THEME.primary}>
+                    {' '}
+                    {getLibraryMetadata(component).variantCount} variants
+                  </Text>
+                )}
 
               {/* File indicator for selected */}
               {isSelected && <Text color={THEME.success}> {SYMBOLS.dot}</Text>}
