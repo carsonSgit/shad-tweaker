@@ -1,5 +1,13 @@
 import { type Request, type Response, Router } from 'express';
 import {
+  ComponentLibraryConflictError,
+  ComponentLibraryNotFoundError,
+  ComponentLibraryValidationError,
+  findComponentLibraryDuplicates,
+  getComponentLibraryDetail,
+  listComponentLibrary,
+} from '../services/componentLibrary.js';
+import {
   getCachedComponents,
   getComponentByName,
   getComponentsWithContent,
@@ -10,6 +18,68 @@ import { logger } from '../utils/logger.js';
 import { validateCustomPath } from '../utils/validation.js';
 
 const router = Router();
+
+function componentLibraryErrorResponse(error: unknown, fallback: string) {
+  if (error instanceof ComponentLibraryNotFoundError) {
+    return { status: 404, message: error.message, code: error.code };
+  }
+  if (error instanceof ComponentLibraryValidationError) {
+    return { status: 400, message: error.message, code: error.code };
+  }
+  if (error instanceof ComponentLibraryConflictError) {
+    return { status: 409, message: error.message, code: error.code };
+  }
+  const message = error instanceof Error ? error.message : fallback;
+  return { status: 500, message, code: 'COMPONENT_LIBRARY_ERROR' };
+}
+
+router.get('/library/inventory', async (_req: Request, res: Response) => {
+  try {
+    res.json({ components: await listComponentLibrary(getWorkingDirectory()) });
+  } catch (error) {
+    logger.error('Failed to list component library inventory', error);
+    const response = componentLibraryErrorResponse(error, 'Failed to list component library');
+    res.status(response.status).json({
+      success: false,
+      error: {
+        message: response.message,
+        code: response.code,
+      },
+    });
+  }
+});
+
+router.get('/library/duplicates', async (_req: Request, res: Response) => {
+  try {
+    res.json({ duplicates: await findComponentLibraryDuplicates(getWorkingDirectory()) });
+  } catch (error) {
+    logger.error('Failed to detect component library duplicates', error);
+    const response = componentLibraryErrorResponse(error, 'Failed to detect duplicates');
+    res.status(response.status).json({
+      success: false,
+      error: {
+        message: response.message,
+        code: response.code,
+      },
+    });
+  }
+});
+
+router.get('/library/detail/:identifier', async (req: Request, res: Response) => {
+  try {
+    res.json({ component: await getComponentLibraryDetail(getWorkingDirectory(), req.params.identifier) });
+  } catch (error) {
+    logger.error(`Failed to get component library detail: ${req.params.identifier}`, error);
+    const response = componentLibraryErrorResponse(error, 'Failed to get component detail');
+    res.status(response.status).json({
+      success: false,
+      error: {
+        message: response.message,
+        code: response.code,
+      },
+    });
+  }
+});
 
 router.get('/scan', async (req: Request, res: Response) => {
   try {
