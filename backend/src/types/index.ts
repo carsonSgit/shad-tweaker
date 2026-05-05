@@ -132,6 +132,50 @@ export interface WorkspaceComponent {
   metadata?: ComponentMetadata;
 }
 
+export type ComponentDependencyStatus = 'none' | 'ok' | 'missing';
+
+export interface ComponentLibraryInventoryItem {
+  name: string;
+  path: string;
+  sourceRegistry?: string;
+  primitiveBase?: string;
+  variantCount: number;
+  lastModified: string;
+  dependencyStatus: ComponentDependencyStatus;
+  tokenUsage: string[];
+  filePath: string;
+}
+
+export interface ComponentLibraryDetail extends ComponentLibraryInventoryItem {
+  content: string;
+  exports: string[];
+  dependencies: RegistryDependency[];
+  localComponentName?: string;
+  originalComponentName?: string;
+}
+
+export interface ComponentLibraryDuplicate {
+  type: 'name' | 'export' | 'dependency';
+  value: string;
+  componentPaths: string[];
+  suggestedNames: string[];
+}
+
+export interface ComponentLibraryCompareResult {
+  name: string;
+  path: string;
+  sourcePath?: string;
+  changed: boolean;
+  diff: string;
+}
+
+export interface ComponentLibraryActionResult {
+  success: true;
+  component: ComponentLibraryDetail;
+  previousPath?: string;
+  newPath?: string;
+}
+
 export interface ComponentPackage {
   id: string;
   name: string;
