@@ -1,6 +1,8 @@
 import path from 'node:path';
 import fs from 'fs-extra';
 import type {
+  ComponentLibraryActionResult,
+  ComponentLibraryCompareResult,
   ComponentLibraryDetail,
   ComponentLibraryDuplicate,
   ComponentLibraryInventoryItem,
@@ -10,7 +12,7 @@ import type {
 import { isSafeProjectRelativePath } from '../utils/paths.js';
 import { parseComponentSource } from './parser.js';
 import { findComponentDirectory } from './scanner.js';
-import { loadWorkspaceManifest } from './workspace.js';
+import { loadWorkspaceManifest, saveWorkspaceManifest } from './workspace.js';
 
 const SUPPORTED_COMPONENT_EXTENSIONS = new Set(['.tsx', '.jsx']);
 const TOKEN_PATTERN = /\b(?:bg|text|border|ring|shadow|fill|stroke|from|via|to)-[a-z0-9-:/[\].%]+/g;
@@ -240,4 +242,170 @@ function addDuplicateCandidate(
 function suggestedNames(value: string): string[] {
   const base = toKebabCase(value);
   return ['linear', 'minimal', 'acme'].map((suffix) => `${base}-${suffix}`);
+}
+
+async function resolveDetailFile(cwd: string, identifier: string): Promise<ComponentFile> {
+  const files = await readComponentFiles(cwd);
+  const normalized = isSafeProjectRelativePath(identifier)
+    ? identifier.replace(/\\/g, '/').replace(/^\.\//, '')
+    : '';
+  const file = files.find(
+    (candidate) =>
+      candidate.relativePath === normalized ||
+      toComponentName(candidate.relativePath) === identifier ||
+      candidate.manifestComponent?.name === identifier
+  );
+  if (!file) throw new ComponentLibraryNotFoundError(`Component not found: ${identifier}`);
+  return file;
+}
+
+export async function renameComponentLibraryItem(
+  cwd: string,
+  identifier: string,
+  newName: string
+): Promise<ComponentLibraryActionResult> {
+  const file = await resolveDetailFile(cwd, identifier);
+  const normalizedName = normalizeComponentName(newName);
+  const newRelativePath = path
+    .join(path.dirname(file.relativePath), `${normalizedName}${path.extname(file.relativePath)}`)
+    .replace(/\\/g, '/');
+  const newAbsolutePath = path.join(cwd, ensureSafeRelativePath(newRelativePath));
+
+  if ((await fs.pathExists(newAbsolutePath)) && newAbsolutePath !== file.absolutePath) {
+    throw new ComponentLibraryConflictError(`Component already exists: ${newRelativePath}`);
+  }
+
+  await fs.move(file.absolutePath, newAbsolutePath, { overwrite: false });
+  await updateManifestComponentPath(cwd, file.relativePath, newRelativePath, normalizedName);
+
+  return {
+    success: true,
+    component: await getComponentLibraryDetail(cwd, newRelativePath),
+    previousPath: file.relativePath,
+    newPath: newRelativePath,
+  };
+}
+
+export async function forkComponentLibraryItem(
+  cwd: string,
+  identifier: string,
+  newName: string
+): Promise<ComponentLibraryActionResult> {
+  const file = await resolveDetailFile(cwd, identifier);
+  const normalizedName = normalizeComponentName(newName);
+  const newRelativePath = path
+    .join(path.dirname(file.relativePath), `${normalizedName}${path.extname(file.relativePath)}`)
+    .replace(/\\/g, '/');
+  const newAbsolutePath = path.join(cwd, ensureSafeRelativePath(newRelativePath));
+
+  if (await fs.pathExists(newAbsolutePath)) {
+    throw new ComponentLibraryConflictError(`Component already exists: ${newRelativePath}`);
+  }
+
+  await fs.copyFile(file.absolutePath, newAbsolutePath);
+
+  return {
+    success: true,
+    component: await getComponentLibraryDetail(cwd, newRelativePath),
+    previousPath: file.relativePath,
+    newPath: newRelativePath,
+  };
+}
+
+export async function detachComponentLibraryItem(
+  cwd: string,
+  identifier: string
+): Promise<ComponentLibraryActionResult> {
+  const file = await resolveDetailFile(cwd, identifier);
+  const manifest = await loadWorkspaceManifest(cwd);
+  manifest.components = manifest.components.map((component) => {
+    if (component.path.replace(/\\/g, '/') !== file.relativePath) return component;
+    const { source: _source, ...detached } = component;
+    return detached;
+  });
+  await saveWorkspaceManifest(manifest, cwd);
+
+  return {
+    success: true,
+    component: await getComponentLibraryDetail(cwd, file.relativePath),
+    previousPath: file.relativePath,
+  };
+}
+
+export async function resetComponentLibraryItem(
+  cwd: string,
+  identifier: string
+): Promise<ComponentLibraryActionResult> {
+  const file = await resolveDetailFile(cwd, identifier);
+  const sourcePath = file.manifestComponent?.source?.originalPackageName;
+  if (!sourcePath || !isSafeProjectRelativePath(sourcePath)) {
+    throw new ComponentLibraryValidationError('Component does not have a reset source path.');
+  }
+
+  const absoluteSourcePath = path.join(cwd, sourcePath);
+  if (!(await fs.pathExists(absoluteSourcePath))) {
+    throw new ComponentLibraryNotFoundError(`Reset source not found: ${sourcePath}`);
+  }
+
+  await fs.copyFile(absoluteSourcePath, file.absolutePath);
+
+  return {
+    success: true,
+    component: await getComponentLibraryDetail(cwd, file.relativePath),
+    previousPath: file.relativePath,
+  };
+}
+
+export async function compareComponentLibraryItem(
+  cwd: string,
+  identifier: string
+): Promise<ComponentLibraryCompareResult> {
+  const file = await resolveDetailFile(cwd, identifier);
+  const sourcePath = file.manifestComponent?.source?.originalPackageName;
+  if (!sourcePath || !isSafeProjectRelativePath(sourcePath)) {
+    return {
+      name: toComponentName(file.relativePath),
+      path: file.relativePath,
+      changed: true,
+      diff: file.content,
+    };
+  }
+
+  const absoluteSourcePath = path.join(cwd, sourcePath);
+  const sourceContent = (await fs.pathExists(absoluteSourcePath))
+    ? await fs.readFile(absoluteSourcePath, 'utf-8')
+    : '';
+
+  return {
+    name: toComponentName(file.relativePath),
+    path: file.relativePath,
+    sourcePath,
+    changed: sourceContent !== file.content,
+    diff: sourceContent === file.content ? '' : file.content,
+  };
+}
+
+async function updateManifestComponentPath(
+  cwd: string,
+  previousPath: string,
+  newPath: string,
+  newName: string
+): Promise<void> {
+  const manifest = await loadWorkspaceManifest(cwd);
+  manifest.components = manifest.components.map((component) => {
+    if (component.path.replace(/\\/g, '/') !== previousPath) return component;
+    return {
+      ...component,
+      id: newName,
+      name: newName,
+      path: newPath,
+      source: component.source
+        ? {
+            ...component.source,
+            localComponentName: newName,
+          }
+        : undefined,
+    };
+  });
+  await saveWorkspaceManifest(manifest, cwd);
 }
