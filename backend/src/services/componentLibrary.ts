@@ -223,11 +223,11 @@ export async function findComponentLibraryDuplicates(
 
   return [...groups.entries()]
     .filter(([, group]) => group.paths.length > 1)
-    .map(([value, group]) => ({
+    .map(([key, group]) => ({
       type: group.type,
-      value,
+      value: key.slice(group.type.length + 1),
       componentPaths: group.paths,
-      suggestedNames: suggestedNames(value),
+      suggestedNames: suggestedNames(key.slice(group.type.length + 1)),
     }));
 }
 
