@@ -22,7 +22,6 @@ async function createTempRoot(): Promise<string> {
   const root = path.join(testWorkspaceBase, randomUUID());
   tempRoots.push(root);
   await fs.ensureDir(path.join(root, 'components/ui'));
-  process.env.SHADCN_TWEAKER_CWD = root;
   return root;
 }
 
