@@ -2,7 +2,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useMemo, useState } from 'react';
 import { SYMBOLS, THEME } from '../App.js';
-import type { Component, Screen } from '../types/index.js';
+import type { Component, ComponentLibraryInventoryItem, Screen } from '../types/index.js';
 
 interface ComponentListProps {
   components: Component[];
@@ -40,6 +40,10 @@ export function ComponentList({
   const visibleCount = 10;
   const startIdx = Math.max(0, Math.min(cursor - 4, filteredComponents.length - visibleCount));
   const visibleComponents = filteredComponents.slice(startIdx, startIdx + visibleCount);
+
+  function getLibraryMetadata(component: Component): Partial<ComponentLibraryInventoryItem> {
+    return component as Component & Partial<ComponentLibraryInventoryItem>;
+  }
 
   useInput((input, key) => {
     if (searchMode) {
@@ -145,6 +149,7 @@ export function ComponentList({
           const actualIdx = startIdx + idx;
           const isSelected = selectedPaths.has(component.path);
           const isCursor = actualIdx === cursor;
+          const libraryMetadata = getLibraryMetadata(component);
 
           return (
             <Box key={component.path}>
@@ -174,6 +179,21 @@ export function ComponentList({
 
               {/* Metadata */}
               <Text color={THEME.muted}>{component.metadata.lines} ln</Text>
+
+              {libraryMetadata.sourceRegistry && (
+                <Text color={THEME.secondary}> {libraryMetadata.sourceRegistry}</Text>
+              )}
+
+              {libraryMetadata.primitiveBase && (
+                <Text color={THEME.muted}> {libraryMetadata.primitiveBase}</Text>
+              )}
+
+              {typeof libraryMetadata.variantCount === 'number' &&
+                libraryMetadata.variantCount > 0 && (
+                  <Text color={THEME.primary}>
+                    {' '}{libraryMetadata.variantCount} variants
+                  </Text>
+                )}
 
               {/* File indicator for selected */}
               {isSelected && <Text color={THEME.success}> {SYMBOLS.dot}</Text>}
