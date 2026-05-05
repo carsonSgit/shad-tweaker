@@ -18,6 +18,43 @@ export interface ComponentDetail extends Component {
   classes: string[];
 }
 
+export type ComponentDependencyStatus = 'none' | 'ok' | 'missing';
+
+export interface ComponentLibraryInventoryItem {
+  name: string;
+  path: string;
+  sourceRegistry?: string;
+  primitiveBase?: string;
+  variantCount: number;
+  lastModified: string;
+  dependencyStatus: ComponentDependencyStatus;
+  tokenUsage: string[];
+  filePath: string;
+}
+
+export interface ComponentLibraryDetail extends ComponentLibraryInventoryItem {
+  content: string;
+  exports: string[];
+  dependencies: Array<{ name: string; type: string; version?: string; source?: string }>;
+  localComponentName?: string;
+  originalComponentName?: string;
+}
+
+export interface ComponentLibraryDuplicate {
+  type: 'name' | 'export' | 'dependency';
+  value: string;
+  componentPaths: string[];
+  suggestedNames: string[];
+}
+
+export interface ComponentLibraryCompareResult {
+  name: string;
+  path: string;
+  sourcePath?: string;
+  changed: boolean;
+  diff: string;
+}
+
 export interface Preview {
   path: string;
   before: string;
