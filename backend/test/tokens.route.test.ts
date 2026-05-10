@@ -262,6 +262,24 @@ describe('token routes', () => {
     assert.match(content, /rounded-md/);
   });
 
+  it('returns 400 for patch apply input paths that cannot be resolved', async () => {
+    await createTempRoot();
+    const tokenSet = await createTokenSet({ name: 'Missing Apply Path Tokens' });
+
+    const apply = await request(app)
+      .post('/api/tokens/patch/apply')
+      .send({
+        tokenSetId: tokenSet.id,
+        componentPaths: ['components/ui/missing.tsx'],
+        changes: [{ category: 'radius', from: 'rounded-md', to: 'rounded-lg' }],
+        createBackup: false,
+      });
+
+    assert.equal(apply.status, 400);
+    assert.equal(apply.body.success, false);
+    assert.match(apply.body.errors[0].error, /could not be resolved/);
+  });
+
   it('returns frequency and inconsistency reports', async () => {
     const root = await createTempRoot();
     await writeComponent(root, 'components/ui/a.tsx', '<div className="rounded-md p-4" />');

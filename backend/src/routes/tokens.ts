@@ -47,6 +47,37 @@ function isTokenSetConflict(error: unknown): boolean {
   return error instanceof TokenSetConflictError;
 }
 
+async function getValidatedComponentPath(
+  value: unknown
+): Promise<{ valid: boolean; value?: string; error?: string }> {
+  return validateTokenComponentPath(value, getWorkingDirectory());
+}
+
+async function sendComponentOverridesForPath(
+  res: Response,
+  componentPathValue: unknown,
+  overridesValue?: unknown
+): Promise<void> {
+  const validation = await getValidatedComponentPath(componentPathValue);
+  if (!validation.valid || !validation.value) {
+    sendValidation(res, validation.error || 'Invalid component path');
+    return;
+  }
+
+  if (overridesValue === undefined) {
+    res.json({ success: true, overrides: await getComponentOverrides(validation.value) });
+    return;
+  }
+
+  const overrides = validateComponentTokenOverrides(overridesValue);
+  if (!overrides) {
+    sendValidation(res, 'Invalid overrides payload');
+    return;
+  }
+
+  await sendComponentOverrides(res, validation.value, overrides);
+}
+
 function validateTokenMap(value: unknown): DesignTokenMap | null {
   const map = { ...createEmptyTokenMap() };
   if (value === undefined) {
@@ -398,7 +429,7 @@ router.post('/patch/apply', async (req: Request, res: Response) => {
       recordOverrides:
         typeof req.body.recordOverrides === 'boolean' ? req.body.recordOverrides : false,
     });
-    res.status(result.success ? 200 : 500).json(result);
+    res.status(result.success ? 200 : 400).json(result);
   } catch (error) {
     logger.error('Failed to apply token patch', error);
     sendServerError(res, 'Failed to apply token patch', 'TOKEN_PATCH_APPLY_ERROR');
@@ -407,12 +438,7 @@ router.post('/patch/apply', async (req: Request, res: Response) => {
 
 router.get('/components/overrides', async (req: Request, res: Response) => {
   try {
-    const validation = validateTokenComponentPath(req.query.componentPath, getWorkingDirectory());
-    if (!validation.valid || !validation.value) {
-      sendValidation(res, validation.error || 'Invalid component path');
-      return;
-    }
-    res.json({ success: true, overrides: await getComponentOverrides(validation.value) });
+    await sendComponentOverridesForPath(res, req.query.componentPath);
   } catch (error) {
     logger.error('Failed to get component token overrides', error);
     sendServerError(res, 'Failed to get component token overrides', 'TOKEN_OVERRIDES_GET_ERROR');
@@ -421,13 +447,7 @@ router.get('/components/overrides', async (req: Request, res: Response) => {
 
 router.put('/components/overrides', async (req: Request, res: Response) => {
   try {
-    const validation = validateTokenComponentPath(req.body?.componentPath, getWorkingDirectory());
-    const overrides = validateComponentTokenOverrides(req.body?.overrides);
-    if (!validation.valid || !validation.value || !overrides) {
-      sendValidation(res, validation.error || 'Invalid overrides payload');
-      return;
-    }
-    await sendComponentOverrides(res, validation.value, overrides);
+    await sendComponentOverridesForPath(res, req.body?.componentPath, req.body?.overrides);
   } catch (error) {
     logger.error('Failed to update component token overrides', error);
     sendServerError(
@@ -440,12 +460,7 @@ router.put('/components/overrides', async (req: Request, res: Response) => {
 
 router.get('/components/:componentPath/overrides', async (req: Request, res: Response) => {
   try {
-    const validation = validateTokenComponentPath(req.params.componentPath, getWorkingDirectory());
-    if (!validation.valid || !validation.value) {
-      sendValidation(res, validation.error || 'Invalid component path');
-      return;
-    }
-    res.json({ success: true, overrides: await getComponentOverrides(validation.value) });
+    await sendComponentOverridesForPath(res, req.params.componentPath);
   } catch (error) {
     logger.error('Failed to get component token overrides', error);
     sendServerError(res, 'Failed to get component token overrides', 'TOKEN_OVERRIDES_GET_ERROR');
@@ -454,13 +469,7 @@ router.get('/components/:componentPath/overrides', async (req: Request, res: Res
 
 router.put('/components/:componentPath/overrides', async (req: Request, res: Response) => {
   try {
-    const validation = validateTokenComponentPath(req.params.componentPath, getWorkingDirectory());
-    const overrides = validateComponentTokenOverrides(req.body?.overrides);
-    if (!validation.valid || !validation.value || !overrides) {
-      sendValidation(res, validation.error || 'Invalid overrides payload');
-      return;
-    }
-    await sendComponentOverrides(res, validation.value, overrides);
+    await sendComponentOverridesForPath(res, req.params.componentPath, req.body?.overrides);
   } catch (error) {
     logger.error('Failed to update component token overrides', error);
     sendServerError(

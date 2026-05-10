@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import fs from 'fs-extra';
@@ -58,6 +59,15 @@ afterEach(async () => {
 });
 
 describe('token service', () => {
+  async function removeTokenTempDirs(): Promise<void> {
+    const entries = await fs.readdir(os.tmpdir()).catch(() => []);
+    await Promise.all(
+      entries
+        .filter((entry) => entry.startsWith('shadcn-tweaker-token-'))
+        .map((entry) => fs.remove(path.join(os.tmpdir(), entry)))
+    );
+  }
+
   it('creates, updates, lists, and deletes token sets', async () => {
     await createTempRoot();
     const tokens = createEmptyTokenMap();
@@ -266,7 +276,25 @@ export function Button() {
     assert.match(after, /rounded-md/);
   });
 
+  it('skips oversized files when previewing patches', async () => {
+    const root = await createTempRoot();
+    const filePath = await writeComponent(
+      root,
+      'components/ui/large-preview.tsx',
+      `<div className="rounded-md">${'x'.repeat(1024 * 1024)}</div>`
+    );
+
+    const preview = await previewTokenPatch(
+      [filePath],
+      [{ category: 'radius', from: 'rounded-md', to: 'rounded-lg' }]
+    );
+
+    assert.equal(preview.totalChanges, 0);
+    assert.equal(preview.previews.length, 0);
+  });
+
   it('applies patches with backups and records overrides only on success', async () => {
+    await removeTokenTempDirs();
     const root = await createTempRoot();
     const filePath = await writeComponent(
       root,
@@ -289,6 +317,30 @@ export function Button() {
     assert.ok(result.backupId);
     assert.match(content, /rounded-lg/);
     assert.equal(overrides[0].overrides.radius?.card, 'rounded-lg');
+    assert.deepEqual(
+      (await fs.readdir(os.tmpdir())).filter((entry) => entry.startsWith('shadcn-tweaker-token-')),
+      []
+    );
+  });
+
+  it('reports oversized files when applying patches', async () => {
+    const root = await createTempRoot();
+    const filePath = await writeComponent(
+      root,
+      'components/ui/large-apply.tsx',
+      `<div className="rounded-md">${'x'.repeat(1024 * 1024)}</div>`
+    );
+    const tokenSet = await createTokenSet({ name: 'Large Patch Tokens' });
+
+    const result = await applyTokenPatch({
+      tokenSetId: tokenSet.id,
+      componentPaths: [filePath],
+      changes: [{ category: 'radius', from: 'rounded-md', to: 'rounded-lg' }],
+      createBackup: false,
+    });
+
+    assert.equal(result.success, false);
+    assert.match(result.errors?.[0].error ?? '', /exceeds/);
   });
 
   it('does not create a backup for no-op patches', async () => {

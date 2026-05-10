@@ -152,6 +152,11 @@ function toProjectRelativeExistingPath(componentPath: string): string | null {
   return relativePath ? relativePath.replace(/\\/g, '/') : null;
 }
 
+async function isTokenComponentFileSizeAllowed(filePath: string): Promise<boolean> {
+  const stats = await fs.stat(filePath);
+  return stats.size <= MAX_TOKEN_COMPONENT_BYTES;
+}
+
 function collectClassesFromContent(componentPath: string, content: string): TokenCandidate[] {
   const parsed = parseComponentSource(componentPath, content);
   const candidates: TokenCandidate[] = [];
@@ -248,8 +253,7 @@ async function readCandidates(componentPaths?: string[]): Promise<TokenCandidate
     if (!safePath) {
       continue;
     }
-    const stats = await fs.stat(safePath);
-    if (stats.size > MAX_TOKEN_COMPONENT_BYTES) {
+    if (!(await isTokenComponentFileSizeAllowed(safePath))) {
       continue;
     }
     const content = await fs.readFile(safePath, 'utf-8');
@@ -462,6 +466,7 @@ export async function createInconsistencyReport(
       category,
       family,
       values: normalizedValues,
+      // Recommend the most common class; ties fall back to lexical order for deterministic output.
       recommendedValue: normalizedValues[0].value,
     });
   }
@@ -502,6 +507,9 @@ export async function previewTokenPatch(
     if (!safePath) {
       continue;
     }
+    if (!(await isTokenComponentFileSizeAllowed(safePath))) {
+      continue;
+    }
     const content = await fs.readFile(safePath, 'utf-8');
     const patched = applyPatchChanges(content, changes);
     if (patched.changes > 0) {
@@ -513,9 +521,12 @@ export async function previewTokenPatch(
   return { previews, totalChanges };
 }
 
-async function tempPathFor(filePath: string): Promise<string> {
+async function tempPathFor(filePath: string): Promise<{ tempDir: string; tempPath: string }> {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'shadcn-tweaker-token-'));
-  return path.join(tempDir, `${crypto.randomUUID()}-${path.basename(filePath)}`);
+  return {
+    tempDir,
+    tempPath: path.join(tempDir, `${crypto.randomUUID()}-${path.basename(filePath)}`),
+  };
 }
 
 export async function applyTokenPatch(options: {
@@ -550,6 +561,13 @@ export async function applyTokenPatch(options: {
 
   for (const componentPath of safePaths) {
     try {
+      if (!(await isTokenComponentFileSizeAllowed(componentPath))) {
+        errors.push({
+          path: componentPath,
+          error: `Component file exceeds ${MAX_TOKEN_COMPONENT_BYTES} bytes`,
+        });
+        continue;
+      }
       const content = await fs.readFile(componentPath, 'utf-8');
       const patched = applyPatchChanges(content, options.changes);
       if (patched.changes === 0) {
@@ -571,10 +589,12 @@ export async function applyTokenPatch(options: {
 
   if (errors.length === 0) {
     for (const plan of patchPlans) {
+      let tempDir: string | undefined;
       try {
         const tmp = await tempPathFor(plan.path);
-        await fs.writeFile(tmp, plan.content, 'utf-8');
-        await fs.move(tmp, plan.path, { overwrite: true });
+        tempDir = tmp.tempDir;
+        await fs.writeFile(tmp.tempPath, plan.content, 'utf-8');
+        await fs.move(tmp.tempPath, plan.path, { overwrite: true });
         modified.push(plan.path);
         totalChanges += plan.changes;
       } catch (error) {
@@ -582,6 +602,10 @@ export async function applyTokenPatch(options: {
           path: plan.path,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
+      } finally {
+        if (tempDir) {
+          await fs.remove(tempDir);
+        }
       }
     }
   }
