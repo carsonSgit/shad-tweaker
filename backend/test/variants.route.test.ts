@@ -169,6 +169,29 @@ describe('variant builder routes', () => {
     assert.match(res.body.error.message, /260 characters or fewer/);
   });
 
+  it('bounds add-axis defaultValue string lengths', async () => {
+    await createTempRoot();
+
+    const res = await request(app)
+      .post('/api/variants/preview')
+      .send({
+        componentPath: 'components/ui/button.tsx',
+        targetDefinition: 'buttonVariants',
+        operation: {
+          type: 'add-axis',
+          axis: {
+            name: 'size',
+            values: [{ name: 'sm', classes: ['h-8'] }],
+          },
+          defaultValue: 'x'.repeat(261),
+        },
+      });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'VARIANT_BUILDER_VALIDATION_ERROR');
+    assert.match(res.body.error.message, /260 characters or fewer/);
+  });
+
   it('rejects traversal-shaped component identifiers', async () => {
     await createTempRoot();
 

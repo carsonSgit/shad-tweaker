@@ -363,6 +363,43 @@ export function Button() { return <button />; }
     assert.equal(after, before);
   });
 
+  it('generates a non-mutating preview for adding a tv value', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'card',
+      `
+import { tv } from "tailwind-variants";
+const card = tv({
+  base: "rounded-lg",
+  variants: {
+    density: {
+      compact: "p-3",
+    },
+  },
+});
+export function Card() { return <section />; }
+`
+    );
+    const absolutePath = path.join(root, relativePath);
+    const before = await fs.readFile(absolutePath, 'utf-8');
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'card',
+      operation: {
+        type: 'add-value',
+        axisName: 'density',
+        value: { name: 'comfortable', classes: ['p-6', 'gap-4'] },
+      },
+    });
+    const after = await fs.readFile(absolutePath, 'utf-8');
+
+    assert.match(preview.after, /comfortable: 'p-6 gap-4'/);
+    assert.match(preview.diff, /comfortable/);
+    assert.equal(after, before);
+  });
+
   it('escapes single quotes in generated preview literals', async () => {
     const root = await createTempRoot();
     const relativePath = await writeComponent(

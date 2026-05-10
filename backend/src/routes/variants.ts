@@ -109,7 +109,9 @@ function readPreviewOperation(value: unknown): VariantPreviewOperation {
       type: 'add-axis',
       axis: readAxis(operation.axis),
       defaultValue:
-        typeof operation.defaultValue === 'string' ? operation.defaultValue.trim() : undefined,
+        typeof operation.defaultValue === 'string'
+          ? readString(operation.defaultValue, 'defaultValue', MAX_PREVIEW_IDENTIFIER_LENGTH)
+          : undefined,
     };
   }
   if (operation.type === 'add-value') {
