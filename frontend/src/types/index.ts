@@ -26,6 +26,7 @@ export interface ComponentLibraryInventoryItem {
   sourceRegistry?: string;
   primitiveBase?: string;
   variantCount: number;
+  variants?: VariantComponentSummary;
   lastModified: string;
   dependencyStatus: ComponentDependencyStatus;
   tokenUsage: string[];
@@ -146,6 +147,83 @@ export interface TokenPatchChange {
   from: string;
   to: string;
   tokenName?: string;
+}
+
+export type VariantSystemKind = 'cva' | 'tv' | 'manual' | 'unsupported';
+
+export interface VariantValue {
+  name: string;
+  classes: string[];
+}
+
+export interface VariantAxis {
+  name: string;
+  values: VariantValue[];
+  defaultValue?: string;
+}
+
+export interface VariantDefinitionDetail {
+  name: string;
+  system: VariantSystemKind;
+  line?: number;
+  baseClasses: string[];
+  axes: VariantAxis[];
+  compoundVariants: Array<{
+    conditions: Record<string, string>;
+    classes: string[];
+  }>;
+  raw?: string;
+  diagnostics: Array<{
+    severity: 'info' | 'warning' | 'error';
+    code: string;
+    message: string;
+    line?: number;
+  }>;
+}
+
+export interface VariantComponentSummary {
+  name: string;
+  path: string;
+  variantCount: number;
+  systems: VariantSystemKind[];
+  axes: string[];
+}
+
+export interface VariantComponentDetail extends VariantComponentSummary {
+  definitions: VariantDefinitionDetail[];
+  diagnostics: Array<{
+    severity: 'info' | 'warning' | 'error';
+    code: string;
+    message: string;
+    line?: number;
+  }>;
+}
+
+export type VariantPreviewOperation =
+  | {
+      type: 'add-axis';
+      axis: VariantAxis;
+      defaultValue?: string;
+    }
+  | {
+      type: 'add-value';
+      axisName: string;
+      value: VariantValue;
+    }
+  | {
+      type: 'set-default';
+      axisName: string;
+      valueName: string;
+    };
+
+export interface VariantGenerationPreview {
+  componentPath: string;
+  targetDefinition: string;
+  operation: VariantPreviewOperation;
+  before: string;
+  after: string;
+  diff: string;
+  changes: number;
 }
 
 export interface TemplateRule {
