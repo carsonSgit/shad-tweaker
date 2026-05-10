@@ -74,6 +74,8 @@ export function Button() {
     assert.equal(inventory[0].path, 'components/ui/button.tsx');
     assert.equal(inventory[0].primitiveBase, 'radix:dialog');
     assert.equal(inventory[0].variantCount, 1);
+    assert.deepEqual(inventory[0].variants?.systems, ['cva']);
+    assert.deepEqual(inventory[0].variants?.axes, ['size']);
     assert.equal(inventory[0].dependencyStatus, 'ok');
     assert.ok(inventory[0].tokenUsage.includes('bg-primary'));
   });

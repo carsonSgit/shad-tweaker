@@ -8,6 +8,8 @@ import type {
   ComponentLibraryDetail,
   ComponentLibraryDuplicate,
   ComponentLibraryInventoryItem,
+  VariantComponentSummary,
+  VariantSystemKind,
   RegistryDependency,
   WorkspaceComponent,
 } from '../types/index.js';
@@ -222,16 +224,37 @@ function isPackageImport(value: string): boolean {
 function toInventoryItem(file: ComponentFile): ComponentLibraryInventoryItem {
   const parsed = parseComponentSource(file.relativePath, file.content);
   const dependencies = getDependencies(file.content, file.manifestComponent);
+  const name = file.manifestComponent?.name ?? toComponentName(file.relativePath);
+  const variantSummary = toVariantSummary(name, file.relativePath, parsed.variantDefinitions);
 
   return {
-    name: file.manifestComponent?.name ?? toComponentName(file.relativePath),
+    name,
     path: file.relativePath,
     sourceRegistry: file.manifestComponent?.source?.originRegistry,
     primitiveBase: getPrimitiveBase(file.content),
     variantCount: parsed.variantDefinitions.length,
+    variants: variantSummary,
     lastModified: file.stats.mtime.toISOString(),
     dependencyStatus: dependencies.length > 0 ? 'ok' : 'none',
     tokenUsage: getTokenUsage(file.content),
+  };
+}
+
+function toVariantSummary(
+  name: string,
+  componentPath: string,
+  definitions: ReturnType<typeof parseComponentSource>['variantDefinitions']
+): VariantComponentSummary {
+  return {
+    name,
+    path: componentPath,
+    variantCount: definitions.length,
+    systems: [...new Set(definitions.map((definition) => definition.callee as VariantSystemKind))],
+    axes: [
+      ...new Set(
+        definitions.flatMap((definition) => Object.keys(definition.variants))
+      ),
+    ],
   };
 }
 
