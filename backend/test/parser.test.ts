@@ -59,13 +59,27 @@ describe('component parser service', () => {
     assert.equal(cvaDefinition.callee, 'cva');
     assert.equal(cvaDefinition.baseClasses.includes('inline-flex'), true);
     assert.deepEqual(cvaDefinition.variants, {
-      variant: ['default', 'destructive', 'outline'],
-      size: ['default', 'sm', 'icon'],
+      variant: {
+        default: ['bg-primary', 'text-primary-foreground'],
+        destructive: ['bg-destructive', 'text-destructive-foreground'],
+        outline: ['border', 'border-input', 'bg-background'],
+      },
+      size: {
+        default: ['h-10', 'px-4', 'py-2'],
+        sm: ['h-9', 'rounded-md', 'px-3'],
+        icon: ['h-10', 'w-10'],
+      },
     });
     assert.deepEqual(cvaDefinition.defaultVariants, {
       variant: 'default',
       size: 'default',
     });
+    assert.deepEqual(cvaDefinition.compoundVariants, [
+      {
+        conditions: { variant: 'outline', size: 'sm' },
+        classes: ['border-primary', 'px-2'],
+      },
+    ]);
   });
 
   it('extracts tailwind-variants definitions and unsupported dynamic className diagnostics', async () => {
@@ -80,8 +94,14 @@ describe('component parser service', () => {
     assert.equal(tvDefinition.callee, 'tv');
     assert.equal(tvDefinition.baseClasses.includes('rounded-lg'), true);
     assert.deepEqual(tvDefinition.variants, {
-      density: ['compact', 'comfortable'],
-      tone: ['neutral', 'brand'],
+      density: {
+        compact: ['p-3', 'gap-2'],
+        comfortable: ['p-6', 'gap-4'],
+      },
+      tone: {
+        neutral: ['border-border'],
+        brand: ['border-primary/40'],
+      },
     });
     assert.deepEqual(tvDefinition.defaultVariants, {
       density: 'comfortable',

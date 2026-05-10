@@ -8,6 +8,7 @@ import parserRouter from './routes/parser.js';
 import primitiveStartersRouter from './routes/primitiveStarters.js';
 import templatesRouter from './routes/templates.js';
 import tokensRouter from './routes/tokens.js';
+import variantsRouter from './routes/variants.js';
 import workspaceRouter from './routes/workspace.js';
 import { initializeDefaultTemplates } from './services/template.js';
 import { initializeWorkspace } from './services/workspace.js';
@@ -53,6 +54,7 @@ app.use('/api/parser', parserRouter);
 app.use('/api/imports', importsRouter);
 app.use('/api/primitive-starters', primitiveStartersRouter);
 app.use('/api/tokens', tokensRouter);
+app.use('/api/variants', variantsRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', err);
@@ -114,6 +116,9 @@ async function start() {
       logger.info('  POST /api/tokens/patch/apply - Apply token patch');
       logger.info('  GET  /api/tokens/components/overrides - Get token overrides');
       logger.info('  PUT  /api/tokens/components/overrides - Update token overrides');
+      logger.info('  GET  /api/variants/components - List component variant summaries');
+      logger.info('  GET  /api/variants/components/:identifier - Get component variant detail');
+      logger.info('  POST /api/variants/preview - Preview variant generation');
       logger.info('  GET  /api/templates - List templates');
       logger.info('  POST /api/templates - Create template');
       logger.info('  DELETE /api/templates/:id - Delete template');

@@ -140,6 +140,7 @@ export interface ComponentLibraryInventoryItem {
   sourceRegistry?: string;
   primitiveBase?: string;
   variantCount: number;
+  variants: VariantComponentSummary;
   lastModified: string;
   dependencyStatus: ComponentDependencyStatus;
   tokenUsage: string[];
@@ -317,6 +318,79 @@ export interface VariantRecipe {
   values: Record<string, string>;
 }
 
+// `unsupported` is reserved for variant-like definitions that future transform workflows can surface.
+export type VariantSystemKind = 'cva' | 'tv' | 'manual' | 'unsupported';
+
+export interface VariantValue {
+  name: string;
+  classes: string[];
+}
+
+export interface VariantAxis {
+  name: string;
+  values: VariantValue[];
+  defaultValue?: string;
+}
+
+export interface VariantDefinitionDetail {
+  name: string;
+  system: VariantSystemKind;
+  line?: number;
+  baseClasses: string[];
+  axes: VariantAxis[];
+  compoundVariants: Array<{
+    conditions: Record<string, string>;
+    classes: string[];
+  }>;
+  raw?: string;
+  rawStart?: number;
+  rawEnd?: number;
+  diagnostics: ParserDiagnostic[];
+}
+
+export interface VariantComponentSummary {
+  name: string;
+  path: string;
+  variantCount: number;
+  systems: VariantSystemKind[];
+  axes: string[];
+}
+
+export interface VariantComponentDetail extends VariantComponentSummary {
+  definitions: VariantDefinitionDetail[];
+  diagnostics: ParserDiagnostic[];
+}
+
+export type VariantPreviewOperation =
+  | {
+      type: 'add-axis';
+      axis: VariantAxis;
+      defaultValue?: string;
+    }
+  | {
+      type: 'add-value';
+      axisName: string;
+      value: VariantValue;
+    }
+  | {
+      type: 'set-default';
+      axisName: string;
+      valueName: string;
+    };
+
+export interface VariantGenerationPreview {
+  componentPath: string;
+  targetDefinition: string;
+  operation: VariantPreviewOperation;
+  // Full raw source before the preview operation, intended for preview/debug display.
+  before: string;
+  // Full raw source after the preview operation, intended for preview/debug display.
+  after: string;
+  diff: string;
+  // Estimated positional changed-line count; insertions/deletions can shift later lines.
+  changes: number;
+}
+
 export interface Preset {
   id: string;
   name: string;
@@ -470,9 +544,15 @@ export interface ParsedVariantDefinition {
   callee: 'cva' | 'tv';
   line: number;
   baseClasses: string[];
-  variants: Record<string, string[]>;
+  variants: Record<string, Record<string, string[]>>;
   defaultVariants: Record<string, string>;
+  compoundVariants: Array<{
+    conditions: Record<string, string>;
+    classes: string[];
+  }>;
   raw: string;
+  rawStart: number;
+  rawEnd: number;
 }
 
 export interface ParserDiagnostic {

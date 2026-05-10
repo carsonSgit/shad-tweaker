@@ -55,6 +55,15 @@ export function parseComponentSource(filePath: string, content: string): ParsedC
     language === 'jsx' ? ts.ScriptKind.JSX : ts.ScriptKind.TSX
   );
 
+  return parseComponentSourceFile(filePath, sourceFile, language);
+}
+
+export function parseComponentSourceFile(
+  filePath: string,
+  sourceFile: ts.SourceFile,
+  language: ParsedComponentFile['language'] = 'tsx'
+): ParsedComponentFile {
+  const extension = path.extname(filePath).toLowerCase();
   const imports: ParsedImport[] = [];
   const exports: ParsedExport[] = [];
   const components: ParsedComponent[] = [];
@@ -369,7 +378,10 @@ function parseVariantDefinition(
     baseClasses,
     variants: config ? parseVariantsObject(config) : {},
     defaultVariants: config ? parseDefaultVariants(config, sourceFile) : {},
+    compoundVariants: config ? parseCompoundVariants(config, sourceFile) : [],
     raw: node.getText(sourceFile),
+    rawStart: node.getStart(sourceFile),
+    rawEnd: node.getEnd(),
   };
 }
 
@@ -395,7 +407,9 @@ function getVariantConfigObject(
   return argument && ts.isObjectLiteralExpression(argument) ? argument : null;
 }
 
-function parseVariantsObject(config: ts.ObjectLiteralExpression): Record<string, string[]> {
+function parseVariantsObject(
+  config: ts.ObjectLiteralExpression
+): Record<string, Record<string, string[]>> {
   const variantsProperty = findProperty(config, 'variants');
   if (
     !variantsProperty?.initializer ||
@@ -404,7 +418,7 @@ function parseVariantsObject(config: ts.ObjectLiteralExpression): Record<string,
     return {};
   }
 
-  const variants: Record<string, string[]> = {};
+  const variants: Record<string, Record<string, string[]>> = {};
   for (const property of variantsProperty.initializer.properties) {
     if (!ts.isPropertyAssignment(property) || !ts.isObjectLiteralExpression(property.initializer)) {
       continue;
@@ -413,13 +427,56 @@ function parseVariantsObject(config: ts.ObjectLiteralExpression): Record<string,
     const axisName = getPropertyName(property.name);
     if (!axisName) continue;
 
-    variants[axisName] = property.initializer.properties
-      .filter(ts.isPropertyAssignment)
-      .map((variantProperty) => getPropertyName(variantProperty.name))
-      .filter((value): value is string => Boolean(value));
+    variants[axisName] = {};
+    for (const variantProperty of property.initializer.properties) {
+      if (!ts.isPropertyAssignment(variantProperty)) continue;
+      const valueName = getPropertyName(variantProperty.name);
+      if (!valueName) continue;
+      variants[axisName][valueName] = collectStringLiterals([variantProperty.initializer]).flatMap(
+        splitClasses
+      );
+    }
   }
 
   return variants;
+}
+
+function parseCompoundVariants(
+  config: ts.ObjectLiteralExpression,
+  sourceFile: ts.SourceFile
+): ParsedVariantDefinition['compoundVariants'] {
+  const compoundVariantsProperty = findProperty(config, 'compoundVariants');
+  if (
+    !compoundVariantsProperty?.initializer ||
+    !ts.isArrayLiteralExpression(compoundVariantsProperty.initializer)
+  ) {
+    return [];
+  }
+
+  const compoundVariants: ParsedVariantDefinition['compoundVariants'] = [];
+  for (const element of compoundVariantsProperty.initializer.elements) {
+    if (!ts.isObjectLiteralExpression(element)) continue;
+    const conditions: Record<string, string> = {};
+    const classes: string[] = [];
+
+    for (const property of element.properties) {
+      if (!ts.isPropertyAssignment(property)) continue;
+      const name = getPropertyName(property.name);
+      if (!name) continue;
+      if (name === 'class' || name === 'className') {
+        classes.push(...collectStringLiterals([property.initializer]).flatMap(splitClasses));
+        continue;
+      }
+      const value = getStaticPropertyValue(property.initializer, sourceFile);
+      if (value) conditions[name] = value;
+    }
+
+    if (Object.keys(conditions).length > 0 || classes.length > 0) {
+      compoundVariants.push({ conditions, classes });
+    }
+  }
+
+  return compoundVariants;
 }
 
 function parseDefaultVariants(
