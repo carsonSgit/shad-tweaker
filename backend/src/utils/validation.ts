@@ -4,6 +4,8 @@ import type {
   BatchActionRequest,
   EditRequest,
   TemplateRule,
+  TokenCategory,
+  TokenPatchChange,
 } from '../types/index.js';
 
 // ============================================
@@ -147,6 +149,123 @@ export function isHttpUrl(value: string): boolean {
 
 export function isSafeRegistryIdentifier(value: string): boolean {
   return value.length > 0 && value.length <= 128 && /^[a-zA-Z0-9_-]+$/.test(value);
+}
+
+// ============================================
+// Token Validation
+// ============================================
+
+export const TOKEN_CATEGORIES: TokenCategory[] = [
+  'colors',
+  'radius',
+  'spacing',
+  'typography',
+  'border',
+  'shadow',
+  'opacity',
+  'zIndex',
+  'motion',
+  'easing',
+  'duration',
+  'breakpoints',
+  'density',
+];
+
+export function isTokenCategory(value: unknown): value is TokenCategory {
+  return typeof value === 'string' && (TOKEN_CATEGORIES as string[]).includes(value);
+}
+
+export function isSafeTokenSetId(value: string): boolean {
+  return value.length > 0 && value.length <= 96 && /^token_set_[a-z0-9][a-z0-9_-]*$/.test(value);
+}
+
+export function isSafeTokenName(value: string): boolean {
+  return value.length > 0 && value.length <= 96 && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(value);
+}
+
+export function validateTokenComponentPath(
+  componentPath: unknown,
+  projectDir: string
+): { valid: boolean; value?: string; error?: string } {
+  if (typeof componentPath !== 'string' || componentPath.trim().length === 0) {
+    return { valid: false, error: 'Component path must be a non-empty string' };
+  }
+
+  const pathValidation = validateComponentPaths([componentPath], projectDir);
+  if (!pathValidation.valid) {
+    return { valid: false, error: pathValidation.error || 'Invalid component path' };
+  }
+
+  return { valid: true, value: componentPath };
+}
+
+export function validateTokenComponentPaths(
+  componentPaths: unknown,
+  projectDir: string,
+  maxItems = 100
+): { valid: boolean; value?: string[]; error?: string } {
+  if (componentPaths === undefined) {
+    return { valid: true, value: undefined };
+  }
+  if (!Array.isArray(componentPaths)) {
+    return { valid: false, error: 'componentPaths must be an array' };
+  }
+  if (componentPaths.length > maxItems) {
+    return { valid: false, error: `componentPaths cannot exceed ${maxItems} items` };
+  }
+  if (!componentPaths.every((componentPath) => typeof componentPath === 'string')) {
+    return { valid: false, error: 'componentPaths must contain only strings' };
+  }
+
+  const pathValidation = validateComponentPaths(componentPaths, projectDir);
+  if (!pathValidation.valid) {
+    return { valid: false, error: pathValidation.error || 'Invalid component paths' };
+  }
+
+  return { valid: true, value: componentPaths };
+}
+
+export function validateTokenPatchChanges(
+  changes: unknown,
+  maxItems = 200
+): { valid: boolean; value?: TokenPatchChange[]; error?: string } {
+  if (!Array.isArray(changes)) {
+    return { valid: false, error: 'changes must be an array' };
+  }
+  if (changes.length > maxItems) {
+    return { valid: false, error: `changes cannot exceed ${maxItems} items` };
+  }
+
+  const normalized: TokenPatchChange[] = [];
+  for (const change of changes) {
+    if (typeof change !== 'object' || change === null) {
+      return { valid: false, error: 'Each change must be an object' };
+    }
+    const candidate = change as Record<string, unknown>;
+    if (!isTokenCategory(candidate.category)) {
+      return { valid: false, error: 'Each change requires a valid category' };
+    }
+    if (typeof candidate.from !== 'string' || candidate.from.trim().length === 0) {
+      return { valid: false, error: 'Each change requires a non-empty from value' };
+    }
+    if (typeof candidate.to !== 'string' || candidate.to.trim().length === 0) {
+      return { valid: false, error: 'Each change requires a non-empty to value' };
+    }
+    if (candidate.tokenName !== undefined) {
+      if (typeof candidate.tokenName !== 'string' || !isSafeTokenName(candidate.tokenName)) {
+        return { valid: false, error: 'tokenName must be a safe token name when provided' };
+      }
+    }
+
+    normalized.push({
+      category: candidate.category,
+      from: candidate.from,
+      to: candidate.to,
+      tokenName: typeof candidate.tokenName === 'string' ? candidate.tokenName : undefined,
+    });
+  }
+
+  return { valid: true, value: normalized };
 }
 
 // ============================================

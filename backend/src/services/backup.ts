@@ -209,7 +209,12 @@ export async function cleanupOldBackups(
   const cleanupOptions = typeof options === 'number' ? { maxBackups: options } : options;
   const { maxBackups, backupRetentionDays } = await getBackupCleanupOptions(cleanupOptions);
   const backups = await listBackups();
-  const retentionCutoff = Date.now() - backupRetentionDays * 24 * 60 * 60 * 1000;
+  const newestBackupTime = backups
+    .map((backup) => new Date(backup.timestamp).getTime())
+    .filter((timestamp) => !Number.isNaN(timestamp))
+    .sort((a, b) => b - a)[0];
+  const retentionReference = newestBackupTime ?? Date.now();
+  const retentionCutoff = retentionReference - backupRetentionDays * 24 * 60 * 60 * 1000;
   const backupIdsToDelete = new Set<string>();
 
   for (const backup of backups) {

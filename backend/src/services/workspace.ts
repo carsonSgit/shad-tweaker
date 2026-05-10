@@ -5,9 +5,13 @@ import type {
   BackupManifest,
   BackupMetadata,
   Component,
+  DesignToken,
+  DesignTokenMap,
+  DesignTokenSet,
   Preset,
   RegistrySource,
   Template,
+  TokenCategory,
   WorkspaceConfig,
   WorkspaceManifest,
 } from '../types/index.js';
@@ -30,6 +34,22 @@ const DEFAULT_CONFIG: WorkspaceConfig = {
   validateAfterEdit: true,
   port: 3001,
 };
+
+const TOKEN_CATEGORIES: TokenCategory[] = [
+  'colors',
+  'radius',
+  'spacing',
+  'typography',
+  'border',
+  'shadow',
+  'opacity',
+  'zIndex',
+  'motion',
+  'easing',
+  'duration',
+  'breakpoints',
+  'density',
+];
 
 interface LegacyConfig {
   componentsPath?: string;
@@ -66,8 +86,81 @@ function createDefaultManifest(now: string = new Date().toISOString()): Workspac
     sources: [],
     packages: [],
     tokenSets: [],
+    componentTokenOverrides: {},
     presets: [],
     backups: [],
+  };
+}
+
+function createEmptyTokenMap(): DesignTokenMap {
+  return Object.fromEntries(TOKEN_CATEGORIES.map((category) => [category, {}])) as DesignTokenMap;
+}
+
+function normalizeDesignTokenSet(raw: DesignTokenSet): DesignTokenSet {
+  const tokenSet = raw as DesignTokenSet & { tokens?: Record<string, unknown> };
+  const tokens = createEmptyTokenMap();
+  const now = new Date().toISOString();
+
+  if (tokenSet.tokens && typeof tokenSet.tokens === 'object') {
+    for (const category of TOKEN_CATEGORIES) {
+      const grouped = tokenSet.tokens[category];
+      if (!grouped || typeof grouped !== 'object' || Array.isArray(grouped)) {
+        continue;
+      }
+
+      for (const [name, value] of Object.entries(grouped as Record<string, unknown>)) {
+        if (value && typeof value === 'object' && 'value' in value) {
+          const candidate = value as Partial<DesignToken>;
+          if (typeof candidate.value !== 'string') {
+            continue;
+          }
+          tokens[category][name] = {
+            name: typeof candidate.name === 'string' ? candidate.name : name,
+            category,
+            value: candidate.value,
+            description:
+              typeof candidate.description === 'string' ? candidate.description : undefined,
+            aliases: Array.isArray(candidate.aliases)
+              ? candidate.aliases.filter((alias): alias is string => typeof alias === 'string')
+              : undefined,
+            createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
+            updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
+          };
+        } else if (typeof value === 'string' || typeof value === 'number') {
+          tokens[category][name] = {
+            name,
+            category,
+            value: String(value),
+            createdAt: tokenSet.createdAt || now,
+            updatedAt: tokenSet.updatedAt || now,
+          };
+        }
+      }
+    }
+
+    for (const [name, value] of Object.entries(tokenSet.tokens)) {
+      if ((TOKEN_CATEGORIES as string[]).includes(name)) {
+        continue;
+      }
+      if (typeof value === 'string' || typeof value === 'number') {
+        tokens.colors[name] = {
+          name,
+          category: 'colors',
+          value: String(value),
+          createdAt: tokenSet.createdAt || now,
+          updatedAt: tokenSet.updatedAt || now,
+        };
+      }
+    }
+  }
+
+  return {
+    id: tokenSet.id,
+    name: tokenSet.name,
+    description: tokenSet.description,
+    tokens,
+    createdAt: tokenSet.createdAt,
+    updatedAt: tokenSet.updatedAt,
   };
 }
 
@@ -96,7 +189,13 @@ function normalizeManifest(raw: unknown): WorkspaceManifest {
     components: Array.isArray(candidate.components) ? candidate.components : [],
     sources: Array.isArray(candidate.sources) ? candidate.sources : [],
     packages: Array.isArray(candidate.packages) ? candidate.packages : [],
-    tokenSets: Array.isArray(candidate.tokenSets) ? candidate.tokenSets : [],
+    tokenSets: Array.isArray(candidate.tokenSets)
+      ? candidate.tokenSets.map(normalizeDesignTokenSet)
+      : [],
+    componentTokenOverrides:
+      typeof candidate.componentTokenOverrides === 'object' && candidate.componentTokenOverrides
+        ? candidate.componentTokenOverrides
+        : {},
     presets: Array.isArray(candidate.presets) ? candidate.presets : [],
     backups: Array.isArray(candidate.backups) ? candidate.backups : [],
   };
@@ -484,6 +583,18 @@ export async function initializeWorkspace(
     const manifest = await loadWorkspaceManifestUnsafe(cwd);
 
     return { manifest, created };
+  });
+}
+
+export async function mutateWorkspaceManifest<T>(
+  operation: (manifest: WorkspaceManifest) => Promise<{ manifest: WorkspaceManifest; result: T }>,
+  cwd: string = getWorkingDirectory()
+): Promise<T> {
+  return withManifestWriteLock(cwd, async () => {
+    const manifest = await loadWorkspaceManifestUnsafe(cwd);
+    const update = await operation(manifest);
+    await saveWorkspaceManifestUnsafe(update.manifest, cwd);
+    return update.result;
   });
 }
 
