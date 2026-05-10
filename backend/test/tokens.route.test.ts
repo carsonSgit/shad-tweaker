@@ -227,7 +227,7 @@ describe('token routes', () => {
     assert.equal(Array.isArray(preview.body.previews), true);
     assert.equal(apply.status, 200);
     assert.equal(apply.body.success, true);
-    assert.equal(apply.body.modified.length, 1);
+    assert.equal(apply.body.result.modified.length, 1);
     assert.equal(overrides.status, 200);
     assert.equal(overrides.body.overrides[0].overrides.spacing['button-inline'], 'px-6');
   });
@@ -374,7 +374,7 @@ describe('token routes', () => {
     assert.equal(unsafe.body.error.message, 'Invalid token set ID');
   });
 
-  it('returns 400 for patch apply input paths that cannot be resolved', async () => {
+  it('reports errors in result when patch apply input paths cannot be resolved', async () => {
     await createTempRoot();
     const tokenSet = await createTokenSet({ name: 'Missing Apply Path Tokens' });
 
@@ -387,9 +387,10 @@ describe('token routes', () => {
         createBackup: false,
       });
 
-    assert.equal(apply.status, 400);
-    assert.equal(apply.body.success, false);
-    assert.match(apply.body.errors[0].error, /could not be resolved/);
+    assert.equal(apply.status, 200);
+    assert.equal(apply.body.success, true);
+    assert.equal(apply.body.result.success, false);
+    assert.match(apply.body.result.errors[0].error, /could not be resolved/);
   });
 
   it('returns frequency and inconsistency reports', async () => {

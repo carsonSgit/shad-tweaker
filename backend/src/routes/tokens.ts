@@ -388,7 +388,7 @@ router.post('/patch/apply', async (req: Request, res: Response) => {
       recordOverrides:
         typeof req.body.recordOverrides === 'boolean' ? req.body.recordOverrides : false,
     });
-    res.status(result.success ? 200 : 400).json(result);
+    res.json({ success: true, result });
   } catch (error) {
     logger.error('Failed to apply token patch', error);
     sendServerError(res, 'Failed to apply token patch', 'TOKEN_PATCH_APPLY_ERROR');

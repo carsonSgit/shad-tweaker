@@ -410,8 +410,13 @@ export function validateTokenPatchChanges(
     });
   }
 
-  const fromValues = new Set(normalized.map((change) => change.from));
-  if (normalized.some((change) => fromValues.has(change.to))) {
+  const fromValuesByCategory = new Map<string, Set<string>>();
+  for (const change of normalized) {
+    const set = fromValuesByCategory.get(change.category) ?? new Set<string>();
+    set.add(change.from);
+    fromValuesByCategory.set(change.category, set);
+  }
+  if (normalized.some((change) => fromValuesByCategory.get(change.category)?.has(change.to))) {
     return {
       valid: false,
       error: 'Patch changes cannot cascade: a to value cannot match another from value',

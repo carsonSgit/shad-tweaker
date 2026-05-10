@@ -277,7 +277,11 @@ async function readCandidates(componentPaths?: string[]): Promise<TokenCandidate
         return [];
       }
       const content = await fs.readFile(safePath, 'utf-8');
-      return collectClassesFromContent(safePath, content);
+      const relativePath = toProjectRelativeExistingPath(safePath);
+      if (!relativePath) {
+        return [];
+      }
+      return collectClassesFromContent(relativePath, content);
     })
   );
 
