@@ -294,18 +294,12 @@ export function validateTokenPatchChanges(
     if (!isTokenCategory(candidate.category)) {
       return { valid: false, error: 'Each change requires a valid category' };
     }
-    if (
-      typeof candidate.from !== 'string' ||
-      candidate.from.trim().length === 0 ||
-      candidate.from.length > 256
-    ) {
+    const from = typeof candidate.from === 'string' ? candidate.from.trim() : '';
+    const to = typeof candidate.to === 'string' ? candidate.to.trim() : '';
+    if (typeof candidate.from !== 'string' || from.length === 0 || from.length > 256) {
       return { valid: false, error: 'Each change requires a non-empty from value' };
     }
-    if (
-      typeof candidate.to !== 'string' ||
-      candidate.to.trim().length === 0 ||
-      candidate.to.length > 256
-    ) {
+    if (typeof candidate.to !== 'string' || to.length === 0 || to.length > 256) {
       return { valid: false, error: 'Each change requires a non-empty to value' };
     }
     if (candidate.tokenName !== undefined) {
@@ -316,8 +310,8 @@ export function validateTokenPatchChanges(
 
     normalized.push({
       category: candidate.category,
-      from: candidate.from,
-      to: candidate.to,
+      from,
+      to,
       tokenName: typeof candidate.tokenName === 'string' ? candidate.tokenName : undefined,
     });
   }

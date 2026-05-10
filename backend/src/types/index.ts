@@ -331,6 +331,7 @@ export interface Preset {
   variantRecipes: VariantRecipe[];
 }
 
+// Keep token system types in sync with frontend/src/types/index.ts.
 export type TokenCategory =
   | 'colors'
   | 'radius'

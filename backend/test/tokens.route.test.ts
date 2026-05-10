@@ -193,6 +193,51 @@ describe('token routes', () => {
     assert.equal(overrides.body.overrides[0].overrides.spacing['button-inline'], 'px-6');
   });
 
+  it('trims patch change values before previewing', async () => {
+    const root = await createTempRoot();
+    const { relativePath } = await writeComponent(
+      root,
+      'components/ui/trimmed.tsx',
+      '<button className="rounded-md" />'
+    );
+
+    const preview = await request(app)
+      .post('/api/tokens/patch/preview')
+      .send({
+        componentPaths: [relativePath],
+        changes: [{ category: 'radius', from: ' rounded-md ', to: ' rounded-lg ' }],
+      });
+
+    assert.equal(preview.status, 200);
+    assert.equal(preview.body.totalChanges, 1);
+    assert.match(preview.body.previews[0].after, /rounded-lg/);
+  });
+
+  it('supports component override paths through query and body payloads', async () => {
+    const root = await createTempRoot();
+    const { relativePath } = await writeComponent(
+      root,
+      'components/ui/query-button.tsx',
+      '<button />'
+    );
+    const tokenSet = await createTokenSet({ name: 'Query Override Tokens' });
+
+    const put = await request(app)
+      .put('/api/tokens/components/overrides')
+      .send({
+        componentPath: relativePath,
+        overrides: [{ tokenSetId: tokenSet.id, overrides: { radius: { card: 'rounded-lg' } } }],
+      });
+    const get = await request(app).get('/api/tokens/components/overrides').query({
+      componentPath: relativePath,
+    });
+
+    assert.equal(put.status, 200);
+    assert.equal(get.status, 200);
+    assert.equal(get.body.overrides[0].componentPath, relativePath);
+    assert.equal(get.body.overrides[0].overrides.radius.card, 'rounded-lg');
+  });
+
   it('rejects patch apply with an unknown token set before editing files', async () => {
     const root = await createTempRoot();
     const { absolutePath, relativePath } = await writeComponent(

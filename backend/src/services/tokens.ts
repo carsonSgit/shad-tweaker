@@ -64,6 +64,15 @@ const INCONSISTENCY_FAMILIES: Array<{ family: string; category: TokenCategory; p
     { family: 'motion', category: 'motion', pattern: /^(animate|transition|duration|ease)-/ },
   ];
 
+const MAX_TOKEN_COMPONENT_BYTES = 1024 * 1024;
+
+export class TokenSetConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TokenSetConflictError';
+  }
+}
+
 function slugify(value: string): string {
   return value
     .trim()
@@ -127,6 +136,20 @@ async function resolveSafeExistingComponentPath(componentPath: string): Promise<
   } catch {
     return null;
   }
+}
+
+function toProjectRelativePath(componentPath: string): string | null {
+  const projectRoot = getProjectRoot();
+  const resolvedProjectRoot = path.resolve(projectRoot);
+  const relativePath = path.isAbsolute(componentPath)
+    ? path.relative(resolvedProjectRoot, componentPath)
+    : componentPath;
+  return sanitizeTokenComponentPath(relativePath);
+}
+
+function toProjectRelativeExistingPath(componentPath: string): string | null {
+  const relativePath = toProjectRelativePath(componentPath);
+  return relativePath ? relativePath.replace(/\\/g, '/') : null;
 }
 
 function collectClassesFromContent(componentPath: string, content: string): TokenCandidate[] {
@@ -225,6 +248,10 @@ async function readCandidates(componentPaths?: string[]): Promise<TokenCandidate
     if (!safePath) {
       continue;
     }
+    const stats = await fs.stat(safePath);
+    if (stats.size > MAX_TOKEN_COMPONENT_BYTES) {
+      continue;
+    }
     const content = await fs.readFile(safePath, 'utf-8');
     candidates.push(...collectClassesFromContent(safePath, content));
   }
@@ -253,10 +280,10 @@ export async function createTokenSet(input: {
     const now = new Date().toISOString();
     const id = input.id || createTokenSetId(input.name);
     if (manifest.tokenSets.some((tokenSet) => tokenSet.id === id)) {
-      throw new Error(`Token set already exists: ${id}`);
+      throw new TokenSetConflictError(`Token set already exists: ${id}`);
     }
     if (manifest.tokenSets.some((tokenSet) => tokenSet.name === input.name)) {
-      throw new Error(`Token set name already exists: ${input.name}`);
+      throw new TokenSetConflictError(`Token set name already exists: ${input.name}`);
     }
     const tokenSet: DesignTokenSet = {
       id,
@@ -286,7 +313,7 @@ export async function updateTokenSet(
       return { manifest, result: null };
     }
     if (manifest.tokenSets.some((tokenSet) => tokenSet.id !== id && tokenSet.name === input.name)) {
-      throw new Error(`Token set name already exists: ${input.name}`);
+      throw new TokenSetConflictError(`Token set name already exists: ${input.name}`);
     }
 
     const updated: DesignTokenSet = {
@@ -344,7 +371,11 @@ export async function createFrequencyReport(
   componentPaths?: string[]
 ): Promise<TokenFrequencyReport> {
   const candidates = await readCandidates(componentPaths);
-  const entriesByKey = new Map<string, TokenFrequencyEntry>();
+  type TokenFrequencyAccumulator = TokenFrequencyEntry & {
+    componentPathSet: Set<string>;
+    classSet: Set<string>;
+  };
+  const entriesByKey = new Map<string, TokenFrequencyAccumulator>();
 
   for (const candidate of candidates) {
     const key = `${candidate.category}:${candidate.value}`;
@@ -356,23 +387,29 @@ export async function createFrequencyReport(
         occurrences: 0,
         componentPaths: [],
         classes: [],
-      } satisfies TokenFrequencyEntry);
+        componentPathSet: new Set<string>(),
+        classSet: new Set<string>(),
+      } satisfies TokenFrequencyAccumulator);
     entry.occurrences += 1;
-    if (!entry.componentPaths.includes(candidate.componentPath)) {
+    if (!entry.componentPathSet.has(candidate.componentPath)) {
       entry.componentPaths.push(candidate.componentPath);
+      entry.componentPathSet.add(candidate.componentPath);
     }
-    if (!entry.classes.includes(candidate.className)) {
+    if (!entry.classSet.has(candidate.className)) {
       entry.classes.push(candidate.className);
+      entry.classSet.add(candidate.className);
     }
     entriesByKey.set(key, entry);
   }
 
-  const entries = [...entriesByKey.values()].sort(
-    (a, b) =>
-      b.occurrences - a.occurrences ||
-      a.category.localeCompare(b.category) ||
-      a.value.localeCompare(b.value)
-  );
+  const entries = [...entriesByKey.values()]
+    .map(({ componentPathSet: _componentPathSet, classSet: _classSet, ...entry }) => entry)
+    .sort(
+      (a, b) =>
+        b.occurrences - a.occurrences ||
+        a.category.localeCompare(b.category) ||
+        a.value.localeCompare(b.value)
+    );
   return {
     entries,
     totalOccurrences: candidates.length,
@@ -492,6 +529,7 @@ export async function applyTokenPatch(options: {
   const errors: Array<{ path: string; error: string }> = [];
   let totalChanges = 0;
   let backupId: string | undefined;
+  const patchPlans: Array<{ path: string; content: string; changes: number }> = [];
   const resolvedPaths = await Promise.all(
     options.componentPaths.map(async (componentPath) => ({
       originalPath: componentPath,
@@ -510,11 +548,6 @@ export async function applyTokenPatch(options: {
     }
   }
 
-  if (options.createBackup ?? true) {
-    const backup = await createBackup(safePaths);
-    backupId = backup.id;
-  }
-
   for (const componentPath of safePaths) {
     try {
       const content = await fs.readFile(componentPath, 'utf-8');
@@ -522,16 +555,34 @@ export async function applyTokenPatch(options: {
       if (patched.changes === 0) {
         continue;
       }
-      const tmp = await tempPathFor(componentPath);
-      await fs.writeFile(tmp, patched.content, 'utf-8');
-      await fs.move(tmp, componentPath, { overwrite: true });
-      modified.push(componentPath);
-      totalChanges += patched.changes;
+      patchPlans.push({ path: componentPath, content: patched.content, changes: patched.changes });
     } catch (error) {
       errors.push({
         path: componentPath,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
+    }
+  }
+
+  if ((options.createBackup ?? true) && errors.length === 0 && patchPlans.length > 0) {
+    const backup = await createBackup(patchPlans.map((plan) => plan.path));
+    backupId = backup.id;
+  }
+
+  if (errors.length === 0) {
+    for (const plan of patchPlans) {
+      try {
+        const tmp = await tempPathFor(plan.path);
+        await fs.writeFile(tmp, plan.content, 'utf-8');
+        await fs.move(tmp, plan.path, { overwrite: true });
+        modified.push(plan.path);
+        totalChanges += plan.changes;
+      } catch (error) {
+        errors.push({
+          path: plan.path,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
     }
   }
 
@@ -574,10 +625,17 @@ export async function getComponentOverrides(
   if (!safePath) {
     return [];
   }
+  const relativePath = toProjectRelativeExistingPath(safePath);
+  if (!relativePath) {
+    return [];
+  }
   return (
-    Object.entries(manifest.componentTokenOverrides).find(
-      ([storedPath]) => storedPath === safePath
-    )?.[1] ?? []
+    manifest.componentTokenOverrides[relativePath] ??
+    manifest.componentTokenOverrides[safePath]?.map((override) => ({
+      ...override,
+      componentPath: relativePath,
+    })) ??
+    []
   );
 }
 
@@ -589,26 +647,41 @@ export async function putComponentOverrides(
   if (!safePath) {
     return [];
   }
+  const relativePath = toProjectRelativeExistingPath(safePath);
+  if (!relativePath) {
+    return [];
+  }
   await recordComponentOverrides(
-    overrides.map((override) => ({ ...override, componentPath: safePath }))
+    overrides.map((override) => ({ ...override, componentPath: relativePath }))
   );
-  return getComponentOverrides(safePath);
+  return getComponentOverrides(relativePath);
 }
 
 async function recordComponentOverrides(overrides: ComponentTokenOverride[]): Promise<void> {
   await mutateWorkspaceManifest(async (manifest) => {
-    const componentTokenOverrides = new Map<string, ComponentTokenOverride[]>(
-      Object.entries(manifest.componentTokenOverrides)
-    );
+    const componentTokenOverrides = new Map<string, ComponentTokenOverride[]>();
+    for (const [storedPath, storedOverrides] of Object.entries(manifest.componentTokenOverrides)) {
+      const relativePath = toProjectRelativeExistingPath(storedPath);
+      if (relativePath) {
+        componentTokenOverrides.set(
+          relativePath,
+          storedOverrides.map((override) => ({ ...override, componentPath: relativePath }))
+        );
+      }
+    }
     for (const override of overrides) {
       const safePath = await resolveSafeExistingComponentPath(override.componentPath);
       if (!safePath) {
         continue;
       }
-      const existing = componentTokenOverrides.get(safePath) ?? [];
-      componentTokenOverrides.set(safePath, [
+      const relativePath = toProjectRelativeExistingPath(safePath);
+      if (!relativePath) {
+        continue;
+      }
+      const existing = componentTokenOverrides.get(relativePath) ?? [];
+      componentTokenOverrides.set(relativePath, [
         ...existing.filter((candidate) => candidate.tokenSetId !== override.tokenSetId),
-        { ...override, componentPath: safePath },
+        { ...override, componentPath: relativePath },
       ]);
     }
 

@@ -65,6 +65,7 @@ export interface Preview {
   lineNumbers: number[];
 }
 
+// Keep token system types in sync with backend/src/types/index.ts.
 export type TokenCategory =
   | 'colors'
   | 'radius'

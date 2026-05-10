@@ -291,6 +291,48 @@ export function Button() {
     assert.equal(overrides[0].overrides.radius?.card, 'rounded-lg');
   });
 
+  it('does not create a backup for no-op patches', async () => {
+    const root = await createTempRoot();
+    const filePath = await writeComponent(
+      root,
+      'components/ui/noop.tsx',
+      '<button className="rounded-md" />'
+    );
+    const tokenSet = await createTokenSet({ name: 'Noop Patch Tokens' });
+
+    const result = await applyTokenPatch({
+      tokenSetId: tokenSet.id,
+      componentPaths: [filePath],
+      changes: [{ category: 'radius', from: 'rounded-xl', to: 'rounded-lg' }],
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.modified.length, 0);
+    assert.equal(result.backupId, undefined);
+  });
+
+  it('stores component overrides by project-relative path', async () => {
+    const root = await createTempRoot();
+    const filePath = await writeComponent(
+      root,
+      'components/ui/relative.tsx',
+      '<button className="rounded-md" />'
+    );
+    const tokenSet = await createTokenSet({ name: 'Relative Override Tokens' });
+
+    await applyTokenPatch({
+      tokenSetId: tokenSet.id,
+      componentPaths: [filePath],
+      changes: [{ category: 'radius', from: 'rounded-md', to: 'rounded-lg', tokenName: 'card' }],
+      createBackup: false,
+      recordOverrides: true,
+    });
+    const manifest = await loadWorkspaceManifest(root);
+
+    assert.ok(manifest.componentTokenOverrides['components/ui/relative.tsx']);
+    assert.equal(manifest.componentTokenOverrides[filePath], undefined);
+  });
+
   it('reports unresolved paths when applying patches', async () => {
     const root = await createTempRoot();
     const tokenSet = await createTokenSet({ name: 'Missing Path Tokens' });

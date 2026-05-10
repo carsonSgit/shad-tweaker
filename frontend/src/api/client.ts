@@ -352,16 +352,18 @@ export async function applyTokenPatch(input: {
 export async function getComponentTokenOverrides(
   componentPath: string
 ): Promise<ApiResponse<{ overrides: ComponentTokenOverride[] }>> {
-  return request(`/api/tokens/components/${encodeURIComponent(componentPath)}/overrides`);
+  return request(
+    `/api/tokens/components/overrides?componentPath=${encodeURIComponent(componentPath)}`
+  );
 }
 
 export async function putComponentTokenOverrides(
   componentPath: string,
   overrides: ComponentTokenOverride[]
 ): Promise<ApiResponse<{ overrides: ComponentTokenOverride[] }>> {
-  return request(`/api/tokens/components/${encodeURIComponent(componentPath)}/overrides`, {
+  return request('/api/tokens/components/overrides', {
     method: 'PUT',
-    body: JSON.stringify({ overrides }),
+    body: JSON.stringify({ componentPath, overrides }),
   });
 }
 
