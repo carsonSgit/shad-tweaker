@@ -8,9 +8,9 @@ import type {
   ComponentLibraryDetail,
   ComponentLibraryDuplicate,
   ComponentLibraryInventoryItem,
+  RegistryDependency,
   VariantComponentSummary,
   VariantSystemKind,
-  RegistryDependency,
   WorkspaceComponent,
 } from '../types/index.js';
 import { isSafeProjectRelativePath } from '../utils/paths.js';
@@ -250,11 +250,7 @@ function toVariantSummary(
     path: componentPath,
     variantCount: definitions.length,
     systems: [...new Set(definitions.map((definition) => definition.callee as VariantSystemKind))],
-    axes: [
-      ...new Set(
-        definitions.flatMap((definition) => Object.keys(definition.variants))
-      ),
-    ],
+    axes: [...new Set(definitions.flatMap((definition) => Object.keys(definition.variants)))],
   };
 }
 

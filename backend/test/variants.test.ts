@@ -63,10 +63,7 @@ export function Card() { return <section />; }
     const summaries = await listVariantComponents(root);
 
     assert.equal(summaries.length, 2);
-    assert.deepEqual(
-      summaries.map((summary) => summary.systems[0]).sort(),
-      ['cva', 'tv']
-    );
+    assert.deepEqual(summaries.map((summary) => summary.systems[0]).sort(), ['cva', 'tv']);
     assert.ok(summaries.some((summary) => summary.axes.includes('variant')));
     assert.ok(summaries.some((summary) => summary.axes.includes('density')));
   });
@@ -94,7 +91,10 @@ export function Button() { return <button />; }
 
     assert.equal(detail.variantCount, 1);
     assert.equal(definition.system, 'cva');
-    assert.deepEqual(definition.axes.map((axis) => axis.name), ['variant', 'size']);
+    assert.deepEqual(
+      definition.axes.map((axis) => axis.name),
+      ['variant', 'size']
+    );
     assert.equal(definition.axes[0].defaultValue, 'default');
     assert.deepEqual(definition.axes[0].values[1].classes, ['border', 'border-input']);
   });
@@ -132,9 +132,7 @@ export function Badge({ tone }: { tone: "neutral" | "brand" }) {
     assert.ok(detail.axes.includes('variant'));
     assert.ok(detail.axes.includes('tone'));
     assert.ok(
-      detail.diagnostics.some(
-        (diagnostic) => diagnostic.code === 'UNSUPPORTED_VARIANT_EXPRESSION'
-      )
+      detail.diagnostics.some((diagnostic) => diagnostic.code === 'UNSUPPORTED_VARIANT_EXPRESSION')
     );
   });
 

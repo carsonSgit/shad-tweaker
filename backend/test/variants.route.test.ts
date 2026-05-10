@@ -97,11 +97,13 @@ describe('variant builder routes', () => {
   it('returns validation errors for malformed preview payloads', async () => {
     await createTempRoot();
 
-    const res = await request(app).post('/api/variants/preview').send({
-      componentPath: 'components/ui/button.tsx',
-      targetDefinition: 'buttonVariants',
-      operation: { type: 'add-value', axisName: 'variant' },
-    });
+    const res = await request(app)
+      .post('/api/variants/preview')
+      .send({
+        componentPath: 'components/ui/button.tsx',
+        targetDefinition: 'buttonVariants',
+        operation: { type: 'add-value', axisName: 'variant' },
+      });
 
     assert.equal(res.status, 400);
     assert.equal(res.body.error.code, 'VARIANT_BUILDER_VALIDATION_ERROR');

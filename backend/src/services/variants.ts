@@ -10,11 +10,10 @@ import type {
   VariantDefinitionDetail,
   VariantGenerationPreview,
   VariantPreviewOperation,
-  VariantSystemKind,
   VariantValue,
 } from '../types/index.js';
-import { parseComponentSource } from './parser.js';
 import { getComponentLibraryDetail, listComponentLibrary } from './componentLibrary.js';
+import { parseComponentSource } from './parser.js';
 
 export class VariantBuilderValidationError extends Error {
   readonly code = 'VARIANT_BUILDER_VALIDATION_ERROR';
@@ -40,7 +39,9 @@ interface VariantPreviewRequest {
 export async function listVariantComponents(cwd: string): Promise<VariantComponentSummary[]> {
   const components = await listComponentLibrary(cwd);
   return Promise.all(
-    components.map(async (component) => summarizeDetail(await getComponentLibraryDetail(cwd, component.path)))
+    components.map(async (component) =>
+      summarizeDetail(await getComponentLibraryDetail(cwd, component.path))
+    )
   );
 }
 
@@ -57,13 +58,17 @@ export async function previewVariantGeneration(
 ): Promise<VariantGenerationPreview> {
   const component = await getComponentLibraryDetail(cwd, request.componentPath);
   const detail = detailFromComponent(component);
-  const definition = detail.definitions.find((candidate) => candidate.name === request.targetDefinition);
+  const definition = detail.definitions.find(
+    (candidate) => candidate.name === request.targetDefinition
+  );
 
   if (!definition) {
     throw new VariantBuilderValidationError('Target variant definition was not found.');
   }
   if (definition.system !== 'cva' && definition.system !== 'tv') {
-    throw new VariantBuilderUnsupportedError('Only cva and tailwind-variants definitions support previews.');
+    throw new VariantBuilderUnsupportedError(
+      'Only cva and tailwind-variants definitions support previews.'
+    );
   }
   if (!definition.raw) {
     throw new VariantBuilderUnsupportedError('Target variant definition is missing raw source.');
@@ -74,7 +79,9 @@ export async function previewVariantGeneration(
   const nextRaw = applyOperationToRawDefinition(definition.raw, request.operation);
   const after = replaceOnce(component.content, definition.raw, nextRaw);
   if (after === component.content) {
-    throw new VariantBuilderUnsupportedError('Could not locate target variant definition in source.');
+    throw new VariantBuilderUnsupportedError(
+      'Could not locate target variant definition in source.'
+    );
   }
 
   return {
@@ -107,7 +114,9 @@ function detailFromComponent(component: ComponentLibraryDetail): VariantComponen
   const unsupportedDiagnostics = detectUnsupportedVariantDiagnostics(component.content);
   const diagnostics = [...parsed.diagnostics, ...unsupportedDiagnostics];
   const systems = unique(definitions.map((definition) => definition.system));
-  const axes = unique(definitions.flatMap((definition) => definition.axes.map((axis) => axis.name)));
+  const axes = unique(
+    definitions.flatMap((definition) => definition.axes.map((axis) => axis.name))
+  );
 
   return {
     name: component.name,
@@ -155,11 +164,22 @@ function detectManualVariantDefinitions(
   filePath: string,
   content: string
 ): VariantDefinitionDetail[] {
-  const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX
+  );
   const candidates: ManualVariantCandidate[] = [];
 
   function visit(node: ts.Node): void {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && ts.isObjectLiteralExpression(node.initializer)) {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      ts.isObjectLiteralExpression(node.initializer)
+    ) {
       const name = node.name.text;
       if (looksLikeVariantName(name)) {
         const axes = parseManualAxes(node.initializer);
@@ -211,7 +231,9 @@ function parseManualAxes(objectLiteral: ts.ObjectLiteralExpression): VariantAxis
     const axisName = getPropertyName(property.name);
     if (!axisName || !ts.isObjectLiteralExpression(property.initializer)) continue;
     const valueProperties = property.initializer.properties.filter(ts.isPropertyAssignment);
-    if (!valueProperties.every((valueProperty) => isStaticClassExpression(valueProperty.initializer))) {
+    if (
+      !valueProperties.every((valueProperty) => isStaticClassExpression(valueProperty.initializer))
+    ) {
       continue;
     }
     axes.push({
@@ -232,7 +254,8 @@ function detectUnsupportedVariantDiagnostics(content: string): ParserDiagnostic[
     {
       severity: 'info',
       code: 'UNSUPPORTED_VARIANT_EXPRESSION',
-      message: 'Conditional variant-like expressions were detected but not converted into variant axes.',
+      message:
+        'Conditional variant-like expressions were detected but not converted into variant axes.',
     },
   ];
 }
@@ -267,16 +290,21 @@ function validateOperation(
 }
 
 function validateValues(values: VariantValue[]): void {
-  if (values.length === 0) throw new VariantBuilderValidationError('At least one variant value is required.');
+  if (values.length === 0)
+    throw new VariantBuilderValidationError('At least one variant value is required.');
   for (const value of values) {
-    if (!value.name.trim()) throw new VariantBuilderValidationError('Variant value name is required.');
-    if (value.classes.length === 0) throw new VariantBuilderValidationError('Variant value classes are required.');
+    if (!value.name.trim())
+      throw new VariantBuilderValidationError('Variant value name is required.');
+    if (value.classes.length === 0)
+      throw new VariantBuilderValidationError('Variant value classes are required.');
   }
 }
 
 function applyOperationToRawDefinition(raw: string, operation: VariantPreviewOperation): string {
-  if (operation.type === 'add-axis') return addAxisToRawDefinition(raw, operation.axis, operation.defaultValue);
-  if (operation.type === 'add-value') return addValueToRawDefinition(raw, operation.axisName, operation.value);
+  if (operation.type === 'add-axis')
+    return addAxisToRawDefinition(raw, operation.axis, operation.defaultValue);
+  if (operation.type === 'add-value')
+    return addValueToRawDefinition(raw, operation.axisName, operation.value);
   return setDefaultInRawDefinition(raw, operation.axisName, operation.valueName);
 }
 
@@ -288,9 +316,15 @@ function addAxisToRawDefinition(raw: string, axis: VariantAxis, defaultValue?: s
   const selectedDefault = defaultValue ?? axis.defaultValue;
   if (!selectedDefault) return withAxis;
   if (/defaultVariants:\s*{/.test(withAxis)) {
-    return withAxis.replace(/defaultVariants:\s*{\s*/, (match) => `${match}\n      ${axis.name}: '${selectedDefault}',`);
+    return withAxis.replace(
+      /defaultVariants:\s*{\s*/,
+      (match) => `${match}\n      ${axis.name}: '${selectedDefault}',`
+    );
   }
-  return withAxis.replace(/}\s*\)?\s*;?\s*$/, `,\n    defaultVariants: {\n      ${axis.name}: '${selectedDefault}',\n    },\n  }\n)`);
+  return withAxis.replace(
+    /}\s*\)?\s*;?\s*$/,
+    `,\n    defaultVariants: {\n      ${axis.name}: '${selectedDefault}',\n    },\n  }\n)`
+  );
 }
 
 function addValueToRawDefinition(raw: string, axisName: string, value: VariantValue): string {
@@ -302,9 +336,15 @@ function setDefaultInRawDefinition(raw: string, axisName: string, valueName: str
   const defaultAxisPattern = new RegExp(`(${escapeRegExp(axisName)}\\s*:\\s*)['"][^'"]+['"]`);
   if (defaultAxisPattern.test(raw)) return raw.replace(defaultAxisPattern, `$1'${valueName}'`);
   if (/defaultVariants:\s*{/.test(raw)) {
-    return raw.replace(/defaultVariants:\s*{\s*/, (match) => `${match}\n      ${axisName}: '${valueName}',`);
+    return raw.replace(
+      /defaultVariants:\s*{\s*/,
+      (match) => `${match}\n      ${axisName}: '${valueName}',`
+    );
   }
-  return raw.replace(/}\s*\)?\s*;?\s*$/, `,\n    defaultVariants: {\n      ${axisName}: '${valueName}',\n    },\n  }\n)`);
+  return raw.replace(
+    /}\s*\)?\s*;?\s*$/,
+    `,\n    defaultVariants: {\n      ${axisName}: '${valueName}',\n    },\n  }\n)`
+  );
 }
 
 function replaceOnce(content: string, search: string, replacement: string): string {
@@ -322,12 +362,15 @@ function isStaticClassExpression(node: ts.Expression): boolean {
 }
 
 function collectStringClasses(node: ts.Expression): string[] {
-  if (!isStaticClassExpression(node)) return [];
-  return node.text.split(/\s+/).filter(Boolean);
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+    return node.text.split(/\s+/).filter(Boolean);
+  }
+  return [];
 }
 
 function getPropertyName(name: ts.PropertyName): string | null {
-  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text;
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name))
+    return name.text;
   return null;
 }
 
