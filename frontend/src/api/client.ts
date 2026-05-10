@@ -7,6 +7,10 @@ import type {
   ComponentTokenOverride,
   DesignTokenMap,
   DesignTokenSet,
+  ComponentLibraryCompareResult,
+  ComponentLibraryDetail,
+  ComponentLibraryDuplicate,
+  ComponentLibraryInventoryItem,
   ImportConflictResolution,
   ImportPlan,
   Preview,
@@ -75,6 +79,66 @@ export async function getComponents(): Promise<ApiResponse<{ components: Compone
 
 export async function getComponent(name: string): Promise<ApiResponse<ComponentDetail>> {
   return request(`/api/components/${encodeURIComponent(name)}`);
+}
+
+export async function getComponentLibraryInventory(): Promise<
+  ApiResponse<{ components: ComponentLibraryInventoryItem[] }>
+> {
+  return request('/api/components/library/inventory');
+}
+
+export async function getComponentLibraryDetail(
+  identifier: string
+): Promise<ApiResponse<{ component: ComponentLibraryDetail }>> {
+  return request(`/api/components/library/detail/${encodeURIComponent(identifier)}`);
+}
+
+export async function getComponentLibraryDuplicates(): Promise<
+  ApiResponse<{ duplicates: ComponentLibraryDuplicate[] }>
+> {
+  return request('/api/components/library/duplicates');
+}
+
+export async function renameComponentLibraryItem(
+  identifier: string,
+  name: string
+): Promise<ApiResponse<{ result: { newPath?: string } }>> {
+  return request(`/api/components/library/${encodeURIComponent(identifier)}/rename`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function forkComponentLibraryItem(
+  identifier: string,
+  name: string
+): Promise<ApiResponse<{ result: { newPath?: string } }>> {
+  return request(`/api/components/library/${encodeURIComponent(identifier)}/fork`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function detachComponentLibraryItem(
+  identifier: string
+): Promise<ApiResponse<{ result: { previousPath?: string } }>> {
+  return request(`/api/components/library/${encodeURIComponent(identifier)}/detach`, {
+    method: 'POST',
+  });
+}
+
+export async function resetComponentLibraryItem(
+  identifier: string
+): Promise<ApiResponse<{ result: { previousPath?: string } }>> {
+  return request(`/api/components/library/${encodeURIComponent(identifier)}/reset`, {
+    method: 'POST',
+  });
+}
+
+export async function compareComponentLibraryItem(
+  identifier: string
+): Promise<ApiResponse<{ compare: ComponentLibraryCompareResult }>> {
+  return request(`/api/components/library/${encodeURIComponent(identifier)}/compare`);
 }
 
 // Edit Operations
