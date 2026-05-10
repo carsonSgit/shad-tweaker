@@ -55,6 +55,15 @@ export function parseComponentSource(filePath: string, content: string): ParsedC
     language === 'jsx' ? ts.ScriptKind.JSX : ts.ScriptKind.TSX
   );
 
+  return parseComponentSourceFile(filePath, sourceFile, language);
+}
+
+export function parseComponentSourceFile(
+  filePath: string,
+  sourceFile: ts.SourceFile,
+  language: ParsedComponentFile['language'] = 'tsx'
+): ParsedComponentFile {
+  const extension = path.extname(filePath).toLowerCase();
   const imports: ParsedImport[] = [];
   const exports: ParsedExport[] = [];
   const components: ParsedComponent[] = [];

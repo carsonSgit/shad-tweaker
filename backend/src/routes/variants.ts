@@ -15,6 +15,7 @@ import type { VariantPreviewOperation } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
+const MAX_PREVIEW_STRING_LENGTH = 260;
 
 interface PreviewRequestBody {
   componentPath?: unknown;
@@ -77,17 +78,14 @@ router.get('/components/:identifier', async (req: Request, res: Response) => {
 router.post('/preview', async (req: Request, res: Response) => {
   try {
     const body = req.body as PreviewRequestBody;
-    if (typeof body.componentPath !== 'string' || typeof body.targetDefinition !== 'string') {
-      throw new VariantBuilderValidationError(
-        'componentPath and targetDefinition must be strings.'
-      );
-    }
+    const componentPath = readString(body.componentPath, 'componentPath');
+    const targetDefinition = readString(body.targetDefinition, 'targetDefinition');
     const operation = readPreviewOperation(body.operation);
     res.json({
       success: true,
       preview: await previewVariantGeneration(getWorkingDirectory(), {
-        componentPath: body.componentPath,
-        targetDefinition: body.targetDefinition,
+        componentPath,
+        targetDefinition,
         operation,
       }),
     });
@@ -158,7 +156,13 @@ function readString(value: unknown, field: string): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new VariantBuilderValidationError(`${field} must be a non-empty string.`);
   }
-  return value.trim();
+  const trimmed = value.trim();
+  if (trimmed.length > MAX_PREVIEW_STRING_LENGTH) {
+    throw new VariantBuilderValidationError(
+      `${field} must be ${MAX_PREVIEW_STRING_LENGTH} characters or fewer.`
+    );
+  }
+  return trimmed;
 }
 
 export default router;

@@ -307,6 +307,30 @@ export function Button() { return <button />; }
     assert.match(preview.after, /defaultVariants: {\n\s+variant: 'ghost'/);
   });
 
+  it('creates a defaultVariants block when setting a missing default', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+  variants: { variant: { default: "bg-primary", ghost: "bg-transparent" } },
+});
+export function Button() { return <button />; }
+`
+    );
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'buttonVariants',
+      operation: { type: 'set-default', axisName: 'variant', valueName: 'ghost' },
+    });
+
+    assert.match(preview.after, /defaultVariants: {\n\s+variant: 'ghost'/);
+    assert.ok(preview.changes > 1);
+  });
+
   it('rejects duplicate preview values before generating output', async () => {
     const root = await createTempRoot();
     const relativePath = await writeComponent(

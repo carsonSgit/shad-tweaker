@@ -13,7 +13,7 @@ import type {
   VariantValue,
 } from '../types/index.js';
 import { getComponentLibraryDetail, listComponentLibrary } from './componentLibrary.js';
-import { parseComponentSource } from './parser.js';
+import { parseComponentSourceFile } from './parser.js';
 
 export class VariantBuilderValidationError extends Error {
   readonly code = 'VARIANT_BUILDER_VALIDATION_ERROR';
@@ -87,14 +87,15 @@ export async function previewVariantGeneration(
     before: component.content,
     after,
     diff: createPatch(component.path, component.content, after, 'before', 'after'),
-    changes: 1,
+    changes: countChangedLines(component.content, after),
   };
 }
 
 function detailFromComponent(component: ComponentLibraryDetail): VariantComponentDetail {
-  const parsed = parseComponentSource(component.path, component.content);
+  const sourceFile = createVariantSourceFile(component.path, component.content);
+  const parsed = parseComponentSourceFile(component.path, sourceFile);
   const parserDefinitions = parsed.variantDefinitions.map(toDefinitionDetail);
-  const manualDefinitions = detectManualVariantDefinitions(component.path, component.content);
+  const manualDefinitions = detectManualVariantDefinitions(sourceFile);
   const definitions = mergeDefinitions(parserDefinitions, manualDefinitions);
   const unsupportedDiagnostics = detectUnsupportedVariantDiagnostics(component.content);
   const diagnostics = [...parsed.diagnostics, ...unsupportedDiagnostics];
@@ -145,17 +146,7 @@ function mergeDefinitions(
   ];
 }
 
-function detectManualVariantDefinitions(
-  filePath: string,
-  content: string
-): VariantDefinitionDetail[] {
-  const sourceFile = ts.createSourceFile(
-    filePath,
-    content,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX
-  );
+function detectManualVariantDefinitions(sourceFile: ts.SourceFile): VariantDefinitionDetail[] {
   const candidates: ManualVariantCandidate[] = [];
 
   function visit(node: ts.Node): void {
@@ -240,7 +231,7 @@ function detectUnsupportedVariantDiagnostics(content: string): ParserDiagnostic[
       severity: 'info',
       code: 'UNSUPPORTED_VARIANT_EXPRESSION',
       message:
-        'Conditional variant-like expressions were detected but not converted into variant axes.',
+        'Conditional expressions were detected and may include variant-like classes that could not be converted into variant axes.',
     },
   ];
 }
@@ -365,6 +356,27 @@ function emptyVariantSummary(component: { name: string; path: string }): Variant
     systems: [],
     axes: [],
   };
+}
+
+function createVariantSourceFile(filePath: string, content: string): ts.SourceFile {
+  return ts.createSourceFile(
+    filePath,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    filePath.endsWith('.jsx') ? ts.ScriptKind.JSX : ts.ScriptKind.TSX
+  );
+}
+
+function countChangedLines(before: string, after: string): number {
+  const beforeLines = before.split(/\r?\n/);
+  const afterLines = after.split(/\r?\n/);
+  const maxLength = Math.max(beforeLines.length, afterLines.length);
+  let changes = 0;
+  for (let index = 0; index < maxLength; index += 1) {
+    if (beforeLines[index] !== afterLines[index]) changes += 1;
+  }
+  return changes;
 }
 
 function detectVariantIndent(raw: string): {

@@ -109,6 +109,25 @@ describe('variant builder routes', () => {
     assert.equal(res.body.error.code, 'VARIANT_BUILDER_VALIDATION_ERROR');
   });
 
+  it('bounds preview request string lengths', async () => {
+    await createTempRoot();
+
+    const res = await request(app)
+      .post('/api/variants/preview')
+      .send({
+        componentPath: `${'x'.repeat(261)}.tsx`,
+        targetDefinition: 'buttonVariants',
+        operation: {
+          type: 'add-value',
+          axisName: 'variant',
+          value: { name: 'ghost', classes: ['bg-transparent'] },
+        },
+      });
+
+    assert.equal(res.status, 400);
+    assert.match(res.body.error.message, /260 characters or fewer/);
+  });
+
   it('rejects traversal-shaped component identifiers', async () => {
     await createTempRoot();
 
