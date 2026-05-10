@@ -148,20 +148,12 @@ describe('workspace manifest service', () => {
       await updateWorkspaceConfig({ maxBackups: 2, backupRetentionDays: 7 }, root);
 
       const backupBasePath = path.join(root, '.shadcn-tweaker', 'backups');
-      const backups = [
-        {
-          id: 'backup_2026-05-03_12-00-00',
-          timestamp: '2026-05-03T12:00:00.000Z',
-        },
-        {
-          id: 'backup_2026-05-02_12-00-00',
-          timestamp: '2026-05-02T12:00:00.000Z',
-        },
-        {
-          id: 'backup_2026-04-20_12-00-00',
-          timestamp: '2026-04-20T12:00:00.000Z',
-        },
-      ];
+      const backupAt = (daysAgo: number) => {
+        const date = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+        const id = `backup_${date.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19)}`;
+        return { id, timestamp: date.toISOString() };
+      };
+      const backups = [backupAt(0), backupAt(1), backupAt(20)];
 
       for (const backup of backups) {
         const backupDir = path.join(backupBasePath, backup.id);

@@ -100,10 +100,58 @@ describe('token routes', () => {
     const malformed = await request(app)
       .post('/api/tokens/patch/preview')
       .send({ componentPaths: [], changes: [{ category: 'radius', from: '', to: 'rounded-lg' }] });
+    const tooLongChange = await request(app)
+      .post('/api/tokens/patch/preview')
+      .send({
+        componentPaths: [],
+        changes: [{ category: 'radius', from: 'x'.repeat(257), to: 'rounded-lg' }],
+      });
 
     assert.equal(traversal.status, 400);
     assert.equal(malformed.status, 400);
     assert.equal(malformed.body.error.code, 'VALIDATION_ERROR');
+    assert.equal(tooLongChange.status, 400);
+  });
+
+  it('rejects component path arrays over the route limit', async () => {
+    await createTempRoot();
+
+    const res = await request(app)
+      .post('/api/tokens/extract')
+      .send({
+        componentPaths: Array.from({ length: 101 }, (_, index) => `component-${index}.tsx`),
+      });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'VALIDATION_ERROR');
+  });
+
+  it('rejects invalid component override payloads', async () => {
+    const root = await createTempRoot();
+    const filePath = await writeComponent(root, 'components/ui/button.tsx', '<button />');
+    const tokenSet = await createTokenSet({ name: 'Override Tokens' });
+
+    const unsafeTokenSet = await request(app)
+      .put(`/api/tokens/components/${encodeURIComponent(filePath)}/overrides`)
+      .send({
+        overrides: [{ tokenSetId: '../bad', overrides: { radius: { card: 'rounded-lg' } } }],
+      });
+    const unknownTokenSet = await request(app)
+      .put(`/api/tokens/components/${encodeURIComponent(filePath)}/overrides`)
+      .send({
+        overrides: [
+          { tokenSetId: 'token_set_missing', overrides: { radius: { card: 'rounded-lg' } } },
+        ],
+      });
+    const badCategory = await request(app)
+      .put(`/api/tokens/components/${encodeURIComponent(filePath)}/overrides`)
+      .send({
+        overrides: [{ tokenSetId: tokenSet.id, overrides: { nope: { card: 'rounded-lg' } } }],
+      });
+
+    assert.equal(unsafeTokenSet.status, 400);
+    assert.equal(unknownTokenSet.status, 400);
+    assert.equal(badCategory.status, 400);
   });
 
   it('verifies preview and apply response shapes', async () => {

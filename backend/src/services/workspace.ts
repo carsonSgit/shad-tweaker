@@ -6,17 +6,16 @@ import type {
   BackupMetadata,
   Component,
   DesignToken,
-  DesignTokenMap,
   DesignTokenSet,
   Preset,
   RegistrySource,
   Template,
-  TokenCategory,
   WorkspaceConfig,
   WorkspaceManifest,
 } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { isSafeProjectRelativePath } from '../utils/paths.js';
+import { createEmptyTokenMap, TOKEN_CATEGORIES } from '../utils/validation.js';
 
 const WORKSPACE_DIR = '.shadcn-tweaker';
 const MANIFEST_FILE = 'manifest.json';
@@ -34,22 +33,6 @@ const DEFAULT_CONFIG: WorkspaceConfig = {
   validateAfterEdit: true,
   port: 3001,
 };
-
-const TOKEN_CATEGORIES: TokenCategory[] = [
-  'colors',
-  'radius',
-  'spacing',
-  'typography',
-  'border',
-  'shadow',
-  'opacity',
-  'zIndex',
-  'motion',
-  'easing',
-  'duration',
-  'breakpoints',
-  'density',
-];
 
 interface LegacyConfig {
   componentsPath?: string;
@@ -90,10 +73,6 @@ function createDefaultManifest(now: string = new Date().toISOString()): Workspac
     presets: [],
     backups: [],
   };
-}
-
-function createEmptyTokenMap(): DesignTokenMap {
-  return Object.fromEntries(TOKEN_CATEGORIES.map((category) => [category, {}])) as DesignTokenMap;
 }
 
 function normalizeDesignTokenSet(raw: DesignTokenSet): DesignTokenSet {

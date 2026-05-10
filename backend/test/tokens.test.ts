@@ -5,7 +5,6 @@ import { afterEach, describe, it } from 'node:test';
 import fs from 'fs-extra';
 import {
   applyTokenPatch,
-  createEmptyTokenMap,
   createFrequencyReport,
   createInconsistencyReport,
   createTokenSet,
@@ -18,6 +17,7 @@ import {
 } from '../src/services/tokens.js';
 import { loadWorkspaceManifest, recordScannedComponents } from '../src/services/workspace.js';
 import type { Component } from '../src/types/index.js';
+import { createEmptyTokenMap } from '../src/utils/validation.js';
 
 const tempRoots: string[] = [];
 const testWorkspaceBase = path.join(process.cwd(), '.shadcn-tweaker-test-workspaces');

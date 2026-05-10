@@ -16,6 +16,7 @@ import type {
   TokenPatchChange,
   TokenPatchPreviewResult,
 } from '../types/index.js';
+import { createEmptyTokenMap } from '../utils/validation.js';
 import { createBackup } from './backup.js';
 import { createPreview } from './differ.js';
 import { parseComponentSource } from './parser.js';
@@ -24,22 +25,6 @@ import {
   loadWorkspaceManifest,
   mutateWorkspaceManifest,
 } from './workspace.js';
-
-const TOKEN_CATEGORIES: TokenCategory[] = [
-  'colors',
-  'radius',
-  'spacing',
-  'typography',
-  'border',
-  'shadow',
-  'opacity',
-  'zIndex',
-  'motion',
-  'easing',
-  'duration',
-  'breakpoints',
-  'density',
-];
 
 const CATEGORY_PREFIXES: Array<[TokenCategory, RegExp]> = [
   ['radius', /^(rounded|rounded-[trbl][lr]?)(-|$)/],
@@ -75,10 +60,6 @@ const INCONSISTENCY_FAMILIES: Array<{ family: string; category: TokenCategory; p
     { family: 'motion', category: 'motion', pattern: /^(animate|transition|duration|ease)-/ },
   ];
 
-export function createEmptyTokenMap(): DesignTokenMap {
-  return Object.fromEntries(TOKEN_CATEGORIES.map((category) => [category, {}])) as DesignTokenMap;
-}
-
 function slugify(value: string): string {
   return value
     .trim()
@@ -104,10 +85,6 @@ export function classifyTokenClass(className: string): TokenCategory | null {
     }
   }
   return null;
-}
-
-function normalizeUtilityValue(className: string): string {
-  return className.trim();
 }
 
 function getProjectRoot(): string {
@@ -156,7 +133,7 @@ function collectClassesFromContent(componentPath: string, content: string): Toke
       if (category) {
         pushCandidate({
           category,
-          value: normalizeUtilityValue(className),
+          value: className,
           className,
           componentPath,
           source: 'className',
@@ -173,7 +150,7 @@ function collectClassesFromContent(componentPath: string, content: string): Toke
         if (category) {
           pushCandidate({
             category,
-            value: normalizeUtilityValue(className),
+            value: className,
             className,
             componentPath,
             source: 'cn',
@@ -190,7 +167,7 @@ function collectClassesFromContent(componentPath: string, content: string): Toke
       if (category) {
         pushCandidate({
           category,
-          value: normalizeUtilityValue(className),
+          value: className,
           className,
           componentPath,
           source: 'variant',
@@ -209,7 +186,7 @@ function collectClassesFromContent(componentPath: string, content: string): Toke
       if (category && !seenClasses.has(className)) {
         pushCandidate({
           category,
-          value: normalizeUtilityValue(className),
+          value: className,
           className,
           componentPath,
           source: 'fallback',
@@ -336,12 +313,6 @@ export async function deleteTokenSet(id: string): Promise<boolean> {
         ...manifest,
         tokenSets,
         componentTokenOverrides: overrides,
-        components: manifest.components.map((component) => ({
-          ...component,
-          tokenOverrides: component.tokenOverrides?.filter(
-            (override) => override.tokenSetId !== id
-          ),
-        })),
       },
       result: true,
     };
@@ -619,17 +590,6 @@ async function recordComponentOverrides(overrides: ComponentTokenOverride[]): Pr
       manifest: {
         ...manifest,
         componentTokenOverrides: overridesByPath,
-        components: manifest.components.map((component) => {
-          const tokenOverrides = overrideEntries.find(
-            ([componentPath]) => componentPath === component.path
-          )?.[1];
-          return tokenOverrides
-            ? {
-                ...component,
-                tokenOverrides,
-              }
-            : component;
-        }),
       },
       result: undefined,
     };

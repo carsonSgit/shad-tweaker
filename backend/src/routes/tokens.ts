@@ -1,8 +1,6 @@
-import path from 'node:path';
 import { type Request, type Response, Router } from 'express';
 import {
   applyTokenPatch,
-  createEmptyTokenMap,
   createFrequencyReport,
   createInconsistencyReport,
   createTokenSet,
@@ -15,9 +13,11 @@ import {
   putComponentOverrides,
   updateTokenSet,
 } from '../services/tokens.js';
+import { getWorkingDirectory } from '../services/workspace.js';
 import type { ComponentTokenOverride, DesignTokenMap } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import {
+  createEmptyTokenMap,
   isSafeTokenName,
   isSafeTokenSetId,
   isTokenCategory,
@@ -27,12 +27,22 @@ import {
 } from '../utils/validation.js';
 
 const router = Router();
-const PROJECT_DIR = path.resolve(process.cwd(), '..');
+
+function getProjectDir(): string {
+  return getWorkingDirectory();
+}
 
 function sendValidation(res: Response, message: string): void {
   res.status(400).json({
     success: false,
     error: { message, code: 'VALIDATION_ERROR' },
+  });
+}
+
+function sendServerError(res: Response, message: string, code: string): void {
+  res.status(500).json({
+    success: false,
+    error: { message, code },
   });
 }
 
@@ -77,6 +87,60 @@ function validateTokenMap(value: unknown): DesignTokenMap | null {
   }
 
   return map;
+}
+
+function validateComponentTokenOverrides(value: unknown): ComponentTokenOverride[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const overrides: ComponentTokenOverride[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) {
+      return null;
+    }
+
+    const candidate = entry as Record<string, unknown>;
+    if (typeof candidate.tokenSetId !== 'string' || !isSafeTokenSetId(candidate.tokenSetId)) {
+      return null;
+    }
+    if (
+      typeof candidate.overrides !== 'object' ||
+      candidate.overrides === null ||
+      Array.isArray(candidate.overrides)
+    ) {
+      return null;
+    }
+
+    const normalized: ComponentTokenOverride['overrides'] = {};
+    for (const [category, tokens] of Object.entries(
+      candidate.overrides as Record<string, unknown>
+    )) {
+      if (!isTokenCategory(category) || typeof tokens !== 'object' || tokens === null) {
+        return null;
+      }
+      const normalizedTokens: Record<string, string> = {};
+      for (const [tokenName, tokenValue] of Object.entries(tokens as Record<string, unknown>)) {
+        if (
+          !isSafeTokenName(tokenName) ||
+          typeof tokenValue !== 'string' ||
+          tokenValue.length > 256
+        ) {
+          return null;
+        }
+        normalizedTokens[tokenName] = tokenValue;
+      }
+      normalized[category] = normalizedTokens;
+    }
+
+    overrides.push({
+      componentPath: '',
+      tokenSetId: candidate.tokenSetId,
+      overrides: normalized,
+    });
+  }
+
+  return overrides;
 }
 
 router.get('/sets', async (_req: Request, res: Response) => {
@@ -217,92 +281,141 @@ router.delete('/sets/:id', async (req: Request, res: Response) => {
 });
 
 router.post('/extract', async (req: Request, res: Response) => {
-  const validation = validateTokenComponentPaths(req.body?.componentPaths, PROJECT_DIR);
-  if (!validation.valid) {
-    sendValidation(res, validation.error || 'Invalid component paths');
-    return;
+  try {
+    const validation = validateTokenComponentPaths(req.body?.componentPaths, getProjectDir());
+    if (!validation.valid) {
+      sendValidation(res, validation.error || 'Invalid component paths');
+      return;
+    }
+    res.json({ success: true, candidates: await extractTokenCandidates(validation.value) });
+  } catch (error) {
+    logger.error('Failed to extract token candidates', error);
+    sendServerError(res, 'Failed to extract token candidates', 'TOKEN_EXTRACT_ERROR');
   }
-  res.json({ success: true, candidates: await extractTokenCandidates(validation.value) });
 });
 
 router.get('/reports/frequency', async (req: Request, res: Response) => {
-  const componentPaths =
-    typeof req.query.componentPath === 'string' ? [req.query.componentPath] : undefined;
-  const validation = validateTokenComponentPaths(componentPaths, PROJECT_DIR);
-  if (!validation.valid) {
-    sendValidation(res, validation.error || 'Invalid component paths');
-    return;
+  try {
+    const componentPaths =
+      typeof req.query.componentPath === 'string' ? [req.query.componentPath] : undefined;
+    const validation = validateTokenComponentPaths(componentPaths, getProjectDir());
+    if (!validation.valid) {
+      sendValidation(res, validation.error || 'Invalid component paths');
+      return;
+    }
+    res.json({ success: true, report: await createFrequencyReport(validation.value) });
+  } catch (error) {
+    logger.error('Failed to create token frequency report', error);
+    sendServerError(res, 'Failed to create token frequency report', 'TOKEN_FREQUENCY_REPORT_ERROR');
   }
-  res.json({ success: true, report: await createFrequencyReport(validation.value) });
 });
 
 router.get('/reports/inconsistencies', async (req: Request, res: Response) => {
-  const componentPaths =
-    typeof req.query.componentPath === 'string' ? [req.query.componentPath] : undefined;
-  const validation = validateTokenComponentPaths(componentPaths, PROJECT_DIR);
-  if (!validation.valid) {
-    sendValidation(res, validation.error || 'Invalid component paths');
-    return;
+  try {
+    const componentPaths =
+      typeof req.query.componentPath === 'string' ? [req.query.componentPath] : undefined;
+    const validation = validateTokenComponentPaths(componentPaths, getProjectDir());
+    if (!validation.valid) {
+      sendValidation(res, validation.error || 'Invalid component paths');
+      return;
+    }
+    res.json({ success: true, report: await createInconsistencyReport(validation.value) });
+  } catch (error) {
+    logger.error('Failed to create token inconsistency report', error);
+    sendServerError(
+      res,
+      'Failed to create token inconsistency report',
+      'TOKEN_INCONSISTENCY_REPORT_ERROR'
+    );
   }
-  res.json({ success: true, report: await createInconsistencyReport(validation.value) });
 });
 
 router.post('/patch/preview', async (req: Request, res: Response) => {
-  const paths = validateTokenComponentPaths(req.body?.componentPaths, PROJECT_DIR);
-  const changes = validateTokenPatchChanges(req.body?.changes);
-  if (!paths.valid || !paths.value || !changes.valid || !changes.value) {
-    sendValidation(res, paths.error || changes.error || 'Invalid patch payload');
-    return;
+  try {
+    const paths = validateTokenComponentPaths(req.body?.componentPaths, getProjectDir());
+    const changes = validateTokenPatchChanges(req.body?.changes);
+    if (!paths.valid || !paths.value || !changes.valid || !changes.value) {
+      sendValidation(res, paths.error || changes.error || 'Invalid patch payload');
+      return;
+    }
+    const result = await previewTokenPatch(paths.value, changes.value);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    logger.error('Failed to preview token patch', error);
+    sendServerError(res, 'Failed to preview token patch', 'TOKEN_PATCH_PREVIEW_ERROR');
   }
-  const result = await previewTokenPatch(paths.value, changes.value);
-  res.json({ success: true, ...result });
 });
 
 router.post('/patch/apply', async (req: Request, res: Response) => {
-  const paths = validateTokenComponentPaths(req.body?.componentPaths, PROJECT_DIR);
-  const changes = validateTokenPatchChanges(req.body?.changes);
-  if (
-    typeof req.body?.tokenSetId !== 'string' ||
-    !isSafeTokenSetId(req.body.tokenSetId) ||
-    !paths.valid ||
-    !paths.value ||
-    !changes.valid ||
-    !changes.value
-  ) {
-    sendValidation(res, paths.error || changes.error || 'Invalid patch payload');
-    return;
+  try {
+    const paths = validateTokenComponentPaths(req.body?.componentPaths, getProjectDir());
+    const changes = validateTokenPatchChanges(req.body?.changes);
+    if (
+      typeof req.body?.tokenSetId !== 'string' ||
+      !isSafeTokenSetId(req.body.tokenSetId) ||
+      !paths.valid ||
+      !paths.value ||
+      !changes.valid ||
+      !changes.value
+    ) {
+      sendValidation(res, paths.error || changes.error || 'Invalid patch payload');
+      return;
+    }
+    const result = await applyTokenPatch({
+      tokenSetId: req.body.tokenSetId,
+      componentPaths: paths.value,
+      changes: changes.value,
+      createBackup: typeof req.body.createBackup === 'boolean' ? req.body.createBackup : true,
+      recordOverrides:
+        typeof req.body.recordOverrides === 'boolean' ? req.body.recordOverrides : false,
+    });
+    res.status(result.success ? 200 : 500).json(result);
+  } catch (error) {
+    logger.error('Failed to apply token patch', error);
+    sendServerError(res, 'Failed to apply token patch', 'TOKEN_PATCH_APPLY_ERROR');
   }
-  const result = await applyTokenPatch({
-    tokenSetId: req.body.tokenSetId,
-    componentPaths: paths.value,
-    changes: changes.value,
-    createBackup: typeof req.body.createBackup === 'boolean' ? req.body.createBackup : true,
-    recordOverrides:
-      typeof req.body.recordOverrides === 'boolean' ? req.body.recordOverrides : false,
-  });
-  res.status(result.success ? 200 : 500).json(result);
 });
 
 router.get('/components/:componentPath/overrides', async (req: Request, res: Response) => {
-  const validation = validateTokenComponentPath(req.params.componentPath, PROJECT_DIR);
-  if (!validation.valid || !validation.value) {
-    sendValidation(res, validation.error || 'Invalid component path');
-    return;
+  try {
+    const validation = validateTokenComponentPath(req.params.componentPath, getProjectDir());
+    if (!validation.valid || !validation.value) {
+      sendValidation(res, validation.error || 'Invalid component path');
+      return;
+    }
+    res.json({ success: true, overrides: await getComponentOverrides(validation.value) });
+  } catch (error) {
+    logger.error('Failed to get component token overrides', error);
+    sendServerError(res, 'Failed to get component token overrides', 'TOKEN_OVERRIDES_GET_ERROR');
   }
-  res.json({ success: true, overrides: await getComponentOverrides(validation.value) });
 });
 
 router.put('/components/:componentPath/overrides', async (req: Request, res: Response) => {
-  const validation = validateTokenComponentPath(req.params.componentPath, PROJECT_DIR);
-  if (!validation.valid || !validation.value || !Array.isArray(req.body?.overrides)) {
-    sendValidation(res, validation.error || 'Invalid overrides payload');
-    return;
+  try {
+    const validation = validateTokenComponentPath(req.params.componentPath, getProjectDir());
+    const overrides = validateComponentTokenOverrides(req.body?.overrides);
+    if (!validation.valid || !validation.value || !overrides) {
+      sendValidation(res, validation.error || 'Invalid overrides payload');
+      return;
+    }
+    for (const override of overrides) {
+      if (!(await getTokenSet(override.tokenSetId))) {
+        sendValidation(res, `Unknown token set: ${override.tokenSetId}`);
+        return;
+      }
+    }
+    res.json({
+      success: true,
+      overrides: await putComponentOverrides(validation.value, overrides),
+    });
+  } catch (error) {
+    logger.error('Failed to update component token overrides', error);
+    sendServerError(
+      res,
+      'Failed to update component token overrides',
+      'TOKEN_OVERRIDES_UPDATE_ERROR'
+    );
   }
-  const overrides = req.body.overrides as ComponentTokenOverride[];
-  res.json({
-    success: true,
-    overrides: await putComponentOverrides(validation.value, overrides),
-  });
 });
 
 export default router;

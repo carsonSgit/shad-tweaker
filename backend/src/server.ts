@@ -103,7 +103,19 @@ async function start() {
       logger.info('  POST /api/primitive-starters/preview - Preview primitive starter files');
       logger.info('  POST /api/primitive-starters/apply - Apply primitive starter files');
       logger.info('  GET  /api/tokens/sets - List design token sets');
+      logger.info('  POST /api/tokens/sets - Create design token set');
+      logger.info('  GET  /api/tokens/sets/:id - Get design token set');
+      logger.info('  PUT  /api/tokens/sets/:id - Update design token set');
+      logger.info('  DELETE /api/tokens/sets/:id - Delete design token set');
       logger.info('  POST /api/tokens/extract - Extract token candidates');
+      logger.info('  GET  /api/tokens/reports/frequency - Report token frequency');
+      logger.info('  GET  /api/tokens/reports/inconsistencies - Report token inconsistencies');
+      logger.info('  POST /api/tokens/patch/preview - Preview token patch');
+      logger.info('  POST /api/tokens/patch/apply - Apply token patch');
+      logger.info('  GET  /api/tokens/components/:componentPath/overrides - Get token overrides');
+      logger.info(
+        '  PUT  /api/tokens/components/:componentPath/overrides - Update token overrides'
+      );
       logger.info('  GET  /api/templates - List templates');
       logger.info('  POST /api/templates - Create template');
       logger.info('  DELETE /api/templates/:id - Delete template');

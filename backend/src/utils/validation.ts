@@ -2,6 +2,7 @@ import path from 'node:path';
 import type {
   ApplyRequest,
   BatchActionRequest,
+  DesignTokenMap,
   EditRequest,
   TemplateRule,
   TokenCategory,
@@ -175,6 +176,10 @@ export function isTokenCategory(value: unknown): value is TokenCategory {
   return typeof value === 'string' && (TOKEN_CATEGORIES as string[]).includes(value);
 }
 
+export function createEmptyTokenMap(): DesignTokenMap {
+  return Object.fromEntries(TOKEN_CATEGORIES.map((category) => [category, {}])) as DesignTokenMap;
+}
+
 export function isSafeTokenSetId(value: string): boolean {
   return value.length > 0 && value.length <= 96 && /^token_set_[a-z0-9][a-z0-9_-]*$/.test(value);
 }
@@ -248,10 +253,18 @@ export function validateTokenPatchChanges(
     if (!isTokenCategory(candidate.category)) {
       return { valid: false, error: 'Each change requires a valid category' };
     }
-    if (typeof candidate.from !== 'string' || candidate.from.trim().length === 0) {
+    if (
+      typeof candidate.from !== 'string' ||
+      candidate.from.trim().length === 0 ||
+      candidate.from.length > 256
+    ) {
       return { valid: false, error: 'Each change requires a non-empty from value' };
     }
-    if (typeof candidate.to !== 'string' || candidate.to.trim().length === 0) {
+    if (
+      typeof candidate.to !== 'string' ||
+      candidate.to.trim().length === 0 ||
+      candidate.to.length > 256
+    ) {
       return { valid: false, error: 'Each change requires a non-empty to value' };
     }
     if (candidate.tokenName !== undefined) {
