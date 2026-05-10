@@ -129,7 +129,7 @@ describe('token service', () => {
             name: 'Legacy',
             tokens: {
               brand: '#fff',
-              __proto__: '#000',
+              ['__proto__']: '#000',
               radius: { sm: 'rounded-sm' },
             },
             createdAt: '2026-05-09T00:00:00.000Z',
@@ -394,6 +394,28 @@ export function Button() {
       (await fs.readdir(os.tmpdir())).filter((entry) => entry.startsWith('shadcn-tweaker-token-')),
       []
     );
+  });
+
+  it('does not record component overrides without explicit token names', async () => {
+    const root = await createTempRoot();
+    const filePath = await writeComponent(
+      root,
+      'components/ui/unnamed-override.tsx',
+      '<button className="rounded-md" />'
+    );
+    const tokenSet = await createTokenSet({ name: 'Unnamed Override Tokens' });
+
+    const result = await applyTokenPatch({
+      tokenSetId: tokenSet.id,
+      componentPaths: [filePath],
+      changes: [{ category: 'radius', from: 'rounded-md', to: 'rounded-lg' }],
+      createBackup: false,
+      recordOverrides: true,
+    });
+    const overrides = await getComponentOverrides(filePath);
+
+    assert.equal(result.success, true);
+    assert.deepEqual(overrides, []);
   });
 
   it('reports oversized files when applying patches', async () => {

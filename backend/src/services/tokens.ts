@@ -652,13 +652,16 @@ export async function applyTokenPatch(options: {
   }
 
   if ((options.recordOverrides ?? false) && errors.length === 0 && modified.length > 0) {
-    await recordComponentOverrides(
-      modified.map((componentPath) => ({
-        componentPath,
-        tokenSetId: options.tokenSetId,
-        overrides: changesToOverrides(options.changes),
-      }))
-    );
+    const overrideChanges = changesToOverrides(options.changes);
+    if (hasComponentOverrideChanges(overrideChanges)) {
+      await recordComponentOverrides(
+        modified.map((componentPath) => ({
+          componentPath,
+          tokenSetId: options.tokenSetId,
+          overrides: overrideChanges,
+        }))
+      );
+    }
   }
 
   return {
@@ -675,13 +678,19 @@ export async function applyTokenPatch(options: {
 function changesToOverrides(changes: TokenPatchChange[]): ComponentTokenOverride['overrides'] {
   const overrides: ComponentTokenOverride['overrides'] = {};
   for (const change of changes) {
-    const tokenName = change.tokenName ?? change.to;
+    if (!change.tokenName) {
+      continue;
+    }
     overrides[change.category] = {
       ...(overrides[change.category] ?? {}),
-      [tokenName]: change.to,
+      [change.tokenName]: change.to,
     };
   }
   return overrides;
+}
+
+function hasComponentOverrideChanges(overrides: ComponentTokenOverride['overrides']): boolean {
+  return Object.values(overrides).some((tokens) => tokens && Object.keys(tokens).length > 0);
 }
 
 export async function getComponentOverrides(

@@ -123,11 +123,22 @@ describe('token routes', () => {
         componentPaths: [],
         changes: [{ category: 'radius', from: 'x'.repeat(257), to: 'rounded-lg' }],
       });
+    const cascadingChange = await request(app)
+      .post('/api/tokens/patch/preview')
+      .send({
+        componentPaths: [],
+        changes: [
+          { category: 'radius', from: 'rounded-md', to: 'rounded-lg' },
+          { category: 'radius', from: 'rounded-lg', to: 'rounded-xl' },
+        ],
+      });
 
     assert.equal(traversal.status, 400);
     assert.equal(malformed.status, 400);
     assert.equal(malformed.body.error.code, 'VALIDATION_ERROR');
     assert.equal(tooLongChange.status, 400);
+    assert.equal(cascadingChange.status, 400);
+    assert.match(cascadingChange.body.error.message, /cannot cascade/);
   });
 
   it('rejects component path arrays over the route limit', async () => {
