@@ -132,20 +132,23 @@ describe('token routes', () => {
     const tokenSet = await createTokenSet({ name: 'Override Tokens' });
 
     const unsafeTokenSet = await request(app)
-      .put(`/api/tokens/components/${encodeURIComponent(relativePath)}/overrides`)
+      .put('/api/tokens/components/overrides')
       .send({
+        componentPath: relativePath,
         overrides: [{ tokenSetId: '../bad', overrides: { radius: { card: 'rounded-lg' } } }],
       });
     const unknownTokenSet = await request(app)
-      .put(`/api/tokens/components/${encodeURIComponent(relativePath)}/overrides`)
+      .put('/api/tokens/components/overrides')
       .send({
+        componentPath: relativePath,
         overrides: [
           { tokenSetId: 'token_set_missing', overrides: { radius: { card: 'rounded-lg' } } },
         ],
       });
     const badCategory = await request(app)
-      .put(`/api/tokens/components/${encodeURIComponent(relativePath)}/overrides`)
+      .put('/api/tokens/components/overrides')
       .send({
+        componentPath: relativePath,
         overrides: [{ tokenSetId: tokenSet.id, overrides: { nope: { card: 'rounded-lg' } } }],
       });
 
@@ -179,9 +182,9 @@ describe('token routes', () => {
         createBackup: false,
         recordOverrides: true,
       });
-    const overrides = await request(app).get(
-      `/api/tokens/components/${encodeURIComponent(relativePath)}/overrides`
-    );
+    const overrides = await request(app).get('/api/tokens/components/overrides').query({
+      componentPath: relativePath,
+    });
 
     assert.equal(preview.status, 200);
     assert.equal(preview.body.totalChanges, 1);
@@ -236,6 +239,21 @@ describe('token routes', () => {
     assert.equal(get.status, 200);
     assert.equal(get.body.overrides[0].componentPath, relativePath);
     assert.equal(get.body.overrides[0].overrides.radius.card, 'rounded-lg');
+  });
+
+  it('does not expose slash-encoded component override path routes', async () => {
+    const root = await createTempRoot();
+    const { relativePath } = await writeComponent(
+      root,
+      'components/ui/legacy-route.tsx',
+      '<button />'
+    );
+
+    const get = await request(app).get(
+      `/api/tokens/components/${encodeURIComponent(relativePath)}/overrides`
+    );
+
+    assert.equal(get.status, 404);
   });
 
   it('rejects patch apply with an unknown token set before editing files', async () => {

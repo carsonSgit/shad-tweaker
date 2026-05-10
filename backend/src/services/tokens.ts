@@ -624,6 +624,7 @@ export async function applyTokenPatch(options: {
     success: errors.length === 0,
     modified,
     changes: totalChanges,
+    partiallyApplied: errors.length > 0 && modified.length > 0 ? true : undefined,
     backupId,
     errors: errors.length > 0 ? errors : undefined,
   };

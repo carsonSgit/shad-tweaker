@@ -423,6 +423,7 @@ export interface TokenPatchApplyResult {
   success: boolean;
   modified: string[];
   changes: number;
+  partiallyApplied?: boolean;
   backupId?: string;
   errors?: Array<{ path: string; error: string }>;
 }

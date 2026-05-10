@@ -276,6 +276,66 @@ export function Button() {
     assert.match(after, /rounded-md/);
   });
 
+  it('patches arbitrary values exactly and skips variant-prefixed utilities', async () => {
+    const root = await createTempRoot();
+    const filePath = await writeComponent(
+      root,
+      'components/ui/arbitrary.tsx',
+      '<div className="p-[1.5rem] hover:rounded-md focus:hover:rounded-md rounded-md" />'
+    );
+
+    const preview = await previewTokenPatch(filePath ? [filePath] : [], [
+      { category: 'radius', from: 'rounded-md', to: 'rounded-lg' },
+      { category: 'spacing', from: 'p-[1.5rem]', to: 'p-[2rem]' },
+    ]);
+    const after = await fs.readFile(filePath, 'utf-8');
+
+    assert.equal(preview.totalChanges, 2);
+    assert.match(preview.previews[0].after, /p-\[2rem\]/);
+    assert.match(preview.previews[0].after, /hover:rounded-md focus:hover:rounded-md rounded-lg/);
+    assert.match(after, /p-\[1\.5rem\] hover:rounded-md focus:hover:rounded-md rounded-md/);
+  });
+
+  it('marks patch results as partial when a later write fails', async () => {
+    const root = await createTempRoot();
+    const firstPath = await writeComponent(
+      root,
+      'components/ui/partial-first.tsx',
+      '<button className="rounded-md" />'
+    );
+    const secondPath = await writeComponent(
+      root,
+      'components/ui/partial-second.tsx',
+      '<button className="rounded-md" />'
+    );
+    const tokenSet = await createTokenSet({ name: 'Partial Patch Tokens' });
+    const originalMove = fs.move;
+    let moveCount = 0;
+    fs.move = (async (...args: Parameters<typeof fs.move>) => {
+      moveCount += 1;
+      if (moveCount === 2) {
+        throw new Error('simulated move failure');
+      }
+      return originalMove(...args);
+    }) as typeof fs.move;
+
+    try {
+      const result = await applyTokenPatch({
+        tokenSetId: tokenSet.id,
+        componentPaths: [firstPath, secondPath],
+        changes: [{ category: 'radius', from: 'rounded-md', to: 'rounded-lg' }],
+        createBackup: false,
+      });
+
+      assert.equal(result.success, false);
+      assert.equal(result.partiallyApplied, true);
+      assert.deepEqual(result.modified, [firstPath]);
+      assert.match(result.errors?.[0].error ?? '', /simulated move failure/);
+    } finally {
+      fs.move = originalMove;
+    }
+  });
+
   it('skips oversized files when previewing patches', async () => {
     const root = await createTempRoot();
     const filePath = await writeComponent(

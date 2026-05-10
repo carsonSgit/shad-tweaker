@@ -341,7 +341,14 @@ export async function applyTokenPatch(input: {
   createBackup?: boolean;
   recordOverrides?: boolean;
 }): Promise<
-  ApiResponse<{ success: boolean; modified: string[]; changes: number; backupId?: string }>
+  ApiResponse<{
+    success: boolean;
+    modified: string[];
+    changes: number;
+    partiallyApplied?: boolean;
+    backupId?: string;
+    errors?: Array<{ path: string; error: string }>;
+  }>
 > {
   return request('/api/tokens/patch/apply', {
     method: 'POST',
