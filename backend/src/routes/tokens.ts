@@ -164,10 +164,7 @@ router.get('/sets', async (_req: Request, res: Response) => {
     res.json({ success: true, tokenSets: await listTokenSets() });
   } catch (error) {
     logger.error('Failed to list token sets', error);
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to list token sets', code: 'TOKEN_SET_LIST_ERROR' },
-    });
+    sendServerError(res, 'Failed to list token sets', 'TOKEN_SET_LIST_ERROR');
   }
 });
 
@@ -225,10 +222,7 @@ router.get('/sets/:id', async (req: Request, res: Response) => {
     res.json({ success: true, tokenSet });
   } catch (error) {
     logger.error(`Failed to get token set ${req.params.id}`, error);
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to get token set', code: 'TOKEN_SET_GET_ERROR' },
-    });
+    sendServerError(res, 'Failed to get token set', 'TOKEN_SET_GET_ERROR');
   }
 });
 
@@ -291,10 +285,7 @@ router.delete('/sets/:id', async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (error) {
     logger.error(`Failed to delete token set ${req.params.id}`, error);
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to delete token set', code: 'TOKEN_SET_DELETE_ERROR' },
-    });
+    sendServerError(res, 'Failed to delete token set', 'TOKEN_SET_DELETE_ERROR');
   }
 });
 

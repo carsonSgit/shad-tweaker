@@ -108,7 +108,7 @@ function normalizeTokenSetNameForConflict(name: string): string {
 }
 
 function normalizeTokenSet(tokenSet: DesignTokenSet): DesignTokenSet {
-  return { ...tokenSet, tokens: { ...createEmptyTokenMap(), ...tokenSet.tokens } };
+  return tokenSet;
 }
 
 export function classifyTokenClass(className: string): TokenCategory | null {
@@ -242,31 +242,13 @@ function collectClassesFromContent(componentPath: string, content: string): Toke
     }
   }
 
-  const seenClasses = new Set(candidates.map((candidate) => candidate.className));
-  const classMatches = content.match(/className\s*=\s*["'`]([^"'`]+)["'`]/g) || [];
-  for (const match of classMatches) {
-    const value = match.replace(/^className\s*=\s*["'`]/, '').replace(/["'`]$/, '');
-    for (const className of value.split(/\s+/).filter(Boolean)) {
-      const category = classifyTokenClass(className);
-      if (category && !seenClasses.has(className)) {
-        pushCandidate({
-          category,
-          value: className,
-          className,
-          componentPath,
-          source: 'fallback',
-        });
-        seenClasses.add(className);
-      }
-    }
-  }
-
   return candidates;
 }
 
 async function readCandidates(componentPaths?: string[]): Promise<TokenCandidate[]> {
   const manifest = await loadWorkspaceManifest();
   const paths = componentPaths ?? manifest.components.map((component) => component.path);
+  // TODO: batch reads (e.g. p-limit) when workspace component counts grow large enough to spike I/O
   const results = await Promise.all(
     paths.map(async (componentPath) => {
       const safePath = await resolveSafeExistingComponentPath(componentPath);

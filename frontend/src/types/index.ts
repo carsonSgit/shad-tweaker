@@ -113,7 +113,7 @@ export interface TokenCandidate {
   value: string;
   className: string;
   componentPath: string;
-  source: 'className' | 'cn' | 'variant' | 'fallback';
+  source: 'className' | 'cn' | 'variant';
   line?: number;
 }
 
