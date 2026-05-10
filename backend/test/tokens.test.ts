@@ -6,6 +6,7 @@ import { afterEach, describe, it } from 'node:test';
 import fs from 'fs-extra';
 import {
   applyTokenPatch,
+  classifyTokenClass,
   createFrequencyReport,
   createInconsistencyReport,
   createTokenSet,
@@ -209,6 +210,13 @@ export function Button() {
       'rounded-md',
       'shadow-sm',
     ]);
+  });
+
+  it('classifies Tailwind logical spacing utilities', () => {
+    assert.equal(classifyTokenClass('ps-4'), 'spacing');
+    assert.equal(classifyTokenClass('pe-4'), 'spacing');
+    assert.equal(classifyTokenClass('ms-2'), 'spacing');
+    assert.equal(classifyTokenClass('me-2'), 'spacing');
   });
 
   it('reports token frequency across multiple components', async () => {

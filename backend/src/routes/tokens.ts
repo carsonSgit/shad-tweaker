@@ -43,26 +43,26 @@ function sendServerError(res: Response, message: string, code: string): void {
   });
 }
 
-function isTokenSetConflict(error: unknown): boolean {
-  return error instanceof TokenSetConflictError;
-}
-
-async function sendComponentOverridesForPath(
-  res: Response,
-  componentPathValue: unknown,
-  overridesValue?: unknown
-): Promise<void> {
+async function readOverrides(res: Response, componentPathValue: unknown): Promise<void> {
   const validation = validateTokenComponentPath(componentPathValue, getWorkingDirectory());
   if (!validation.valid || !validation.value) {
     sendValidation(res, validation.error || 'Invalid component path');
     return;
   }
 
-  if (overridesValue === undefined) {
-    res.json({ success: true, overrides: await getComponentOverrides(validation.value) });
+  res.json({ success: true, overrides: await getComponentOverrides(validation.value) });
+}
+
+async function writeOverrides(
+  res: Response,
+  componentPathValue: unknown,
+  overridesValue: unknown
+): Promise<void> {
+  const validation = validateTokenComponentPath(componentPathValue, getWorkingDirectory());
+  if (!validation.valid || !validation.value) {
+    sendValidation(res, validation.error || 'Invalid component path');
     return;
   }
-
   const overrides = validateComponentTokenOverrides(overridesValue);
   if (!overrides) {
     sendValidation(res, 'Invalid overrides payload');
@@ -229,7 +229,7 @@ router.post('/sets', async (req: Request, res: Response) => {
     res.status(201).json({ success: true, tokenSet });
   } catch (error) {
     logger.error('Failed to create token set', error);
-    const conflict = isTokenSetConflict(error);
+    const conflict = error instanceof TokenSetConflictError;
     res.status(conflict ? 409 : 500).json({
       success: false,
       error: {
@@ -295,7 +295,7 @@ router.put('/sets/:id', async (req: Request, res: Response) => {
     res.json({ success: true, tokenSet });
   } catch (error) {
     logger.error(`Failed to update token set ${req.params.id}`, error);
-    const conflict = isTokenSetConflict(error);
+    const conflict = error instanceof TokenSetConflictError;
     res.status(conflict ? 409 : 500).json({
       success: false,
       error: {
@@ -398,16 +398,13 @@ router.post('/patch/preview', async (req: Request, res: Response) => {
 
 router.post('/patch/apply', async (req: Request, res: Response) => {
   try {
+    if (typeof req.body?.tokenSetId !== 'string' || !isSafeTokenSetId(req.body.tokenSetId)) {
+      sendValidation(res, 'Invalid token set ID');
+      return;
+    }
     const paths = validateTokenComponentPaths(req.body?.componentPaths, getWorkingDirectory());
     const changes = validateTokenPatchChanges(req.body?.changes);
-    if (
-      typeof req.body?.tokenSetId !== 'string' ||
-      !isSafeTokenSetId(req.body.tokenSetId) ||
-      !paths.valid ||
-      !paths.value ||
-      !changes.valid ||
-      !changes.value
-    ) {
+    if (!paths.valid || !paths.value || !changes.valid || !changes.value) {
       sendValidation(res, paths.error || changes.error || 'Invalid patch payload');
       return;
     }
@@ -432,7 +429,7 @@ router.post('/patch/apply', async (req: Request, res: Response) => {
 
 router.get('/components/overrides', async (req: Request, res: Response) => {
   try {
-    await sendComponentOverridesForPath(res, req.query.componentPath);
+    await readOverrides(res, req.query.componentPath);
   } catch (error) {
     logger.error('Failed to get component token overrides', error);
     sendServerError(res, 'Failed to get component token overrides', 'TOKEN_OVERRIDES_GET_ERROR');
@@ -441,7 +438,7 @@ router.get('/components/overrides', async (req: Request, res: Response) => {
 
 router.put('/components/overrides', async (req: Request, res: Response) => {
   try {
-    await sendComponentOverridesForPath(res, req.body?.componentPath, req.body?.overrides);
+    await writeOverrides(res, req.body?.componentPath, req.body?.overrides);
   } catch (error) {
     logger.error('Failed to update component token overrides', error);
     sendServerError(

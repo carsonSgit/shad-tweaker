@@ -112,10 +112,8 @@ async function start() {
       logger.info('  GET  /api/tokens/reports/inconsistencies - Report token inconsistencies');
       logger.info('  POST /api/tokens/patch/preview - Preview token patch');
       logger.info('  POST /api/tokens/patch/apply - Apply token patch');
-      logger.info('  GET  /api/tokens/components/:componentPath/overrides - Get token overrides');
-      logger.info(
-        '  PUT  /api/tokens/components/:componentPath/overrides - Update token overrides'
-      );
+      logger.info('  GET  /api/tokens/components/overrides - Get token overrides');
+      logger.info('  PUT  /api/tokens/components/overrides - Update token overrides');
       logger.info('  GET  /api/templates - List templates');
       logger.info('  POST /api/templates - Create template');
       logger.info('  DELETE /api/templates/:id - Delete template');

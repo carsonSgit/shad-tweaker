@@ -280,6 +280,29 @@ describe('token routes', () => {
     assert.match(content, /rounded-md/);
   });
 
+  it('returns a specific validation error for invalid patch apply token set IDs', async () => {
+    await createTempRoot();
+
+    const missing = await request(app)
+      .post('/api/tokens/patch/apply')
+      .send({
+        componentPaths: ['components/ui/button.tsx'],
+        changes: [{ category: 'radius', from: 'rounded-md', to: 'rounded-lg' }],
+      });
+    const unsafe = await request(app)
+      .post('/api/tokens/patch/apply')
+      .send({
+        tokenSetId: '../bad',
+        componentPaths: ['components/ui/button.tsx'],
+        changes: [{ category: 'radius', from: 'rounded-md', to: 'rounded-lg' }],
+      });
+
+    assert.equal(missing.status, 400);
+    assert.equal(missing.body.error.message, 'Invalid token set ID');
+    assert.equal(unsafe.status, 400);
+    assert.equal(unsafe.body.error.message, 'Invalid token set ID');
+  });
+
   it('returns 400 for patch apply input paths that cannot be resolved', async () => {
     await createTempRoot();
     const tokenSet = await createTokenSet({ name: 'Missing Apply Path Tokens' });

@@ -32,7 +32,10 @@ import {
 
 const CATEGORY_PREFIXES: Array<[TokenCategory, RegExp]> = [
   ['radius', /^(rounded|rounded-[trbl][lr]?)(-|$)/],
-  ['spacing', /^(p|px|py|pt|pr|pb|pl|m|mx|my|mt|mr|mb|ml|gap|gap-x|gap-y|space-x|space-y)-/],
+  [
+    'spacing',
+    /^(p|px|py|pt|pr|pb|pl|ps|pe|m|mx|my|mt|mr|mb|ml|ms|me|gap|gap-x|gap-y|space-x|space-y)-/,
+  ],
   ['typography', /^(text|font|leading|tracking|line-clamp)-/],
   ['border', /^(border|border-[trblxy]|divide-x|divide-y)(-|$)/],
   ['shadow', /^shadow($|-)/],
@@ -246,21 +249,21 @@ function collectClassesFromContent(componentPath: string, content: string): Toke
 async function readCandidates(componentPaths?: string[]): Promise<TokenCandidate[]> {
   const manifest = await loadWorkspaceManifest();
   const paths = componentPaths ?? manifest.components.map((component) => component.path);
-  const candidates: TokenCandidate[] = [];
+  const results = await Promise.all(
+    paths.map(async (componentPath) => {
+      const safePath = await resolveSafeExistingComponentPath(componentPath);
+      if (!safePath) {
+        return [];
+      }
+      if (!(await isTokenComponentFileSizeAllowed(safePath))) {
+        return [];
+      }
+      const content = await fs.readFile(safePath, 'utf-8');
+      return collectClassesFromContent(safePath, content);
+    })
+  );
 
-  for (const componentPath of paths) {
-    const safePath = await resolveSafeExistingComponentPath(componentPath);
-    if (!safePath) {
-      continue;
-    }
-    if (!(await isTokenComponentFileSizeAllowed(safePath))) {
-      continue;
-    }
-    const content = await fs.readFile(safePath, 'utf-8');
-    candidates.push(...collectClassesFromContent(safePath, content));
-  }
-
-  return candidates;
+  return results.flat();
 }
 
 export async function listTokenSets(): Promise<DesignTokenSet[]> {
@@ -499,26 +502,34 @@ export async function previewTokenPatch(
   componentPaths: string[],
   changes: TokenPatchChange[]
 ): Promise<TokenPatchPreviewResult> {
-  const previews = [];
-  let totalChanges = 0;
+  const results = await Promise.all(
+    componentPaths.map(async (componentPath) => {
+      const safePath = await resolveSafeExistingComponentPath(componentPath);
+      if (!safePath) {
+        return null;
+      }
+      if (!(await isTokenComponentFileSizeAllowed(safePath))) {
+        return null;
+      }
+      const content = await fs.readFile(safePath, 'utf-8');
+      const patched = applyPatchChanges(content, changes);
+      if (patched.changes > 0) {
+        return {
+          preview: createPreview(safePath, content, patched.content),
+          changes: patched.changes,
+        };
+      }
+      return null;
+    })
+  );
+  const changedResults = results.filter((result): result is NonNullable<typeof result> =>
+    Boolean(result)
+  );
 
-  for (const componentPath of componentPaths) {
-    const safePath = await resolveSafeExistingComponentPath(componentPath);
-    if (!safePath) {
-      continue;
-    }
-    if (!(await isTokenComponentFileSizeAllowed(safePath))) {
-      continue;
-    }
-    const content = await fs.readFile(safePath, 'utf-8');
-    const patched = applyPatchChanges(content, changes);
-    if (patched.changes > 0) {
-      previews.push(createPreview(safePath, content, patched.content));
-      totalChanges += patched.changes;
-    }
-  }
-
-  return { previews, totalChanges };
+  return {
+    previews: changedResults.map((result) => result.preview),
+    totalChanges: changedResults.reduce((total, result) => total + result.changes, 0),
+  };
 }
 
 async function tempPathFor(filePath: string): Promise<{ tempDir: string; tempPath: string }> {
