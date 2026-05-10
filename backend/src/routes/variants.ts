@@ -33,7 +33,7 @@ function variantErrorResponse(error: unknown, fallback: string) {
     return {
       status: 400,
       message: error.message,
-      code: error instanceof VariantBuilderValidationError ? error.code : error.code,
+      code: error.code,
     };
   }
   if (error instanceof VariantBuilderUnsupportedError) {

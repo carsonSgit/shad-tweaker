@@ -149,6 +149,7 @@ export interface TokenPatchChange {
   tokenName?: string;
 }
 
+// Keep variant builder types in sync with backend/src/types/index.ts.
 export type VariantSystemKind = 'cva' | 'tv' | 'manual' | 'unsupported';
 
 export interface VariantValue {

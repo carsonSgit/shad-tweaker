@@ -38,11 +38,7 @@ interface VariantPreviewRequest {
 
 export async function listVariantComponents(cwd: string): Promise<VariantComponentSummary[]> {
   const components = await listComponentLibrary(cwd);
-  return Promise.all(
-    components.map(async (component) =>
-      summarizeDetail(await getComponentLibraryDetail(cwd, component.path))
-    )
-  );
+  return components.map((component) => component.variants ?? emptyVariantSummary(component));
 }
 
 export async function getVariantComponentDetail(
@@ -92,17 +88,6 @@ export async function previewVariantGeneration(
     after,
     diff: createPatch(component.path, component.content, after, 'before', 'after'),
     changes: 1,
-  };
-}
-
-function summarizeDetail(component: ComponentLibraryDetail): VariantComponentSummary {
-  const detail = detailFromComponent(component);
-  return {
-    name: detail.name,
-    path: detail.path,
-    variantCount: detail.variantCount,
-    systems: detail.systems,
-    axes: detail.axes,
   };
 }
 
@@ -249,7 +234,7 @@ function parseManualAxes(objectLiteral: ts.ObjectLiteralExpression): VariantAxis
 }
 
 function detectUnsupportedVariantDiagnostics(content: string): ParserDiagnostic[] {
-  if (!/\b(?:variant|size|tone|density)\b[^?;{]*\?/.test(content)) return [];
+  if (!/\b[a-zA-Z_$][\w$]*\s*(?:===|!==|==|!=)\s*[^?;{]+\?/.test(content)) return [];
   return [
     {
       severity: 'info',
@@ -309,42 +294,114 @@ function applyOperationToRawDefinition(raw: string, operation: VariantPreviewOpe
 }
 
 function addAxisToRawDefinition(raw: string, axis: VariantAxis, defaultValue?: string): string {
-  const axisBlock = `${axis.name}: {\n${axis.values
-    .map((value) => `        ${value.name}: '${value.classes.join(' ')}',`)
-    .join('\n')}\n      },`;
-  const withAxis = raw.replace(/variants:\s*{\s*/, (match) => `${match}\n      ${axisBlock}\n`);
+  const indent = detectVariantIndent(raw);
+  const axisBlock = `${indent.value}${formatObjectKey(axis.name)}: {\n${axis.values
+    .map(
+      (value) =>
+        `${indent.valueValue}${formatObjectKey(value.name)}: '${escapeSingleQuotedLiteral(
+          value.classes.join(' ')
+        )}',`
+    )
+    .join('\n')}\n${indent.value}},`;
+  const withAxis = raw.replace(/variants:\s*{\s*/, (match) => `${match}\n${axisBlock}\n`);
   const selectedDefault = defaultValue ?? axis.defaultValue;
   if (!selectedDefault) return withAxis;
   if (/defaultVariants:\s*{/.test(withAxis)) {
     return withAxis.replace(
       /defaultVariants:\s*{\s*/,
-      (match) => `${match}\n      ${axis.name}: '${selectedDefault}',`
+      (match) =>
+        `${match}\n${indent.value}${formatObjectKey(axis.name)}: '${escapeSingleQuotedLiteral(
+          selectedDefault
+        )}',`
     );
   }
   return withAxis.replace(
     /}\s*\)?\s*;?\s*$/,
-    `,\n    defaultVariants: {\n      ${axis.name}: '${selectedDefault}',\n    },\n  }\n)`
+    `,\n${indent.config}defaultVariants: {\n${indent.value}${formatObjectKey(
+      axis.name
+    )}: '${escapeSingleQuotedLiteral(selectedDefault)}',\n${indent.config}},\n${indent.close}}\n)`
   );
 }
 
 function addValueToRawDefinition(raw: string, axisName: string, value: VariantValue): string {
+  const indent = detectVariantIndent(raw);
   const axisPattern = new RegExp(`(${escapeRegExp(axisName)}\\s*:\\s*{)`);
-  return raw.replace(axisPattern, `$1\n        ${value.name}: '${value.classes.join(' ')}',`);
+  return raw.replace(
+    axisPattern,
+    `$1\n${indent.valueValue}${formatObjectKey(value.name)}: '${escapeSingleQuotedLiteral(
+      value.classes.join(' ')
+    )}',`
+  );
 }
 
 function setDefaultInRawDefinition(raw: string, axisName: string, valueName: string): string {
+  const indent = detectVariantIndent(raw);
   const defaultAxisPattern = new RegExp(`(${escapeRegExp(axisName)}\\s*:\\s*)['"][^'"]+['"]`);
-  if (defaultAxisPattern.test(raw)) return raw.replace(defaultAxisPattern, `$1'${valueName}'`);
+  if (defaultAxisPattern.test(raw)) {
+    return raw.replace(defaultAxisPattern, `$1'${escapeSingleQuotedLiteral(valueName)}'`);
+  }
   if (/defaultVariants:\s*{/.test(raw)) {
     return raw.replace(
       /defaultVariants:\s*{\s*/,
-      (match) => `${match}\n      ${axisName}: '${valueName}',`
+      (match) =>
+        `${match}\n${indent.value}${formatObjectKey(axisName)}: '${escapeSingleQuotedLiteral(
+          valueName
+        )}',`
     );
   }
   return raw.replace(
     /}\s*\)?\s*;?\s*$/,
-    `,\n    defaultVariants: {\n      ${axisName}: '${valueName}',\n    },\n  }\n)`
+    `,\n${indent.config}defaultVariants: {\n${indent.value}${formatObjectKey(
+      axisName
+    )}: '${escapeSingleQuotedLiteral(valueName)}',\n${indent.config}},\n${indent.close}}\n)`
   );
+}
+
+function emptyVariantSummary(component: { name: string; path: string }): VariantComponentSummary {
+  return {
+    name: component.name,
+    path: component.path,
+    variantCount: 0,
+    systems: [],
+    axes: [],
+  };
+}
+
+function detectVariantIndent(raw: string): {
+  config: string;
+  value: string;
+  valueValue: string;
+  close: string;
+} {
+  const variantsLine = raw.match(/(^[ \t]*)variants:\s*{/m);
+  const config = variantsLine?.[1] ?? '    ';
+  const unit = detectIndentUnit(raw) ?? '  ';
+  return {
+    config,
+    value: `${config}${unit}`,
+    valueValue: `${config}${unit}${unit}`,
+    close: config.slice(0, Math.max(0, config.length - unit.length)),
+  };
+}
+
+function detectIndentUnit(raw: string): string | null {
+  const indents = [...raw.matchAll(/^\s*\S/gm)].map((match) => match[0].slice(0, -1));
+  const sorted = [...new Set(indents)].sort((a, b) => a.length - b.length);
+  for (let index = 1; index < sorted.length; index += 1) {
+    if (sorted[index].startsWith(sorted[index - 1])) {
+      const unit = sorted[index].slice(sorted[index - 1].length);
+      if (unit.length > 0) return unit;
+    }
+  }
+  return null;
+}
+
+function formatObjectKey(value: string): string {
+  return /^[A-Za-z_$][\w$]*$/.test(value) ? value : `'${escapeSingleQuotedLiteral(value)}'`;
+}
+
+function escapeSingleQuotedLiteral(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 function replaceOnce(content: string, search: string, replacement: string): string {

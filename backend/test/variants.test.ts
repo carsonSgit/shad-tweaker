@@ -136,6 +136,60 @@ export function Badge({ tone }: { tone: "neutral" | "brand" }) {
     );
   });
 
+  it('reports unsupported conditional diagnostics for arbitrary axis names', async () => {
+    const root = await createTempRoot();
+    await writeComponent(
+      root,
+      'pill',
+      `
+export function Pill({ intent }: { intent: "info" | "danger" }) {
+  return <span className={intent === "danger" ? "bg-destructive" : "bg-primary"} />;
+}
+`
+    );
+
+    const detail = await getVariantComponentDetail(root, 'pill');
+
+    assert.ok(
+      detail.diagnostics.some((diagnostic) => diagnostic.code === 'UNSUPPORTED_VARIANT_EXPRESSION')
+    );
+  });
+
+  it('generates a non-mutating preview for adding a cva axis', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+    variants: {
+        variant: {
+            default: "bg-primary",
+        },
+    },
+});
+export function Button() { return <button />; }
+`
+    );
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'buttonVariants',
+      operation: {
+        type: 'add-axis',
+        axis: {
+          name: 'size',
+          values: [{ name: 'sm', classes: ['h-8', 'px-3'] }],
+        },
+        defaultValue: 'sm',
+      },
+    });
+
+    assert.match(preview.after, /size: {\n\s+sm: 'h-8 px-3'/);
+    assert.match(preview.after, /defaultVariants: {\n\s+size: 'sm'/);
+  });
+
   it('generates a non-mutating preview for adding a cva value', async () => {
     const root = await createTempRoot();
     const relativePath = await writeComponent(
@@ -171,6 +225,86 @@ export function Button() { return <button />; }
     assert.match(preview.after, /ghost: 'bg-transparent hover:bg-accent'/);
     assert.match(preview.diff, /ghost/);
     assert.equal(after, before);
+  });
+
+  it('escapes single quotes in generated preview literals', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+  variants: {
+    variant: {
+      default: "bg-primary",
+    },
+  },
+  defaultVariants: { variant: "default" },
+});
+export function Button() { return <button />; }
+`
+    );
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'buttonVariants',
+      operation: {
+        type: 'add-value',
+        axisName: 'variant',
+        value: { name: 'quoted', classes: ["content-['']", "text-[color:'red']"] },
+      },
+    });
+
+    assert.match(preview.after, /content-\[\\'\\'\] text-\[color:\\'red\\'\]/);
+  });
+
+  it('replaces an existing default variant in preview output', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+  variants: { variant: { default: "bg-primary", ghost: "bg-transparent" } },
+  defaultVariants: { variant: "default" },
+});
+export function Button() { return <button />; }
+`
+    );
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'buttonVariants',
+      operation: { type: 'set-default', axisName: 'variant', valueName: 'ghost' },
+    });
+
+    assert.match(preview.after, /defaultVariants: { variant: 'ghost' }/);
+  });
+
+  it('injects a missing default variant in preview output', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+  variants: { variant: { default: "bg-primary", ghost: "bg-transparent" } },
+  defaultVariants: {},
+});
+export function Button() { return <button />; }
+`
+    );
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'buttonVariants',
+      operation: { type: 'set-default', axisName: 'variant', valueName: 'ghost' },
+    });
+
+    assert.match(preview.after, /defaultVariants: {\n\s+variant: 'ghost'/);
   });
 
   it('rejects duplicate preview values before generating output', async () => {
