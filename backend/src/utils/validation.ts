@@ -196,7 +196,7 @@ export function validateTokenComponentPath(
     return { valid: false, error: pathValidation.error || 'Invalid component path' };
   }
 
-  return { valid: true, value: componentPath };
+  return { valid: true, value: path.resolve(projectDir, componentPath) };
 }
 
 export function validateTokenComponentPaths(
@@ -222,7 +222,10 @@ export function validateTokenComponentPaths(
     return { valid: false, error: pathValidation.error || 'Invalid component paths' };
   }
 
-  return { valid: true, value: componentPaths };
+  return {
+    valid: true,
+    value: componentPaths.map((componentPath) => path.resolve(projectDir, componentPath)),
+  };
 }
 
 export function validateTokenPatchChanges(

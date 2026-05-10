@@ -19,7 +19,11 @@ import type {
 import { createBackup } from './backup.js';
 import { createPreview } from './differ.js';
 import { parseComponentSource } from './parser.js';
-import { loadWorkspaceManifest, mutateWorkspaceManifest } from './workspace.js';
+import {
+  getWorkingDirectory,
+  loadWorkspaceManifest,
+  mutateWorkspaceManifest,
+} from './workspace.js';
 
 const TOKEN_CATEGORIES: TokenCategory[] = [
   'colors',
@@ -104,6 +108,32 @@ export function classifyTokenClass(className: string): TokenCategory | null {
 
 function normalizeUtilityValue(className: string): string {
   return className.trim();
+}
+
+function getProjectRoot(): string {
+  return path.resolve(getWorkingDirectory());
+}
+
+async function resolveSafeExistingComponentPath(componentPath: string): Promise<string | null> {
+  const projectRoot = getProjectRoot();
+  const resolvedProjectRoot = path.resolve(projectRoot);
+  const resolvedPath = path.resolve(projectRoot, componentPath);
+
+  try {
+    const realProjectRoot = await fs.realpath(resolvedProjectRoot);
+    const realComponentPath = await fs.realpath(resolvedPath);
+    const rootPrefix = realProjectRoot.endsWith(path.sep)
+      ? realProjectRoot
+      : `${realProjectRoot}${path.sep}`;
+
+    if (realComponentPath !== realProjectRoot && !realComponentPath.startsWith(rootPrefix)) {
+      return null;
+    }
+
+    return realComponentPath;
+  } catch {
+    return null;
+  }
 }
 
 function collectClassesFromContent(componentPath: string, content: string): TokenCandidate[] {
@@ -198,11 +228,12 @@ async function readCandidates(componentPaths?: string[]): Promise<TokenCandidate
   const candidates: TokenCandidate[] = [];
 
   for (const componentPath of paths) {
-    if (!(await fs.pathExists(componentPath))) {
+    const safePath = await resolveSafeExistingComponentPath(componentPath);
+    if (!safePath) {
       continue;
     }
-    const content = await fs.readFile(componentPath, 'utf-8');
-    candidates.push(...collectClassesFromContent(componentPath, content));
+    const content = await fs.readFile(safePath, 'utf-8');
+    candidates.push(...collectClassesFromContent(safePath, content));
   }
 
   return candidates;
@@ -442,10 +473,14 @@ export async function previewTokenPatch(
   let totalChanges = 0;
 
   for (const componentPath of componentPaths) {
-    const content = await fs.readFile(componentPath, 'utf-8');
+    const safePath = await resolveSafeExistingComponentPath(componentPath);
+    if (!safePath) {
+      continue;
+    }
+    const content = await fs.readFile(safePath, 'utf-8');
     const patched = applyPatchChanges(content, changes);
     if (patched.changes > 0) {
-      previews.push(createPreview(componentPath, content, patched.content));
+      previews.push(createPreview(safePath, content, patched.content));
       totalChanges += patched.changes;
     }
   }
@@ -453,11 +488,9 @@ export async function previewTokenPatch(
   return { previews, totalChanges };
 }
 
-function tempPathFor(filePath: string): string {
-  return path.join(
-    os.tmpdir(),
-    `shadcn-tweaker-token-${crypto.randomUUID()}-${path.basename(filePath)}`
-  );
+async function tempPathFor(filePath: string): Promise<string> {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'shadcn-tweaker-token-'));
+  return path.join(tempDir, `${crypto.randomUUID()}-${path.basename(filePath)}`);
 }
 
 export async function applyTokenPatch(options: {
@@ -471,20 +504,25 @@ export async function applyTokenPatch(options: {
   const errors: Array<{ path: string; error: string }> = [];
   let totalChanges = 0;
   let backupId: string | undefined;
+  const safePaths = (
+    await Promise.all(
+      options.componentPaths.map((componentPath) => resolveSafeExistingComponentPath(componentPath))
+    )
+  ).filter((componentPath): componentPath is string => typeof componentPath === 'string');
 
   if (options.createBackup ?? true) {
-    const backup = await createBackup(options.componentPaths);
+    const backup = await createBackup(safePaths);
     backupId = backup.id;
   }
 
-  for (const componentPath of options.componentPaths) {
+  for (const componentPath of safePaths) {
     try {
       const content = await fs.readFile(componentPath, 'utf-8');
       const patched = applyPatchChanges(content, options.changes);
       if (patched.changes === 0) {
         continue;
       }
-      const tmp = tempPathFor(componentPath);
+      const tmp = await tempPathFor(componentPath);
       await fs.writeFile(tmp, patched.content, 'utf-8');
       await fs.move(tmp, componentPath, { overwrite: true });
       modified.push(componentPath);
@@ -532,37 +570,66 @@ export async function getComponentOverrides(
   componentPath: string
 ): Promise<ComponentTokenOverride[]> {
   const manifest = await loadWorkspaceManifest();
-  return manifest.componentTokenOverrides?.[componentPath] ?? [];
+  const safePath = await resolveSafeExistingComponentPath(componentPath);
+  if (!safePath) {
+    return [];
+  }
+  return (
+    Object.entries(manifest.componentTokenOverrides ?? {}).find(
+      ([storedPath]) => storedPath === safePath
+    )?.[1] ?? []
+  );
 }
 
 export async function putComponentOverrides(
   componentPath: string,
   overrides: ComponentTokenOverride[]
 ): Promise<ComponentTokenOverride[]> {
-  await recordComponentOverrides(overrides.map((override) => ({ ...override, componentPath })));
-  return getComponentOverrides(componentPath);
+  const safePath = await resolveSafeExistingComponentPath(componentPath);
+  if (!safePath) {
+    return [];
+  }
+  await recordComponentOverrides(
+    overrides.map((override) => ({ ...override, componentPath: safePath }))
+  );
+  return getComponentOverrides(safePath);
 }
 
 async function recordComponentOverrides(overrides: ComponentTokenOverride[]): Promise<void> {
   await mutateWorkspaceManifest(async (manifest) => {
-    const componentTokenOverrides = { ...(manifest.componentTokenOverrides ?? {}) };
+    const componentTokenOverrides = new Map<string, ComponentTokenOverride[]>(
+      Object.entries(manifest.componentTokenOverrides ?? {})
+    );
     for (const override of overrides) {
-      const existing = componentTokenOverrides[override.componentPath] ?? [];
-      componentTokenOverrides[override.componentPath] = [
+      const safePath = await resolveSafeExistingComponentPath(override.componentPath);
+      if (!safePath) {
+        continue;
+      }
+      const existing = componentTokenOverrides.get(safePath) ?? [];
+      componentTokenOverrides.set(safePath, [
         ...existing.filter((candidate) => candidate.tokenSetId !== override.tokenSetId),
-        override,
-      ];
+        { ...override, componentPath: safePath },
+      ]);
     }
+
+    const overrideEntries = [...componentTokenOverrides.entries()];
+    const overridesByPath = Object.fromEntries(overrideEntries);
 
     return {
       manifest: {
         ...manifest,
-        componentTokenOverrides,
-        components: manifest.components.map((component) =>
-          componentTokenOverrides[component.path]
-            ? { ...component, tokenOverrides: componentTokenOverrides[component.path] }
-            : component
-        ),
+        componentTokenOverrides: overridesByPath,
+        components: manifest.components.map((component) => {
+          const tokenOverrides = overrideEntries.find(
+            ([componentPath]) => componentPath === component.path
+          )?.[1];
+          return tokenOverrides
+            ? {
+                ...component,
+                tokenOverrides,
+              }
+            : component;
+        }),
       },
       result: undefined,
     };
