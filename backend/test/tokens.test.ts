@@ -127,11 +127,11 @@ describe('token service', () => {
           {
             id: 'token_set_legacy',
             name: 'Legacy',
-            tokens: {
+            tokens: Object.assign(Object.create(null), {
               brand: '#fff',
               ['__proto__']: '#000',
               radius: { sm: 'rounded-sm' },
-            },
+            }),
             createdAt: '2026-05-09T00:00:00.000Z',
             updatedAt: '2026-05-09T00:00:00.000Z',
           },
