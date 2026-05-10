@@ -83,6 +83,13 @@ export class TokenSetReferenceError extends Error {
   }
 }
 
+export class TokenComponentPathError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TokenComponentPathError';
+  }
+}
+
 function slugify(value: string): string {
   return value
     .trim()
@@ -658,7 +665,8 @@ export async function applyTokenPatch(options: {
     success: errors.length === 0,
     modified,
     changes: totalChanges,
-    partiallyApplied: errors.length > 0 && modified.length > 0 ? true : undefined,
+    // Only write-phase failures can be partial; preflight errors skip writes entirely.
+    partiallyApplied: errors.length > 0 && modified.length > 0,
     backupId,
     errors: errors.length > 0 ? errors : undefined,
   };
@@ -704,35 +712,23 @@ export async function putComponentOverrides(
 ): Promise<ComponentTokenOverride[]> {
   const safePath = await resolveSafeExistingComponentPath(componentPath);
   if (!safePath) {
-    return [];
+    throw new TokenComponentPathError('Component path could not be resolved within the project');
   }
   const relativePath = toProjectRelativeExistingPath(safePath);
   if (!relativePath) {
-    return [];
+    throw new TokenComponentPathError('Component path could not be resolved within the project');
   }
-  const replaced = await replaceComponentOverrides(
+  await replaceComponentOverrides(
     relativePath,
     overrides.map((override) => ({ ...override, componentPath: relativePath }))
   );
-  if (!replaced) {
-    return [];
-  }
   return getComponentOverrides(relativePath);
 }
 
 async function replaceComponentOverrides(
-  componentPath: string,
+  relativePath: string,
   overrides: ComponentTokenOverride[]
-): Promise<boolean> {
-  const safePath = await resolveSafeExistingComponentPath(componentPath);
-  if (!safePath) {
-    return false;
-  }
-  const relativePath = toProjectRelativeExistingPath(safePath);
-  if (!relativePath) {
-    return false;
-  }
-
+): Promise<void> {
   await mutateWorkspaceManifest(async (manifest) => {
     const tokenSetIds = new Set(manifest.tokenSets.map((tokenSet) => tokenSet.id));
     for (const override of overrides) {
@@ -766,11 +762,19 @@ async function replaceComponentOverrides(
       result: undefined,
     };
   });
-
-  return true;
 }
 
 async function recordComponentOverrides(overrides: ComponentTokenOverride[]): Promise<void> {
+  const resolvedOverrides = (
+    await Promise.all(
+      overrides.map(async (override) => {
+        const safePath = await resolveSafeExistingComponentPath(override.componentPath);
+        const relativePath = safePath ? toProjectRelativeExistingPath(safePath) : null;
+        return relativePath ? { ...override, componentPath: relativePath } : null;
+      })
+    )
+  ).filter((override): override is ComponentTokenOverride => override !== null);
+
   await mutateWorkspaceManifest(async (manifest) => {
     const componentTokenOverrides = new Map<string, ComponentTokenOverride[]>();
     for (const [storedPath, storedOverrides] of Object.entries(manifest.componentTokenOverrides)) {
@@ -782,19 +786,11 @@ async function recordComponentOverrides(overrides: ComponentTokenOverride[]): Pr
         );
       }
     }
-    for (const override of overrides) {
-      const safePath = await resolveSafeExistingComponentPath(override.componentPath);
-      if (!safePath) {
-        continue;
-      }
-      const relativePath = toProjectRelativeExistingPath(safePath);
-      if (!relativePath) {
-        continue;
-      }
-      const existing = componentTokenOverrides.get(relativePath) ?? [];
-      componentTokenOverrides.set(relativePath, [
+    for (const override of resolvedOverrides) {
+      const existing = componentTokenOverrides.get(override.componentPath) ?? [];
+      componentTokenOverrides.set(override.componentPath, [
         ...existing.filter((candidate) => candidate.tokenSetId !== override.tokenSetId),
-        { ...override, componentPath: relativePath },
+        override,
       ]);
     }
 

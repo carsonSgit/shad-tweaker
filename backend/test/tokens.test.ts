@@ -127,7 +127,11 @@ describe('token service', () => {
           {
             id: 'token_set_legacy',
             name: 'Legacy',
-            tokens: { brand: '#fff', radius: { sm: 'rounded-sm' } },
+            tokens: {
+              brand: '#fff',
+              __proto__: '#000',
+              radius: { sm: 'rounded-sm' },
+            },
             createdAt: '2026-05-09T00:00:00.000Z',
             updatedAt: '2026-05-09T00:00:00.000Z',
           },
@@ -141,6 +145,7 @@ describe('token service', () => {
     const manifest = await loadWorkspaceManifest(root);
 
     assert.equal(manifest.tokenSets[0].tokens.colors.brand.value, '#fff');
+    assert.equal(Object.hasOwn(manifest.tokenSets[0].tokens.colors, '__proto__'), false);
     assert.equal(manifest.tokenSets[0].tokens.radius.sm.value, 'rounded-sm');
   });
 

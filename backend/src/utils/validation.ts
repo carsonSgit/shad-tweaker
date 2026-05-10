@@ -209,7 +209,7 @@ export function normalizeDesignTokenMap(
       if (strict) {
         return null;
       }
-      if (typeof tokens === 'string' || typeof tokens === 'number') {
+      if (isSafeTokenName(category) && (typeof tokens === 'string' || typeof tokens === 'number')) {
         map.colors[category] = {
           name: category,
           category: 'colors',

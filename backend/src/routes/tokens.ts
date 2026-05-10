@@ -11,6 +11,7 @@ import {
   listTokenSets,
   previewTokenPatch,
   putComponentOverrides,
+  TokenComponentPathError,
   TokenSetConflictError,
   TokenSetReferenceError,
   updateTokenSet,
@@ -147,6 +148,10 @@ async function sendComponentOverrides(
     });
   } catch (error) {
     if (error instanceof TokenSetReferenceError) {
+      sendValidation(res, error.message);
+      return;
+    }
+    if (error instanceof TokenComponentPathError) {
       sendValidation(res, error.message);
       return;
     }

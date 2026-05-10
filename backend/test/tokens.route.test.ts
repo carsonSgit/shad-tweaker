@@ -168,10 +168,18 @@ describe('token routes', () => {
         componentPath: relativePath,
         overrides: [{ tokenSetId: tokenSet.id, overrides: { nope: { card: 'rounded-lg' } } }],
       });
+    const missingPath = await request(app)
+      .put('/api/tokens/components/overrides')
+      .send({
+        componentPath: 'components/ui/missing.tsx',
+        overrides: [{ tokenSetId: tokenSet.id, overrides: { radius: { card: 'rounded-lg' } } }],
+      });
 
     assert.equal(unsafeTokenSet.status, 400);
     assert.equal(unknownTokenSet.status, 400);
     assert.equal(badCategory.status, 400);
+    assert.equal(missingPath.status, 400);
+    assert.match(missingPath.body.error.message, /could not be resolved/);
   });
 
   it('verifies preview and apply response shapes', async () => {
