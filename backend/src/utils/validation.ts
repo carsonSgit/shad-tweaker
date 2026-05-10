@@ -2,8 +2,12 @@ import path from 'node:path';
 import type {
   ApplyRequest,
   BatchActionRequest,
+  DesignToken,
+  DesignTokenMap,
   EditRequest,
   TemplateRule,
+  TokenCategory,
+  TokenPatchChange,
 } from '../types/index.js';
 
 // ============================================
@@ -147,6 +151,279 @@ export function isHttpUrl(value: string): boolean {
 
 export function isSafeRegistryIdentifier(value: string): boolean {
   return value.length > 0 && value.length <= 128 && /^[a-zA-Z0-9_-]+$/.test(value);
+}
+
+// ============================================
+// Token Validation
+// ============================================
+
+export const TOKEN_CATEGORIES: TokenCategory[] = [
+  'colors',
+  'radius',
+  'spacing',
+  'typography',
+  'border',
+  'shadow',
+  'opacity',
+  'zIndex',
+  'motion',
+  'easing',
+  'duration',
+  'breakpoints',
+  'density',
+];
+
+export function isTokenCategory(value: unknown): value is TokenCategory {
+  return typeof value === 'string' && (TOKEN_CATEGORIES as string[]).includes(value);
+}
+
+export function createEmptyTokenMap(): DesignTokenMap {
+  return Object.fromEntries(TOKEN_CATEGORIES.map((category) => [category, {}])) as DesignTokenMap;
+}
+
+export function normalizeDesignTokenMap(
+  value: unknown,
+  options: {
+    strict?: boolean;
+    now?: string;
+    fallbackCreatedAt?: string;
+    fallbackUpdatedAt?: string;
+  } = {}
+): DesignTokenMap | null {
+  const strict = options.strict ?? false;
+  const now = options.now ?? new Date().toISOString();
+  const fallbackCreatedAt = options.fallbackCreatedAt ?? now;
+  const fallbackUpdatedAt = options.fallbackUpdatedAt ?? now;
+  const map = createEmptyTokenMap();
+
+  if (value === undefined) {
+    return map;
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
+  }
+
+  const tokenGroups = value as Record<string, unknown>;
+  for (const [category, tokens] of Object.entries(tokenGroups)) {
+    if (!isTokenCategory(category)) {
+      if (strict) {
+        return null;
+      }
+      if (isSafeTokenName(category) && (typeof tokens === 'string' || typeof tokens === 'number')) {
+        map.colors[category] = {
+          name: category,
+          category: 'colors',
+          value: String(tokens),
+          createdAt: fallbackCreatedAt,
+          updatedAt: fallbackUpdatedAt,
+        };
+      }
+      continue;
+    }
+    if (typeof tokens !== 'object' || tokens === null || Array.isArray(tokens)) {
+      if (strict) {
+        return null;
+      }
+      continue;
+    }
+
+    for (const [name, token] of Object.entries(tokens as Record<string, unknown>)) {
+      if (!isSafeTokenName(name)) {
+        if (strict) {
+          return null;
+        }
+        continue;
+      }
+      if (token && typeof token === 'object' && 'value' in token) {
+        const candidate = token as Partial<DesignToken>;
+        if (
+          typeof candidate.value !== 'string' ||
+          (strict && candidate.name !== undefined && typeof candidate.name !== 'string')
+        ) {
+          if (strict) {
+            return null;
+          }
+          continue;
+        }
+        map[category][name] = {
+          name: typeof candidate.name === 'string' ? candidate.name : name,
+          category,
+          value: candidate.value,
+          description:
+            typeof candidate.description === 'string' ? candidate.description : undefined,
+          aliases: Array.isArray(candidate.aliases)
+            ? candidate.aliases.filter((alias): alias is string => typeof alias === 'string')
+            : undefined,
+          createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
+          updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
+        };
+      } else if (!strict && (typeof token === 'string' || typeof token === 'number')) {
+        map[category][name] = {
+          name,
+          category,
+          value: String(token),
+          createdAt: fallbackCreatedAt,
+          updatedAt: fallbackUpdatedAt,
+        };
+      } else if (strict) {
+        return null;
+      }
+    }
+  }
+
+  return map;
+}
+
+export function isSafeTokenSetId(value: string): boolean {
+  return value.length > 0 && value.length <= 96 && /^token_set_[a-z0-9][a-z0-9_-]*$/.test(value);
+}
+
+export function isSafeTokenName(value: string): boolean {
+  return value.length > 0 && value.length <= 96 && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(value);
+}
+
+const SAFE_TOKEN_COMPONENT_PATH_PATTERN =
+  /^(?:[A-Za-z0-9._-]+[\\/])*[A-Za-z0-9._-]+\.(?:[jt]sx?|vue|svelte|html|css|scss|less)$/;
+
+export function sanitizeTokenComponentPath(componentPath: string): string | null {
+  if (
+    componentPath.length === 0 ||
+    componentPath.length > 512 ||
+    componentPath.includes('\0') ||
+    path.isAbsolute(componentPath) ||
+    !SAFE_TOKEN_COMPONENT_PATH_PATTERN.test(componentPath)
+  ) {
+    return null;
+  }
+
+  const normalized = path.normalize(componentPath).replace(/\\/g, '/');
+  if (normalized === '..' || normalized.startsWith('../') || normalized.includes('/../')) {
+    return null;
+  }
+
+  return normalized;
+}
+
+export function validateTokenComponentPath(
+  componentPath: unknown,
+  projectDir: string
+): { valid: boolean; value?: string; error?: string } {
+  if (typeof componentPath !== 'string' || componentPath.trim().length === 0) {
+    return { valid: false, error: 'Component path must be a non-empty string' };
+  }
+
+  const sanitizedPath = sanitizeTokenComponentPath(componentPath);
+  if (!sanitizedPath) {
+    return { valid: false, error: 'Component path must be a safe project-relative file path' };
+  }
+
+  const resolvedProjectDir = path.resolve(projectDir);
+  const resolvedPath = path.resolve(resolvedProjectDir, sanitizedPath);
+  if (!isPathSafe(resolvedPath, resolvedProjectDir)) {
+    return { valid: false, error: 'Component path must stay within the project directory' };
+  }
+
+  return { valid: true, value: sanitizedPath };
+}
+
+export function validateTokenComponentPaths(
+  componentPaths: unknown,
+  projectDir: string,
+  maxItems = 100
+): { valid: boolean; value?: string[]; error?: string } {
+  if (componentPaths === undefined) {
+    return { valid: true, value: undefined };
+  }
+  if (!Array.isArray(componentPaths)) {
+    return { valid: false, error: 'componentPaths must be an array' };
+  }
+  if (componentPaths.length > maxItems) {
+    return { valid: false, error: `componentPaths cannot exceed ${maxItems} items` };
+  }
+  if (!componentPaths.every((componentPath) => typeof componentPath === 'string')) {
+    return { valid: false, error: 'componentPaths must contain only strings' };
+  }
+
+  const normalizedPaths: string[] = [];
+  for (const componentPath of componentPaths) {
+    const sanitizedPath = sanitizeTokenComponentPath(componentPath);
+    if (!sanitizedPath) {
+      return {
+        valid: false,
+        error: 'componentPaths must contain safe project-relative file paths',
+      };
+    }
+
+    const resolvedProjectDir = path.resolve(projectDir);
+    const resolvedPath = path.resolve(resolvedProjectDir, sanitizedPath);
+    if (!isPathSafe(resolvedPath, resolvedProjectDir)) {
+      return { valid: false, error: 'componentPaths must stay within the project directory' };
+    }
+    normalizedPaths.push(sanitizedPath);
+  }
+
+  return {
+    valid: true,
+    value: normalizedPaths,
+  };
+}
+
+export function validateTokenPatchChanges(
+  changes: unknown,
+  maxItems = 200
+): { valid: boolean; value?: TokenPatchChange[]; error?: string } {
+  if (!Array.isArray(changes)) {
+    return { valid: false, error: 'changes must be an array' };
+  }
+  if (changes.length > maxItems) {
+    return { valid: false, error: `changes cannot exceed ${maxItems} items` };
+  }
+
+  const normalized: TokenPatchChange[] = [];
+  for (const change of changes) {
+    if (typeof change !== 'object' || change === null) {
+      return { valid: false, error: 'Each change must be an object' };
+    }
+    const candidate = change as Record<string, unknown>;
+    if (!isTokenCategory(candidate.category)) {
+      return { valid: false, error: 'Each change requires a valid category' };
+    }
+    const from = typeof candidate.from === 'string' ? candidate.from.trim() : '';
+    const to = typeof candidate.to === 'string' ? candidate.to.trim() : '';
+    if (typeof candidate.from !== 'string' || from.length === 0 || from.length > 256) {
+      return { valid: false, error: 'Each change requires a non-empty from value' };
+    }
+    if (typeof candidate.to !== 'string' || to.length === 0 || to.length > 256) {
+      return { valid: false, error: 'Each change requires a non-empty to value' };
+    }
+    if (candidate.tokenName !== undefined) {
+      if (typeof candidate.tokenName !== 'string' || !isSafeTokenName(candidate.tokenName)) {
+        return { valid: false, error: 'tokenName must be a safe token name when provided' };
+      }
+    }
+
+    normalized.push({
+      category: candidate.category,
+      from,
+      to,
+      tokenName: typeof candidate.tokenName === 'string' ? candidate.tokenName : undefined,
+    });
+  }
+
+  const fromValuesByCategory = new Map<string, Set<string>>();
+  for (const change of normalized) {
+    const set = fromValuesByCategory.get(change.category) ?? new Set<string>();
+    set.add(change.from);
+    fromValuesByCategory.set(change.category, set);
+  }
+  if (normalized.some((change) => fromValuesByCategory.get(change.category)?.has(change.to))) {
+    return {
+      valid: false,
+      error: 'Patch changes cannot cascade: a to value cannot match another from value',
+    };
+  }
+
+  return { valid: true, value: normalized };
 }
 
 // ============================================

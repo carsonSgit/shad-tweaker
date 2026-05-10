@@ -65,6 +65,89 @@ export interface Preview {
   lineNumbers: number[];
 }
 
+// Keep token system types in sync with backend/src/types/index.ts.
+export type TokenCategory =
+  | 'colors'
+  | 'radius'
+  | 'spacing'
+  | 'typography'
+  | 'border'
+  | 'shadow'
+  | 'opacity'
+  | 'zIndex'
+  | 'motion'
+  | 'easing'
+  | 'duration'
+  | 'breakpoints'
+  | 'density';
+
+export interface DesignToken {
+  name: string;
+  category: TokenCategory;
+  value: string;
+  description?: string;
+  aliases?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type DesignTokenMap = Record<TokenCategory, Record<string, DesignToken>>;
+
+export interface DesignTokenSet {
+  id: string;
+  name: string;
+  description?: string;
+  tokens: DesignTokenMap;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComponentTokenOverride {
+  componentPath: string;
+  tokenSetId: string;
+  overrides: Partial<Record<TokenCategory, Record<string, string>>>;
+}
+
+export interface TokenCandidate {
+  category: TokenCategory;
+  value: string;
+  className: string;
+  componentPath: string;
+  source: 'className' | 'cn' | 'variant';
+  line?: number;
+}
+
+export interface TokenFrequencyEntry {
+  category: TokenCategory;
+  value: string;
+  occurrences: number;
+  componentPaths: string[];
+  classes: string[];
+}
+
+export interface TokenFrequencyReport {
+  entries: TokenFrequencyEntry[];
+  totalOccurrences: number;
+}
+
+export interface TokenInconsistencyEntry {
+  category: TokenCategory;
+  family: string;
+  values: Array<{ value: string; occurrences: number; componentPaths: string[] }>;
+  recommendedValue: string;
+}
+
+export interface TokenInconsistencyReport {
+  entries: TokenInconsistencyEntry[];
+}
+
+export interface TokenPatchChange {
+  category: TokenCategory;
+  from: string;
+  to: string;
+  tokenName?: string;
+}
+
 export interface TemplateRule {
   find: string;
   replace: string;

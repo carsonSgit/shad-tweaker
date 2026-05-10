@@ -330,13 +330,101 @@ export interface Preset {
   variantRecipes: VariantRecipe[];
 }
 
+// Keep token system types in sync with frontend/src/types/index.ts.
+export type TokenCategory =
+  | 'colors'
+  | 'radius'
+  | 'spacing'
+  | 'typography'
+  | 'border'
+  | 'shadow'
+  | 'opacity'
+  | 'zIndex'
+  | 'motion'
+  | 'easing'
+  | 'duration'
+  | 'breakpoints'
+  | 'density';
+
+export interface DesignToken {
+  name: string;
+  category: TokenCategory;
+  value: string;
+  description?: string;
+  aliases?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type DesignTokenMap = Record<TokenCategory, Record<string, DesignToken>>;
+
+export interface ComponentTokenOverride {
+  componentPath: string;
+  tokenSetId: string;
+  overrides: Partial<Record<TokenCategory, Record<string, string>>>;
+}
+
 export interface DesignTokenSet {
   id: string;
   name: string;
   description?: string;
-  tokens: Record<string, unknown>;
+  tokens: DesignTokenMap;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TokenCandidate {
+  category: TokenCategory;
+  value: string;
+  className: string;
+  componentPath: string;
+  source: 'className' | 'cn' | 'variant';
+  line?: number;
+}
+
+export interface TokenFrequencyEntry {
+  category: TokenCategory;
+  value: string;
+  occurrences: number;
+  componentPaths: string[];
+  classes: string[];
+}
+
+export interface TokenFrequencyReport {
+  entries: TokenFrequencyEntry[];
+  totalOccurrences: number;
+}
+
+export interface TokenInconsistencyEntry {
+  category: TokenCategory;
+  family: string;
+  values: Array<{ value: string; occurrences: number; componentPaths: string[] }>;
+  recommendedValue: string;
+}
+
+export interface TokenInconsistencyReport {
+  entries: TokenInconsistencyEntry[];
+}
+
+export interface TokenPatchChange {
+  category: TokenCategory;
+  from: string;
+  to: string;
+  tokenName?: string;
+}
+
+export interface TokenPatchPreviewResult {
+  previews: Preview[];
+  totalChanges: number;
+}
+
+export interface TokenPatchApplyResult {
+  success: boolean;
+  modified: string[];
+  changes: number;
+  partiallyApplied?: boolean;
+  backupId?: string;
+  errors?: Array<{ path: string; error: string }>;
 }
 
 export interface ParsedImport {
@@ -427,6 +515,7 @@ export interface WorkspaceManifest {
   sources: RegistrySource[];
   packages: ComponentPackage[];
   tokenSets: DesignTokenSet[];
+  componentTokenOverrides: Record<string, ComponentTokenOverride[]>;
   presets: Preset[];
   backups: BackupMetadata[];
 }

@@ -8,10 +8,17 @@ import type {
   ComponentLibraryDetail,
   ComponentLibraryDuplicate,
   ComponentLibraryInventoryItem,
+  ComponentTokenOverride,
+  DesignTokenMap,
+  DesignTokenSet,
   ImportConflictResolution,
   ImportPlan,
   Preview,
   Template,
+  TokenCandidate,
+  TokenFrequencyReport,
+  TokenInconsistencyReport,
+  TokenPatchChange,
 } from '../types/index.js';
 
 // Get backend URL from environment variable (set by CLI wrapper)
@@ -256,6 +263,118 @@ export async function applyImportPlan(
   return request('/api/imports/apply', {
     method: 'POST',
     body: JSON.stringify({ plan, resolutions }),
+  });
+}
+
+// Token System
+export async function getTokenSets(): Promise<ApiResponse<{ tokenSets: DesignTokenSet[] }>> {
+  return request('/api/tokens/sets');
+}
+
+export async function createTokenSet(input: {
+  id?: string;
+  name: string;
+  description?: string;
+  tokens?: DesignTokenMap;
+}): Promise<ApiResponse<{ tokenSet: DesignTokenSet }>> {
+  return request('/api/tokens/sets', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getTokenSet(id: string): Promise<ApiResponse<{ tokenSet: DesignTokenSet }>> {
+  return request(`/api/tokens/sets/${encodeURIComponent(id)}`);
+}
+
+export async function updateTokenSet(
+  id: string,
+  input: { name: string; description?: string; tokens: DesignTokenMap }
+): Promise<ApiResponse<{ tokenSet: DesignTokenSet }>> {
+  return request(`/api/tokens/sets/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteTokenSet(id: string): Promise<ApiResponse<{ success: boolean }>> {
+  return request(`/api/tokens/sets/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function extractTokens(
+  componentPaths?: string[]
+): Promise<ApiResponse<{ candidates: TokenCandidate[] }>> {
+  return request('/api/tokens/extract', {
+    method: 'POST',
+    body: JSON.stringify({ componentPaths }),
+  });
+}
+
+export async function getTokenFrequencyReport(
+  componentPath?: string
+): Promise<ApiResponse<{ report: TokenFrequencyReport }>> {
+  // The API currently supports a single componentPath query filter, not a multi-path report filter.
+  const query = componentPath ? `?componentPath=${encodeURIComponent(componentPath)}` : '';
+  return request(`/api/tokens/reports/frequency${query}`);
+}
+
+export async function getTokenInconsistencyReport(
+  componentPath?: string
+): Promise<ApiResponse<{ report: TokenInconsistencyReport }>> {
+  // The API currently supports a single componentPath query filter, not a multi-path report filter.
+  const query = componentPath ? `?componentPath=${encodeURIComponent(componentPath)}` : '';
+  return request(`/api/tokens/reports/inconsistencies${query}`);
+}
+
+export async function previewTokenPatch(input: {
+  componentPaths: string[];
+  changes: TokenPatchChange[];
+}): Promise<ApiResponse<{ previews: Preview[]; totalChanges: number }>> {
+  return request('/api/tokens/patch/preview', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function applyTokenPatch(input: {
+  tokenSetId: string;
+  componentPaths: string[];
+  changes: TokenPatchChange[];
+  createBackup?: boolean;
+  recordOverrides?: boolean;
+}): Promise<
+  ApiResponse<{
+    result: {
+      success: boolean;
+      modified: string[];
+      changes: number;
+      partiallyApplied?: boolean;
+      backupId?: string;
+      errors?: Array<{ path: string; error: string }>;
+    };
+  }>
+> {
+  return request('/api/tokens/patch/apply', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getComponentTokenOverrides(
+  componentPath: string
+): Promise<ApiResponse<{ overrides: ComponentTokenOverride[] }>> {
+  return request(
+    `/api/tokens/components/overrides?componentPath=${encodeURIComponent(componentPath)}`
+  );
+}
+
+export async function putComponentTokenOverrides(
+  componentPath: string,
+  overrides: ComponentTokenOverride[]
+): Promise<ApiResponse<{ overrides: ComponentTokenOverride[] }>> {
+  return request('/api/tokens/components/overrides', {
+    method: 'PUT',
+    body: JSON.stringify({ componentPath, overrides }),
   });
 }
 
