@@ -1,4 +1,4 @@
-import { createPatch } from 'diff';
+import { createPatch, diffLines } from 'diff';
 import ts from 'typescript';
 import type {
   ComponentLibraryDetail,
@@ -73,7 +73,7 @@ export async function previewVariantGeneration(
   validateOperation(definition, request.operation);
 
   const nextRaw = applyOperationToRawDefinition(definition.raw, request.operation);
-  const after = replaceOnce(component.content, definition.raw, nextRaw);
+  const after = replaceRawAtParsedRange(component.content, definition, nextRaw);
   if (after === component.content) {
     throw new VariantBuilderUnsupportedError(
       'Could not locate target variant definition in source.'
@@ -87,8 +87,7 @@ export async function previewVariantGeneration(
     before: component.content,
     after,
     diff: createPatch(component.path, component.content, after, 'before', 'after'),
-    // Public API name stays `changes`; the value is a positional line-change estimate.
-    changes: countChangedLineEstimate(component.content, after),
+    changes: countChangedLines(component.content, after),
   };
 }
 
@@ -132,6 +131,8 @@ function toDefinitionDetail(definition: ParsedVariantDefinition): VariantDefinit
     })),
     compoundVariants: definition.compoundVariants,
     raw: definition.raw,
+    rawStart: definition.rawStart,
+    rawEnd: definition.rawEnd,
     diagnostics: [],
   };
 }
@@ -381,15 +382,32 @@ function createVariantSourceFile(filePath: string, content: string): ts.SourceFi
   );
 }
 
-function countChangedLineEstimate(before: string, after: string): number {
-  const beforeLines = before.split(/\r?\n/);
-  const afterLines = after.split(/\r?\n/);
-  const maxLength = Math.max(beforeLines.length, afterLines.length);
+function countChangedLines(before: string, after: string): number {
   let changes = 0;
-  for (let index = 0; index < maxLength; index += 1) {
-    if (beforeLines[index] !== afterLines[index]) changes += 1;
+  let pendingRemoved = 0;
+
+  for (const part of diffLines(before, after)) {
+    if (part.removed) {
+      pendingRemoved += countDiffPartLines(part.value);
+      continue;
+    }
+    if (part.added) {
+      changes += Math.max(pendingRemoved, countDiffPartLines(part.value));
+      pendingRemoved = 0;
+      continue;
+    }
+    changes += pendingRemoved;
+    pendingRemoved = 0;
   }
+  changes += pendingRemoved;
+
   return changes;
+}
+
+function countDiffPartLines(value: string): number {
+  if (value.length === 0) return 0;
+  const lines = value.split(/\r?\n/);
+  return lines[lines.length - 1] === '' ? lines.length - 1 : lines.length;
 }
 
 function detectVariantIndent(raw: string): {
@@ -429,10 +447,20 @@ function escapeSingleQuotedLiteral(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
-function replaceOnce(content: string, search: string, replacement: string): string {
-  const index = content.indexOf(search);
-  if (index === -1) return content;
-  return `${content.slice(0, index)}${replacement}${content.slice(index + search.length)}`;
+function replaceRawAtParsedRange(
+  content: string,
+  definition: VariantDefinitionDetail,
+  replacement: string
+): string {
+  if (definition.rawStart === undefined || definition.rawEnd === undefined || !definition.raw) {
+    return content;
+  }
+  if (content.slice(definition.rawStart, definition.rawEnd) !== definition.raw) {
+    return content;
+  }
+  return `${content.slice(0, definition.rawStart)}${replacement}${content.slice(
+    definition.rawEnd
+  )}`;
 }
 
 function replaceRawDefinitionFallback(raw: string, pattern: RegExp, replacement: string): string {

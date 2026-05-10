@@ -326,6 +326,46 @@ export function Button() { return <button />; }
     assert.match(preview.after, /defaultVariants: \{\s+size: 'sm',variant: "default"/);
   });
 
+  it('generates a non-mutating preview for adding a tv axis', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'card',
+      `
+import { tv } from "tailwind-variants";
+const card = tv({
+  base: "rounded-lg",
+  variants: {
+    density: {
+      compact: "p-3",
+    },
+  },
+});
+export function Card() { return <section />; }
+`
+    );
+    const absolutePath = path.join(root, relativePath);
+    const before = await fs.readFile(absolutePath, 'utf-8');
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'card',
+      operation: {
+        type: 'add-axis',
+        axis: {
+          name: 'tone',
+          values: [{ name: 'muted', classes: ['text-muted-foreground'] }],
+        },
+        defaultValue: 'muted',
+      },
+    });
+    const after = await fs.readFile(absolutePath, 'utf-8');
+
+    assert.match(preview.after, /tone: {\n\s+muted: 'text-muted-foreground'/);
+    assert.match(preview.after, /defaultVariants: {\n\s+tone: 'muted'/);
+    assert.equal(after, before);
+  });
+
   it('generates a non-mutating preview for adding a cva value', async () => {
     const root = await createTempRoot();
     const relativePath = await writeComponent(
@@ -398,6 +438,76 @@ export function Card() { return <section />; }
     assert.match(preview.after, /comfortable: 'p-6 gap-4'/);
     assert.match(preview.diff, /comfortable/);
     assert.equal(after, before);
+  });
+
+  it('replaces the parsed variant definition instead of earlier matching text', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+/*
+const buttonVariants = cva("inline-flex", {
+  variants: { variant: { default: "bg-primary" } },
+});
+*/
+const buttonVariants = cva("inline-flex", {
+  variants: { variant: { default: "bg-primary" } },
+});
+export function Button() { return <button />; }
+`
+    );
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'buttonVariants',
+      operation: {
+        type: 'add-value',
+        axisName: 'variant',
+        value: { name: 'ghost', classes: ['bg-transparent'] },
+      },
+    });
+
+    assert.match(
+      preview.after,
+      /\/\*\nconst buttonVariants = cva\("inline-flex", {\n {2}variants: { variant: { default: "bg-primary" } },\n}\);\n\*\//
+    );
+    assert.match(
+      preview.after,
+      /const buttonVariants = cva\("inline-flex", {\n {2}variants: { variant: {\n\s+ghost: 'bg-transparent', default: "bg-primary" } },\n}\);/
+    );
+  });
+
+  it('reports changed lines from a diff instead of positional shifts', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+  variants: { variant: { default: "bg-primary" } },
+});
+export function Button() { return <button />; }
+export const afterOne = 1;
+export const afterTwo = 2;
+export const afterThree = 3;
+export const afterFour = 4;
+`
+    );
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'buttonVariants',
+      operation: {
+        type: 'add-value',
+        axisName: 'variant',
+        value: { name: 'ghost', classes: ['bg-transparent'] },
+      },
+    });
+
+    assert.equal(preview.changes, 2);
   });
 
   it('escapes single quotes in generated preview literals', async () => {

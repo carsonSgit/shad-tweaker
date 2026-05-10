@@ -380,6 +380,8 @@ function parseVariantDefinition(
     defaultVariants: config ? parseDefaultVariants(config, sourceFile) : {},
     compoundVariants: config ? parseCompoundVariants(config, sourceFile) : [],
     raw: node.getText(sourceFile),
+    rawStart: node.getStart(sourceFile),
+    rawEnd: node.getEnd(),
   };
 }
 

@@ -182,6 +182,8 @@ export interface VariantDefinitionDetail {
     classes: string[];
   }>;
   raw?: string;
+  rawStart?: number;
+  rawEnd?: number;
   diagnostics: ParserDiagnostic[];
 }
 

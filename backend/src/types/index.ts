@@ -343,6 +343,8 @@ export interface VariantDefinitionDetail {
     classes: string[];
   }>;
   raw?: string;
+  rawStart?: number;
+  rawEnd?: number;
   diagnostics: ParserDiagnostic[];
 }
 
@@ -549,6 +551,8 @@ export interface ParsedVariantDefinition {
     classes: string[];
   }>;
   raw: string;
+  rawStart: number;
+  rawEnd: number;
 }
 
 export interface ParserDiagnostic {

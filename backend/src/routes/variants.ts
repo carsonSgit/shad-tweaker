@@ -143,7 +143,10 @@ function readAxis(value: unknown) {
   return {
     name: readString(axis.name, 'axis.name', MAX_PREVIEW_IDENTIFIER_LENGTH),
     values,
-    defaultValue: typeof axis.defaultValue === 'string' ? axis.defaultValue.trim() : undefined,
+    defaultValue:
+      typeof axis.defaultValue === 'string'
+        ? readString(axis.defaultValue, 'axis.defaultValue', MAX_PREVIEW_IDENTIFIER_LENGTH)
+        : undefined,
   };
 }
 
