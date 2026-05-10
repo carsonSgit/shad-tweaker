@@ -7,6 +7,7 @@ import importsRouter from './routes/imports.js';
 import parserRouter from './routes/parser.js';
 import primitiveStartersRouter from './routes/primitiveStarters.js';
 import templatesRouter from './routes/templates.js';
+import tokensRouter from './routes/tokens.js';
 import workspaceRouter from './routes/workspace.js';
 import { initializeDefaultTemplates } from './services/template.js';
 import { initializeWorkspace } from './services/workspace.js';
@@ -51,6 +52,7 @@ app.use('/api/workspace', workspaceRouter);
 app.use('/api/parser', parserRouter);
 app.use('/api/imports', importsRouter);
 app.use('/api/primitive-starters', primitiveStartersRouter);
+app.use('/api/tokens', tokensRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', err);
@@ -100,6 +102,8 @@ async function start() {
       logger.info('  GET  /api/primitive-starters - List primitive starter templates');
       logger.info('  POST /api/primitive-starters/preview - Preview primitive starter files');
       logger.info('  POST /api/primitive-starters/apply - Apply primitive starter files');
+      logger.info('  GET  /api/tokens/sets - List design token sets');
+      logger.info('  POST /api/tokens/extract - Extract token candidates');
       logger.info('  GET  /api/templates - List templates');
       logger.info('  POST /api/templates - Create template');
       logger.info('  DELETE /api/templates/:id - Delete template');
