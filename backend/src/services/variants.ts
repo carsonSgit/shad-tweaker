@@ -190,7 +190,7 @@ function parseManualAxes(objectLiteral: ts.ObjectLiteralExpression): VariantAxis
   const properties = objectLiteral.properties.filter(ts.isPropertyAssignment);
   if (properties.length === 0) return [];
 
-  if (properties.every((property) => isStaticClassExpression(property.initializer))) {
+  if (properties.every((property) => isNonEmptyStaticClassExpression(property.initializer))) {
     return [
       {
         name: 'variant',
@@ -208,7 +208,10 @@ function parseManualAxes(objectLiteral: ts.ObjectLiteralExpression): VariantAxis
     if (!axisName || !ts.isObjectLiteralExpression(property.initializer)) continue;
     const valueProperties = property.initializer.properties.filter(ts.isPropertyAssignment);
     if (
-      !valueProperties.every((valueProperty) => isStaticClassExpression(valueProperty.initializer))
+      valueProperties.length === 0 ||
+      !valueProperties.every((valueProperty) =>
+        isNonEmptyStaticClassExpression(valueProperty.initializer)
+      )
     ) {
       continue;
     }
@@ -225,7 +228,8 @@ function parseManualAxes(objectLiteral: ts.ObjectLiteralExpression): VariantAxis
 }
 
 function detectUnsupportedVariantDiagnostics(content: string): ParserDiagnostic[] {
-  if (!/\b[a-zA-Z_$][\w$]*\s*(?:===|!==|==|!=)\s*[^?;{]+\?/.test(content)) return [];
+  if (!/className\s*=\s*{[^}]*\b[a-zA-Z_$][\w$]*\s*(?:===|!==|==|!=)\s*[^?;{]+\?/s.test(content))
+    return [];
   return [
     {
       severity: 'info',
@@ -327,9 +331,21 @@ function addValueToRawDefinition(raw: string, axisName: string, value: VariantVa
 
 function setDefaultInRawDefinition(raw: string, axisName: string, valueName: string): string {
   const indent = detectVariantIndent(raw);
-  const defaultAxisPattern = new RegExp(`(${escapeRegExp(axisName)}\\s*:\\s*)['"][^'"]+['"]`);
-  if (defaultAxisPattern.test(raw)) {
-    return raw.replace(defaultAxisPattern, `$1'${escapeSingleQuotedLiteral(valueName)}'`);
+  const defaultVariantsBlock = findObjectBlock(raw, 'defaultVariants');
+  if (defaultVariantsBlock) {
+    const defaultAxisPattern = new RegExp(
+      `(${escapeObjectKeyRegExp(axisName)}\\s*:\\s*)['"][^'"]+['"]`
+    );
+    const block = raw.slice(defaultVariantsBlock.start, defaultVariantsBlock.end);
+    if (defaultAxisPattern.test(block)) {
+      const updatedBlock = block.replace(
+        defaultAxisPattern,
+        `$1'${escapeSingleQuotedLiteral(valueName)}'`
+      );
+      return `${raw.slice(0, defaultVariantsBlock.start)}${updatedBlock}${raw.slice(
+        defaultVariantsBlock.end
+      )}`;
+    }
   }
   if (/defaultVariants:\s*{/.test(raw)) {
     return raw.replace(
@@ -430,6 +446,10 @@ function isStaticClassExpression(node: ts.Expression): boolean {
   return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node);
 }
 
+function isNonEmptyStaticClassExpression(node: ts.Expression): boolean {
+  return isStaticClassExpression(node) && collectStringClasses(node).length > 0;
+}
+
 function collectStringClasses(node: ts.Expression): string[] {
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
     return node.text.split(/\s+/).filter(Boolean);
@@ -449,4 +469,45 @@ function unique<T>(values: T[]): T[] {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function escapeObjectKeyRegExp(value: string): string {
+  const escaped = escapeRegExp(value);
+  if (/^[A-Za-z_$][\w$]*$/.test(value)) return `(?:${escaped}|['"]${escaped}['"])`;
+  return `['"]${escaped}['"]`;
+}
+
+function findObjectBlock(raw: string, propertyName: string): { start: number; end: number } | null {
+  const match = new RegExp(`${escapeRegExp(propertyName)}\\s*:\\s*{`).exec(raw);
+  if (!match) return null;
+  const start = match.index;
+  const openBrace = raw.indexOf('{', start);
+  let depth = 0;
+  let quote: '"' | "'" | '`' | null = null;
+  let escaped = false;
+
+  for (let index = openBrace; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) return { start, end: index + 1 };
+    }
+  }
+
+  return null;
 }

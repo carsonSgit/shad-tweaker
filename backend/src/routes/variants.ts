@@ -15,7 +15,8 @@ import type { VariantPreviewOperation } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 
 const router = Router();
-const MAX_PREVIEW_STRING_LENGTH = 260;
+const MAX_PREVIEW_PATH_LENGTH = 1024;
+const MAX_PREVIEW_IDENTIFIER_LENGTH = 260;
 
 interface PreviewRequestBody {
   componentPath?: unknown;
@@ -78,8 +79,12 @@ router.get('/components/:identifier', async (req: Request, res: Response) => {
 router.post('/preview', async (req: Request, res: Response) => {
   try {
     const body = req.body as PreviewRequestBody;
-    const componentPath = readString(body.componentPath, 'componentPath');
-    const targetDefinition = readString(body.targetDefinition, 'targetDefinition');
+    const componentPath = readString(body.componentPath, 'componentPath', MAX_PREVIEW_PATH_LENGTH);
+    const targetDefinition = readString(
+      body.targetDefinition,
+      'targetDefinition',
+      MAX_PREVIEW_IDENTIFIER_LENGTH
+    );
     const operation = readPreviewOperation(body.operation);
     res.json({
       success: true,
@@ -111,15 +116,15 @@ function readPreviewOperation(value: unknown): VariantPreviewOperation {
   if (operation.type === 'add-value') {
     return {
       type: 'add-value',
-      axisName: readString(operation.axisName, 'axisName'),
+      axisName: readString(operation.axisName, 'axisName', MAX_PREVIEW_IDENTIFIER_LENGTH),
       value: readValue(operation.value),
     };
   }
   if (operation.type === 'set-default') {
     return {
       type: 'set-default',
-      axisName: readString(operation.axisName, 'axisName'),
-      valueName: readString(operation.valueName, 'valueName'),
+      axisName: readString(operation.axisName, 'axisName', MAX_PREVIEW_IDENTIFIER_LENGTH),
+      valueName: readString(operation.valueName, 'valueName', MAX_PREVIEW_IDENTIFIER_LENGTH),
     };
   }
   throw new VariantBuilderValidationError('Unsupported preview operation type.');
@@ -132,7 +137,7 @@ function readAxis(value: unknown) {
   const axis = value as Record<string, unknown>;
   const values = Array.isArray(axis.values) ? axis.values.map(readValue) : [];
   return {
-    name: readString(axis.name, 'axis.name'),
+    name: readString(axis.name, 'axis.name', MAX_PREVIEW_IDENTIFIER_LENGTH),
     values,
     defaultValue: typeof axis.defaultValue === 'string' ? axis.defaultValue.trim() : undefined,
   };
@@ -147,20 +152,18 @@ function readValue(value: unknown) {
     throw new VariantBuilderValidationError('variant value classes must be strings.');
   }
   return {
-    name: readString(record.name, 'value.name'),
+    name: readString(record.name, 'value.name', MAX_PREVIEW_IDENTIFIER_LENGTH),
     classes: record.classes.map((item) => item.trim()).filter(Boolean),
   };
 }
 
-function readString(value: unknown, field: string): string {
+function readString(value: unknown, field: string, maxLength: number): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new VariantBuilderValidationError(`${field} must be a non-empty string.`);
   }
   const trimmed = value.trim();
-  if (trimmed.length > MAX_PREVIEW_STRING_LENGTH) {
-    throw new VariantBuilderValidationError(
-      `${field} must be ${MAX_PREVIEW_STRING_LENGTH} characters or fewer.`
-    );
+  if (trimmed.length > maxLength) {
+    throw new VariantBuilderValidationError(`${field} must be ${maxLength} characters or fewer.`);
   }
   return trimmed;
 }

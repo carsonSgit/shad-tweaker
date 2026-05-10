@@ -136,6 +136,27 @@ export function Badge({ tone }: { tone: "neutral" | "brand" }) {
     );
   });
 
+  it('ignores empty manual variant-like maps', async () => {
+    const root = await createTempRoot();
+    await writeComponent(
+      root,
+      'card',
+      `
+const cardStyles = {
+  root: "",
+  body: "   ",
+};
+export function Card() {
+  return <section />;
+}
+`
+    );
+
+    const detail = await getVariantComponentDetail(root, 'card');
+
+    assert.equal(detail.definitions.length, 0);
+  });
+
   it('reports unsupported conditional diagnostics for arbitrary axis names', async () => {
     const root = await createTempRoot();
     await writeComponent(
@@ -152,6 +173,26 @@ export function Pill({ intent }: { intent: "info" | "danger" }) {
 
     assert.ok(
       detail.diagnostics.some((diagnostic) => diagnostic.code === 'UNSUPPORTED_VARIANT_EXPRESSION')
+    );
+  });
+
+  it('does not report unsupported diagnostics for unrelated conditionals', async () => {
+    const root = await createTempRoot();
+    await writeComponent(
+      root,
+      'spinner',
+      `
+export function Spinner({ isLoading }: { isLoading: boolean }) {
+  return isLoading === true ? <span /> : null;
+}
+`
+    );
+
+    const detail = await getVariantComponentDetail(root, 'spinner');
+
+    assert.equal(
+      detail.diagnostics.some((diagnostic) => diagnostic.code === 'UNSUPPORTED_VARIANT_EXPRESSION'),
+      false
     );
   });
 
@@ -281,6 +322,57 @@ export function Button() { return <button />; }
     });
 
     assert.match(preview.after, /defaultVariants: { variant: 'ghost' }/);
+  });
+
+  it('only updates set-default values inside defaultVariants', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+  variants: {
+    ghost: { default: "bg-transparent", outline: "border" },
+  },
+  defaultVariants: { ghost: "default" },
+});
+export function Button() { return <button />; }
+`
+    );
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'buttonVariants',
+      operation: { type: 'set-default', axisName: 'ghost', valueName: 'outline' },
+    });
+
+    assert.match(preview.after, /ghost: { default: "bg-transparent", outline: "border" }/);
+    assert.match(preview.after, /defaultVariants: { ghost: 'outline' }/);
+  });
+
+  it('updates quoted default variant keys', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+  variants: { variant: { default: "bg-primary", ghost: "bg-transparent" } },
+  defaultVariants: { 'variant': "default" },
+});
+export function Button() { return <button />; }
+`
+    );
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'buttonVariants',
+      operation: { type: 'set-default', axisName: 'variant', valueName: 'ghost' },
+    });
+
+    assert.match(preview.after, /defaultVariants: { 'variant': 'ghost' }/);
   });
 
   it('injects a missing default variant in preview output', async () => {

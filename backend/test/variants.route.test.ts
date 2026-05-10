@@ -109,14 +109,37 @@ describe('variant builder routes', () => {
     assert.equal(res.body.error.code, 'VARIANT_BUILDER_VALIDATION_ERROR');
   });
 
-  it('bounds preview request string lengths', async () => {
+  it('allows long preview component paths through validation', async () => {
+    await createTempRoot();
+    const nestedPath = `components/ui/${Array.from(
+      { length: 25 },
+      (_, index) => `segment-${index}`
+    ).join('/')}/button.tsx`;
+
+    const res = await request(app)
+      .post('/api/variants/preview')
+      .send({
+        componentPath: nestedPath,
+        targetDefinition: 'buttonVariants',
+        operation: {
+          type: 'add-value',
+          axisName: 'variant',
+          value: { name: 'ghost', classes: ['bg-transparent'] },
+        },
+      });
+
+    assert.equal(res.status, 404);
+    assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_NOT_FOUND');
+  });
+
+  it('bounds preview identifier string lengths', async () => {
     await createTempRoot();
 
     const res = await request(app)
       .post('/api/variants/preview')
       .send({
-        componentPath: `${'x'.repeat(261)}.tsx`,
-        targetDefinition: 'buttonVariants',
+        componentPath: 'components/ui/button.tsx',
+        targetDefinition: 'x'.repeat(261),
         operation: {
           type: 'add-value',
           axisName: 'variant',
