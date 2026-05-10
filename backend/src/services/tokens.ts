@@ -227,7 +227,12 @@ function collectClassesFromContent(componentPath: string, content: string): Toke
   }
 
   for (const variant of parsed.variantDefinitions) {
-    for (const className of variant.baseClasses) {
+    const variantClasses = [
+      ...variant.baseClasses,
+      ...Object.values(variant.variants).flatMap((values) => Object.values(values).flat()),
+      ...variant.compoundVariants.flatMap((compoundVariant) => compoundVariant.classes),
+    ];
+    for (const className of variantClasses) {
       const category = classifyTokenClass(className);
       if (category) {
         pushCandidate({

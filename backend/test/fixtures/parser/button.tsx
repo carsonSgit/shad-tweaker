@@ -22,6 +22,13 @@ const buttonVariants = cva(
       variant: 'default',
       size: 'default',
     },
+    compoundVariants: [
+      {
+        variant: 'outline',
+        size: 'sm',
+        className: 'border-primary px-2',
+      },
+    ],
   }
 );
 

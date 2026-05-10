@@ -470,8 +470,12 @@ export interface ParsedVariantDefinition {
   callee: 'cva' | 'tv';
   line: number;
   baseClasses: string[];
-  variants: Record<string, string[]>;
+  variants: Record<string, Record<string, string[]>>;
   defaultVariants: Record<string, string>;
+  compoundVariants: Array<{
+    conditions: Record<string, string>;
+    classes: string[];
+  }>;
   raw: string;
 }
 

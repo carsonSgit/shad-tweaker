@@ -186,7 +186,7 @@ describe('token service', () => {
     assert.deepEqual(tokenSet?.tokens.spacing, {});
   });
 
-  it('extracts token candidates from className, cn, and cva base classes', async () => {
+  it('extracts token candidates from className, cn, and cva variant classes', async () => {
     const root = await createTempRoot();
     const filePath = await writeComponent(
       root,
@@ -194,8 +194,16 @@ describe('token service', () => {
       `
 import { cva } from "class-variance-authority";
 const styles = cva("rounded-md shadow-sm duration-200", {});
+const badge = cva("inline-flex", {
+  variants: {
+    tone: {
+      brand: "bg-primary text-primary-foreground",
+    },
+  },
+  compoundVariants: [{ tone: "brand", className: "ring-2" }],
+});
 export function Button() {
-  return <button className={cn("bg-primary px-4", active && "ring-2")}>Save</button>;
+  return <button className={cn("px-4", active && "border-primary")}>Save</button>;
 }
 `
     );
@@ -205,11 +213,13 @@ export function Button() {
 
     assert.deepEqual(values, [
       'bg-primary',
+      'border-primary',
       'duration-200',
       'px-4',
       'ring-2',
       'rounded-md',
       'shadow-sm',
+      'text-primary-foreground',
     ]);
   });
 
