@@ -135,7 +135,10 @@ function readAxis(value: unknown) {
     throw new VariantBuilderValidationError('axis is required.');
   }
   const axis = value as Record<string, unknown>;
-  const values = Array.isArray(axis.values) ? axis.values.map(readValue) : [];
+  if (!Array.isArray(axis.values)) {
+    throw new VariantBuilderValidationError('axis.values is required.');
+  }
+  const values = axis.values.map(readValue);
   return {
     name: readString(axis.name, 'axis.name', MAX_PREVIEW_IDENTIFIER_LENGTH),
     values,

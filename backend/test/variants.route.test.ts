@@ -109,6 +109,24 @@ describe('variant builder routes', () => {
     assert.equal(res.body.error.code, 'VARIANT_BUILDER_VALIDATION_ERROR');
   });
 
+  it('returns a direct validation error when axis values are missing', async () => {
+    await createTempRoot();
+
+    const res = await request(app)
+      .post('/api/variants/preview')
+      .send({
+        componentPath: 'components/ui/button.tsx',
+        targetDefinition: 'buttonVariants',
+        operation: {
+          type: 'add-axis',
+          axis: { name: 'size' },
+        },
+      });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.message, 'axis.values is required.');
+  });
+
   it('allows long preview component paths through validation', async () => {
     await createTempRoot();
     const nestedPath = `components/ui/${Array.from(

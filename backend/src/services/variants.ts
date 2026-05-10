@@ -87,7 +87,8 @@ export async function previewVariantGeneration(
     before: component.content,
     after,
     diff: createPatch(component.path, component.content, after, 'before', 'after'),
-    changes: countChangedLines(component.content, after),
+    // Public API name stays `changes`; the value is a positional line-change estimate.
+    changes: countChangedLineEstimate(component.content, after),
   };
 }
 
@@ -253,6 +254,10 @@ function validateOperation(
     return;
   }
 
+  if (operation.type !== 'add-value' && operation.type !== 'set-default') {
+    throw new VariantBuilderValidationError('Unsupported preview operation type.');
+  }
+
   const axis = definition.axes.find((candidate) => candidate.name === operation.axisName);
   if (!axis) throw new VariantBuilderValidationError('Variant axis was not found.');
 
@@ -310,7 +315,8 @@ function addAxisToRawDefinition(raw: string, axis: VariantAxis, defaultValue?: s
         )}',`
     );
   }
-  return withAxis.replace(
+  return replaceRawDefinitionFallback(
+    withAxis,
     /}\s*\)?\s*;?\s*$/,
     `,\n${indent.config}defaultVariants: {\n${indent.value}${formatObjectKey(
       axis.name
@@ -356,7 +362,8 @@ function setDefaultInRawDefinition(raw: string, axisName: string, valueName: str
         )}',`
     );
   }
-  return raw.replace(
+  return replaceRawDefinitionFallback(
+    raw,
     /}\s*\)?\s*;?\s*$/,
     `,\n${indent.config}defaultVariants: {\n${indent.value}${formatObjectKey(
       axisName
@@ -384,7 +391,7 @@ function createVariantSourceFile(filePath: string, content: string): ts.SourceFi
   );
 }
 
-function countChangedLines(before: string, after: string): number {
+function countChangedLineEstimate(before: string, after: string): number {
   const beforeLines = before.split(/\r?\n/);
   const afterLines = after.split(/\r?\n/);
   const maxLength = Math.max(beforeLines.length, afterLines.length);
@@ -438,8 +445,19 @@ function replaceOnce(content: string, search: string, replacement: string): stri
   return `${content.slice(0, index)}${replacement}${content.slice(index + search.length)}`;
 }
 
+function replaceRawDefinitionFallback(raw: string, pattern: RegExp, replacement: string): string {
+  const nextRaw = raw.replace(pattern, replacement);
+  if (nextRaw === raw) {
+    throw new VariantBuilderUnsupportedError(
+      'Could not insert defaultVariants into target variant definition.'
+    );
+  }
+  return nextRaw;
+}
+
 function looksLikeVariantName(name: string): boolean {
-  return /variant|style|styles|classes/i.test(name);
+  if (/^(?:allClasses|classes|classesMap|globalStyles|styles)$/i.test(name)) return false;
+  return /(?:^variant|Variants?$|Styles?$|^classesBy|ClassesBy)/.test(name);
 }
 
 function isStaticClassExpression(node: ts.Expression): boolean {

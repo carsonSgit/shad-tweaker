@@ -7,6 +7,7 @@ import {
   getVariantComponentDetail,
   listVariantComponents,
   previewVariantGeneration,
+  VariantBuilderUnsupportedError,
   VariantBuilderValidationError,
 } from '../src/services/variants.js';
 
@@ -157,6 +158,32 @@ export function Card() {
     assert.equal(detail.definitions.length, 0);
   });
 
+  it('ignores broad manual variant name false positives', async () => {
+    const root = await createTempRoot();
+    await writeComponent(
+      root,
+      'card',
+      `
+const globalStyles = {
+  root: "rounded-lg border",
+};
+const allClasses = {
+  primary: "bg-primary",
+};
+const classesMap = {
+  muted: "text-muted-foreground",
+};
+export function Card() {
+  return <section />;
+}
+`
+    );
+
+    const detail = await getVariantComponentDetail(root, 'card');
+
+    assert.equal(detail.definitions.length, 0);
+  });
+
   it('reports unsupported conditional diagnostics for arbitrary axis names', async () => {
     const root = await createTempRoot();
     await writeComponent(
@@ -229,6 +256,73 @@ export function Button() { return <button />; }
 
     assert.match(preview.after, /size: {\n\s+sm: 'h-8 px-3'/);
     assert.match(preview.after, /defaultVariants: {\n\s+size: 'sm'/);
+  });
+
+  it('adds a cva axis without injecting a default when none is selected', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+  variants: {
+    variant: {
+      default: "bg-primary",
+    },
+  },
+});
+export function Button() { return <button />; }
+`
+    );
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'buttonVariants',
+      operation: {
+        type: 'add-axis',
+        axis: {
+          name: 'size',
+          values: [{ name: 'sm', classes: ['h-8', 'px-3'] }],
+        },
+      },
+    });
+
+    assert.match(preview.after, /size: {\n\s+sm: 'h-8 px-3'/);
+    assert.doesNotMatch(preview.after, /defaultVariants/);
+  });
+
+  it('adds a cva axis default into an existing defaultVariants block', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+  variants: {
+    variant: { default: "bg-primary" },
+  },
+  defaultVariants: { variant: "default" },
+});
+export function Button() { return <button />; }
+`
+    );
+
+    const preview = await previewVariantGeneration(root, {
+      componentPath: relativePath,
+      targetDefinition: 'buttonVariants',
+      operation: {
+        type: 'add-axis',
+        axis: {
+          name: 'size',
+          values: [{ name: 'sm', classes: ['h-8', 'px-3'] }],
+        },
+        defaultValue: 'sm',
+      },
+    });
+
+    assert.match(preview.after, /defaultVariants: \{\s+size: 'sm',variant: "default"/);
   });
 
   it('generates a non-mutating preview for adding a cva value', async () => {
@@ -421,6 +515,54 @@ export function Button() { return <button />; }
 
     assert.match(preview.after, /defaultVariants: {\n\s+variant: 'ghost'/);
     assert.ok(preview.changes > 1);
+  });
+
+  it('throws an unsupported error when defaultVariants fallback insertion cannot be applied', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+  variants: { variant: { default: "bg-primary", ghost: "bg-transparent" } },
+} /* trailing config comment */);
+export function Button() { return <button />; }
+`
+    );
+
+    await assert.rejects(
+      previewVariantGeneration(root, {
+        componentPath: relativePath,
+        targetDefinition: 'buttonVariants',
+        operation: { type: 'set-default', axisName: 'variant', valueName: 'ghost' },
+      }),
+      VariantBuilderUnsupportedError
+    );
+  });
+
+  it('rejects unsupported preview operation types defensively', async () => {
+    const root = await createTempRoot();
+    const relativePath = await writeComponent(
+      root,
+      'button',
+      `
+import { cva } from "class-variance-authority";
+const buttonVariants = cva("inline-flex", {
+  variants: { variant: { default: "bg-primary" } },
+});
+export function Button() { return <button />; }
+`
+    );
+
+    await assert.rejects(
+      previewVariantGeneration(root, {
+        componentPath: relativePath,
+        targetDefinition: 'buttonVariants',
+        operation: { type: 'remove-axis', axisName: 'variant' } as never,
+      }),
+      /Unsupported preview operation type/
+    );
   });
 
   it('rejects duplicate preview values before generating output', async () => {

@@ -150,6 +150,14 @@ export interface TokenPatchChange {
 }
 
 // Keep variant builder types in sync with backend/src/types/index.ts.
+export interface ParserDiagnostic {
+  severity: 'info' | 'warning' | 'error';
+  code: string;
+  message: string;
+  line?: number;
+}
+
+// `unsupported` is reserved for variant-like definitions that future transform workflows can surface.
 export type VariantSystemKind = 'cva' | 'tv' | 'manual' | 'unsupported';
 
 export interface VariantValue {
@@ -174,12 +182,7 @@ export interface VariantDefinitionDetail {
     classes: string[];
   }>;
   raw?: string;
-  diagnostics: Array<{
-    severity: 'info' | 'warning' | 'error';
-    code: string;
-    message: string;
-    line?: number;
-  }>;
+  diagnostics: ParserDiagnostic[];
 }
 
 export interface VariantComponentSummary {
@@ -192,12 +195,7 @@ export interface VariantComponentSummary {
 
 export interface VariantComponentDetail extends VariantComponentSummary {
   definitions: VariantDefinitionDetail[];
-  diagnostics: Array<{
-    severity: 'info' | 'warning' | 'error';
-    code: string;
-    message: string;
-    line?: number;
-  }>;
+  diagnostics: ParserDiagnostic[];
 }
 
 export type VariantPreviewOperation =

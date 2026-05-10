@@ -318,6 +318,7 @@ export interface VariantRecipe {
   values: Record<string, string>;
 }
 
+// `unsupported` is reserved for variant-like definitions that future transform workflows can surface.
 export type VariantSystemKind = 'cva' | 'tv' | 'manual' | 'unsupported';
 
 export interface VariantValue {
