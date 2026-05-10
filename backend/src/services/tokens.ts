@@ -94,7 +94,10 @@ function getProjectRoot(): string {
 async function resolveSafeExistingComponentPath(componentPath: string): Promise<string | null> {
   const projectRoot = getProjectRoot();
   const resolvedProjectRoot = path.resolve(projectRoot);
-  const resolvedPath = path.resolve(projectRoot, componentPath);
+  const candidatePath = path.isAbsolute(componentPath)
+    ? path.normalize(componentPath)
+    : path.resolve(projectRoot, componentPath);
+  const resolvedPath = path.resolve(candidatePath);
 
   // First enforce lexical containment, then realpath containment below to catch symlinks.
   if (!isPathSafe(resolvedPath, resolvedProjectRoot)) {
@@ -228,7 +231,8 @@ export async function listTokenSets(): Promise<DesignTokenSet[]> {
 
 export async function getTokenSet(id: string): Promise<DesignTokenSet | null> {
   const manifest = await loadWorkspaceManifest();
-  return manifest.tokenSets.find((tokenSet) => tokenSet.id === id) ?? null;
+  const tokenSet = manifest.tokenSets.find((tokenSet) => tokenSet.id === id);
+  return tokenSet ? normalizeTokenSet(tokenSet) : null;
 }
 
 export async function createTokenSet(input: {
@@ -480,11 +484,23 @@ export async function applyTokenPatch(options: {
   const errors: Array<{ path: string; error: string }> = [];
   let totalChanges = 0;
   let backupId: string | undefined;
-  const safePaths = (
-    await Promise.all(
-      options.componentPaths.map((componentPath) => resolveSafeExistingComponentPath(componentPath))
-    )
-  ).filter((componentPath): componentPath is string => typeof componentPath === 'string');
+  const resolvedPaths = await Promise.all(
+    options.componentPaths.map(async (componentPath) => ({
+      originalPath: componentPath,
+      safePath: await resolveSafeExistingComponentPath(componentPath),
+    }))
+  );
+  const safePaths: string[] = [];
+  for (const resolved of resolvedPaths) {
+    if (resolved.safePath) {
+      safePaths.push(resolved.safePath);
+    } else {
+      errors.push({
+        path: resolved.originalPath,
+        error: 'Component path could not be resolved within the project',
+      });
+    }
+  }
 
   if (options.createBackup ?? true) {
     const backup = await createBackup(safePaths);

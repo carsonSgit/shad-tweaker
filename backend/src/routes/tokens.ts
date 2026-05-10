@@ -42,6 +42,10 @@ function sendServerError(res: Response, message: string, code: string): void {
   });
 }
 
+function isTokenSetConflict(error: unknown): boolean {
+  return error instanceof Error && /^Token set (?:name )?already exists:/.test(error.message);
+}
+
 function validateTokenMap(value: unknown): DesignTokenMap | null {
   const map = { ...createEmptyTokenMap() };
   if (value === undefined) {
@@ -178,11 +182,12 @@ router.post('/sets', async (req: Request, res: Response) => {
     res.status(201).json({ success: true, tokenSet });
   } catch (error) {
     logger.error('Failed to create token set', error);
-    res.status(409).json({
+    const conflict = isTokenSetConflict(error);
+    res.status(conflict ? 409 : 500).json({
       success: false,
       error: {
         message: error instanceof Error ? error.message : 'Failed to create token set',
-        code: 'TOKEN_SET_CONFLICT',
+        code: conflict ? 'TOKEN_SET_CONFLICT' : 'TOKEN_SET_CREATE_ERROR',
       },
     });
   }
@@ -243,11 +248,12 @@ router.put('/sets/:id', async (req: Request, res: Response) => {
     res.json({ success: true, tokenSet });
   } catch (error) {
     logger.error(`Failed to update token set ${req.params.id}`, error);
-    res.status(409).json({
+    const conflict = isTokenSetConflict(error);
+    res.status(conflict ? 409 : 500).json({
       success: false,
       error: {
         message: error instanceof Error ? error.message : 'Failed to update token set',
-        code: 'TOKEN_SET_CONFLICT',
+        code: conflict ? 'TOKEN_SET_CONFLICT' : 'TOKEN_SET_UPDATE_ERROR',
       },
     });
   }
@@ -356,6 +362,10 @@ router.post('/patch/apply', async (req: Request, res: Response) => {
       !changes.value
     ) {
       sendValidation(res, paths.error || changes.error || 'Invalid patch payload');
+      return;
+    }
+    if (!(await getTokenSet(req.body.tokenSetId))) {
+      sendValidation(res, `Unknown token set: ${req.body.tokenSetId}`);
       return;
     }
     const result = await applyTokenPatch({

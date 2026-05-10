@@ -193,6 +193,30 @@ describe('token routes', () => {
     assert.equal(overrides.body.overrides[0].overrides.spacing['button-inline'], 'px-6');
   });
 
+  it('rejects patch apply with an unknown token set before editing files', async () => {
+    const root = await createTempRoot();
+    const { absolutePath, relativePath } = await writeComponent(
+      root,
+      'components/ui/button.tsx',
+      '<button className="rounded-md" />'
+    );
+
+    const apply = await request(app)
+      .post('/api/tokens/patch/apply')
+      .send({
+        tokenSetId: 'token_set_missing',
+        componentPaths: [relativePath],
+        changes: [{ category: 'radius', from: 'rounded-md', to: 'rounded-lg' }],
+        createBackup: false,
+        recordOverrides: true,
+      });
+    const content = await fs.readFile(absolutePath, 'utf-8');
+
+    assert.equal(apply.status, 400);
+    assert.equal(apply.body.error.code, 'VALIDATION_ERROR');
+    assert.match(content, /rounded-md/);
+  });
+
   it('returns frequency and inconsistency reports', async () => {
     const root = await createTempRoot();
     await writeComponent(root, 'components/ui/a.tsx', '<div className="rounded-md p-4" />');

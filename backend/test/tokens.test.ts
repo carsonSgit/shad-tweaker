@@ -11,6 +11,7 @@ import {
   deleteTokenSet,
   extractTokenCandidates,
   getComponentOverrides,
+  getTokenSet,
   listTokenSets,
   previewTokenPatch,
   updateTokenSet,
@@ -132,6 +133,47 @@ describe('token service', () => {
     assert.equal(manifest.tokenSets[0].tokens.radius.sm.value, 'rounded-sm');
   });
 
+  it('normalizes legacy token sets when reading a single set', async () => {
+    const root = await createTempRoot();
+    await fs.outputJson(
+      path.join(root, '.shadcn-tweaker', 'manifest.json'),
+      {
+        version: 1,
+        createdAt: '2026-05-09T00:00:00.000Z',
+        updatedAt: '2026-05-09T00:00:00.000Z',
+        config: {
+          componentDirectory: './components/ui',
+          backupRetentionDays: 30,
+          maxBackups: 20,
+          autoBackup: true,
+          validateAfterEdit: true,
+          port: 3001,
+        },
+        components: [],
+        sources: [],
+        packages: [],
+        tokenSets: [
+          {
+            id: 'token_set_legacy_single',
+            name: 'Legacy Single',
+            tokens: { radius: { card: 'rounded-md' } },
+            createdAt: '2026-05-09T00:00:00.000Z',
+            updatedAt: '2026-05-09T00:00:00.000Z',
+          },
+        ],
+        componentTokenOverrides: {},
+        presets: [],
+        backups: [],
+      },
+      { spaces: 2 }
+    );
+
+    const tokenSet = await getTokenSet('token_set_legacy_single');
+
+    assert.equal(tokenSet?.tokens.radius.card.value, 'rounded-md');
+    assert.deepEqual(tokenSet?.tokens.spacing, {});
+  });
+
   it('extracts token candidates from className, cn, and cva base classes', async () => {
     const root = await createTempRoot();
     const filePath = await writeComponent(
@@ -247,5 +289,22 @@ export function Button() {
     assert.ok(result.backupId);
     assert.match(content, /rounded-lg/);
     assert.equal(overrides[0].overrides.radius?.card, 'rounded-lg');
+  });
+
+  it('reports unresolved paths when applying patches', async () => {
+    const root = await createTempRoot();
+    const tokenSet = await createTokenSet({ name: 'Missing Path Tokens' });
+    const missingPath = path.join(root, 'components/ui/missing.tsx');
+
+    const result = await applyTokenPatch({
+      tokenSetId: tokenSet.id,
+      componentPaths: [missingPath],
+      changes: [{ category: 'radius', from: 'rounded-md', to: 'rounded-lg' }],
+      createBackup: false,
+    });
+
+    assert.equal(result.success, false);
+    assert.deepEqual(result.modified, []);
+    assert.equal(result.errors?.[0].path, missingPath);
   });
 });
