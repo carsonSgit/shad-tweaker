@@ -230,7 +230,11 @@ function parseManualAxes(objectLiteral: ts.ObjectLiteralExpression): VariantAxis
 }
 
 function detectUnsupportedVariantDiagnostics(content: string): ParserDiagnostic[] {
-  if (!/className\s*=\s*{[^}]*\b[a-zA-Z_$][\w$]*\s*(?:===|!==|==|!=)\s*[^?;{]+\?/.test(content))
+  if (
+    !/className\s*=\s*{[\s\S]*?\b[a-zA-Z_$][\w$]*\s*(?:===|!==|==|!=)\s*[^?;{]+\?[\s\S]*?}/.test(
+      content
+    )
+  )
     return [];
   return [
     {
@@ -296,24 +300,26 @@ function applyOperationToRawDefinition(raw: string, operation: VariantPreviewOpe
 
 function addAxisToRawDefinition(raw: string, axis: VariantAxis, defaultValue?: string): string {
   const indent = detectVariantIndent(raw);
-  const axisBlock = `${indent.value}${formatObjectKey(axis.name)}: {\n${axis.values
+  const axisBlock = `${formatObjectKey(axis.name)}: {\n${axis.values
     .map(
       (value) =>
         `${indent.valueValue}${formatObjectKey(value.name)}: '${escapeSingleQuotedLiteral(
           value.classes.join(' ')
         )}',`
     )
-    .join('\n')}\n${indent.value}},`;
-  const withAxis = raw.replace(/variants:\s*{\s*/, (match) => `${match}\n${axisBlock}\n`);
+    .join('\n')}\n${indent.value}}`;
+  const variantsBlock = findObjectBlock(raw, 'variants');
+  if (!variantsBlock) return raw;
+  const withAxis = insertPropertyIntoObjectBlock(raw, variantsBlock, axisBlock, indent.value);
   const selectedDefault = defaultValue ?? axis.defaultValue;
   if (!selectedDefault) return withAxis;
-  if (/defaultVariants:\s*{/.test(withAxis)) {
-    return withAxis.replace(
-      /defaultVariants:\s*{\s*/,
-      (match) =>
-        `${match}\n${indent.value}${formatObjectKey(axis.name)}: '${escapeSingleQuotedLiteral(
-          selectedDefault
-        )}',`
+  const defaultVariantsBlock = findObjectBlock(withAxis, 'defaultVariants');
+  if (defaultVariantsBlock) {
+    return insertPropertyIntoObjectBlock(
+      withAxis,
+      defaultVariantsBlock,
+      `${formatObjectKey(axis.name)}: '${escapeSingleQuotedLiteral(selectedDefault)}'`,
+      indent.value
     );
   }
   return replaceRawDefinitionFallback(
@@ -327,12 +333,13 @@ function addAxisToRawDefinition(raw: string, axis: VariantAxis, defaultValue?: s
 
 function addValueToRawDefinition(raw: string, axisName: string, value: VariantValue): string {
   const indent = detectVariantIndent(raw);
-  const axisPattern = new RegExp(`(${escapeRegExp(axisName)}\\s*:\\s*{)`);
-  return raw.replace(
-    axisPattern,
-    `$1\n${indent.valueValue}${formatObjectKey(value.name)}: '${escapeSingleQuotedLiteral(
-      value.classes.join(' ')
-    )}',`
+  const axisBlock = findObjectBlock(raw, axisName);
+  if (!axisBlock) return raw;
+  return insertPropertyIntoObjectBlock(
+    raw,
+    axisBlock,
+    `${formatObjectKey(value.name)}: '${escapeSingleQuotedLiteral(value.classes.join(' '))}'`,
+    indent.valueValue
   );
 }
 
@@ -471,6 +478,32 @@ function replaceRawDefinitionFallback(raw: string, pattern: RegExp, replacement:
     );
   }
   return nextRaw;
+}
+
+function insertPropertyIntoObjectBlock(
+  raw: string,
+  block: { start: number; end: number },
+  property: string,
+  indent: string
+): string {
+  const openBrace = raw.indexOf('{', block.start);
+  const closeBrace = block.end - 1;
+  const inner = raw.slice(openBrace + 1, closeBrace);
+  const trimmedInner = inner.trim();
+
+  if (!trimmedInner) {
+    return `${raw.slice(0, openBrace + 1)}\n${indent}${property},\n${raw.slice(closeBrace)}`;
+  }
+
+  if (!inner.includes('\n')) {
+    const trailingWhitespace = inner.match(/\s*$/)?.[0] ?? '';
+    const insertionPrefix = trimmedInner.endsWith(',') ? '' : ',';
+    return `${raw.slice(0, closeBrace - trailingWhitespace.length)}${insertionPrefix} ${property}${trailingWhitespace}${raw.slice(closeBrace)}`;
+  }
+
+  const trailingWhitespace = inner.match(/\s*$/)?.[0] ?? '';
+  const insertionPrefix = trimmedInner.endsWith(',') ? '' : ',';
+  return `${raw.slice(0, closeBrace - trailingWhitespace.length)}${insertionPrefix}\n${indent}${property},${trailingWhitespace}${raw.slice(closeBrace)}`;
 }
 
 function looksLikeVariantName(name: string): boolean {

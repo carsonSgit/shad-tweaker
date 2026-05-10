@@ -204,6 +204,31 @@ export function Pill({ intent }: { intent: "info" | "danger" }) {
     );
   });
 
+  it('reports unsupported conditional diagnostics for multiline className expressions', async () => {
+    const root = await createTempRoot();
+    await writeComponent(
+      root,
+      'pill',
+      `
+export function Pill({ intent }: { intent: "info" | "danger" }) {
+  return (
+    <span
+      className={
+        intent === "danger" ? "bg-destructive" : "bg-primary"
+      }
+    />
+  );
+}
+`
+    );
+
+    const detail = await getVariantComponentDetail(root, 'pill');
+
+    assert.ok(
+      detail.diagnostics.some((diagnostic) => diagnostic.code === 'UNSUPPORTED_VARIANT_EXPRESSION')
+    );
+  });
+
   it('does not report unsupported diagnostics for unrelated conditionals', async () => {
     const root = await createTempRoot();
     await writeComponent(
@@ -323,7 +348,7 @@ export function Button() { return <button />; }
       },
     });
 
-    assert.match(preview.after, /defaultVariants: \{\s+size: 'sm',variant: "default"/);
+    assert.match(preview.after, /defaultVariants: { variant: "default", size: 'sm' }/);
   });
 
   it('generates a non-mutating preview for adding a tv axis', async () => {
@@ -399,6 +424,10 @@ export function Button() { return <button />; }
     const after = await fs.readFile(absolutePath, 'utf-8');
 
     assert.match(preview.after, /ghost: 'bg-transparent hover:bg-accent'/);
+    assert.match(
+      preview.after,
+      /variant: {\n\s+default: "bg-primary",\n\s+ghost: 'bg-transparent hover:bg-accent',\n\s+}/
+    );
     assert.match(preview.diff, /ghost/);
     assert.equal(after, before);
   });
@@ -475,7 +504,7 @@ export function Button() { return <button />; }
     );
     assert.match(
       preview.after,
-      /const buttonVariants = cva\("inline-flex", {\n {2}variants: { variant: {\n\s+ghost: 'bg-transparent', default: "bg-primary" } },\n}\);/
+      /const buttonVariants = cva\("inline-flex", {\n {2}variants: { variant: { default: "bg-primary", ghost: 'bg-transparent' } },\n}\);/
     );
   });
 
@@ -507,7 +536,7 @@ export const afterFour = 4;
       },
     });
 
-    assert.equal(preview.changes, 2);
+    assert.equal(preview.changes, 1);
   });
 
   it('escapes single quotes in generated preview literals', async () => {
