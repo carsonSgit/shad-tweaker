@@ -41,8 +41,7 @@ function variantErrorResponse(error: unknown, fallback: string) {
   if (error instanceof VariantBuilderUnsupportedError) {
     return { status: 422, message: error.message, code: error.code };
   }
-  const message = error instanceof Error ? error.message : fallback;
-  return { status: 500, message, code: 'VARIANT_BUILDER_ERROR' };
+  return { status: 500, message: fallback, code: 'VARIANT_BUILDER_ERROR' };
 }
 
 function sendError(res: Response, response: ReturnType<typeof variantErrorResponse>): void {

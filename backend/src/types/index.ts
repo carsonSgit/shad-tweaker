@@ -140,7 +140,7 @@ export interface ComponentLibraryInventoryItem {
   sourceRegistry?: string;
   primitiveBase?: string;
   variantCount: number;
-  variants?: VariantComponentSummary;
+  variants: VariantComponentSummary;
   lastModified: string;
   dependencyStatus: ComponentDependencyStatus;
   tokenUsage: string[];
@@ -380,9 +380,12 @@ export interface VariantGenerationPreview {
   componentPath: string;
   targetDefinition: string;
   operation: VariantPreviewOperation;
+  // Full raw source before the preview operation, intended for preview/debug display.
   before: string;
+  // Full raw source after the preview operation, intended for preview/debug display.
   after: string;
   diff: string;
+  // Estimated positional changed-line count; insertions/deletions can shift later lines.
   changes: number;
 }
 

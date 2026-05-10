@@ -38,7 +38,7 @@ interface VariantPreviewRequest {
 
 export async function listVariantComponents(cwd: string): Promise<VariantComponentSummary[]> {
   const components = await listComponentLibrary(cwd);
-  return components.map((component) => component.variants ?? emptyVariantSummary(component));
+  return components.map((component) => component.variants);
 }
 
 export async function getVariantComponentDetail(
@@ -229,7 +229,7 @@ function parseManualAxes(objectLiteral: ts.ObjectLiteralExpression): VariantAxis
 }
 
 function detectUnsupportedVariantDiagnostics(content: string): ParserDiagnostic[] {
-  if (!/className\s*=\s*{[^}]*\b[a-zA-Z_$][\w$]*\s*(?:===|!==|==|!=)\s*[^?;{]+\?/s.test(content))
+  if (!/className\s*=\s*{[^}]*\b[a-zA-Z_$][\w$]*\s*(?:===|!==|==|!=)\s*[^?;{]+\?/.test(content))
     return [];
   return [
     {
@@ -317,7 +317,7 @@ function addAxisToRawDefinition(raw: string, axis: VariantAxis, defaultValue?: s
   }
   return replaceRawDefinitionFallback(
     withAxis,
-    /}\s*\)?\s*;?\s*$/,
+    /}\s*\)\s*;?\s*$/,
     `,\n${indent.config}defaultVariants: {\n${indent.value}${formatObjectKey(
       axis.name
     )}: '${escapeSingleQuotedLiteral(selectedDefault)}',\n${indent.config}},\n${indent.close}}\n)`
@@ -364,21 +364,11 @@ function setDefaultInRawDefinition(raw: string, axisName: string, valueName: str
   }
   return replaceRawDefinitionFallback(
     raw,
-    /}\s*\)?\s*;?\s*$/,
+    /}\s*\)\s*;?\s*$/,
     `,\n${indent.config}defaultVariants: {\n${indent.value}${formatObjectKey(
       axisName
     )}: '${escapeSingleQuotedLiteral(valueName)}',\n${indent.config}},\n${indent.close}}\n)`
   );
-}
-
-function emptyVariantSummary(component: { name: string; path: string }): VariantComponentSummary {
-  return {
-    name: component.name,
-    path: component.path,
-    variantCount: 0,
-    systems: [],
-    axes: [],
-  };
 }
 
 function createVariantSourceFile(filePath: string, content: string): ts.SourceFile {

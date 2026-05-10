@@ -65,6 +65,7 @@ export function Card() { return <section />; }
 
     assert.equal(summaries.length, 2);
     assert.deepEqual(summaries.map((summary) => summary.systems[0]).sort(), ['cva', 'tv']);
+    assert.ok(summaries.every((summary) => Array.isArray(summary.systems)));
     assert.ok(summaries.some((summary) => summary.axes.includes('variant')));
     assert.ok(summaries.some((summary) => summary.axes.includes('density')));
   });
@@ -514,6 +515,7 @@ export function Button() { return <button />; }
     });
 
     assert.match(preview.after, /defaultVariants: {\n\s+variant: 'ghost'/);
+    assert.match(preview.after, /}\n\);\nexport function Button/);
     assert.ok(preview.changes > 1);
   });
 
