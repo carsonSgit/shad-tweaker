@@ -16,7 +16,7 @@ import type {
   TokenPatchChange,
   TokenPatchPreviewResult,
 } from '../types/index.js';
-import { createEmptyTokenMap } from '../utils/validation.js';
+import { createEmptyTokenMap, isPathSafe } from '../utils/validation.js';
 import { createBackup } from './backup.js';
 import { createPreview } from './differ.js';
 import { parseComponentSource } from './parser.js';
@@ -95,6 +95,10 @@ async function resolveSafeExistingComponentPath(componentPath: string): Promise<
   const projectRoot = getProjectRoot();
   const resolvedProjectRoot = path.resolve(projectRoot);
   const resolvedPath = path.resolve(projectRoot, componentPath);
+
+  if (!isPathSafe(resolvedPath, resolvedProjectRoot)) {
+    return null;
+  }
 
   try {
     const realProjectRoot = await fs.realpath(resolvedProjectRoot);

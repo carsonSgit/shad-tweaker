@@ -196,12 +196,16 @@ export function validateTokenComponentPath(
     return { valid: false, error: 'Component path must be a non-empty string' };
   }
 
-  const pathValidation = validateComponentPaths([componentPath], projectDir);
-  if (!pathValidation.valid) {
-    return { valid: false, error: pathValidation.error || 'Invalid component path' };
+  if (path.isAbsolute(componentPath)) {
+    return { valid: false, error: 'Component path must be project-relative' };
   }
 
-  return { valid: true, value: path.resolve(projectDir, componentPath) };
+  const resolvedPath = path.resolve(projectDir, componentPath);
+  if (!isPathSafe(resolvedPath, projectDir)) {
+    return { valid: false, error: 'Component path must stay within the project directory' };
+  }
+
+  return { valid: true, value: resolvedPath };
 }
 
 export function validateTokenComponentPaths(
@@ -222,14 +226,22 @@ export function validateTokenComponentPaths(
     return { valid: false, error: 'componentPaths must contain only strings' };
   }
 
-  const pathValidation = validateComponentPaths(componentPaths, projectDir);
-  if (!pathValidation.valid) {
-    return { valid: false, error: pathValidation.error || 'Invalid component paths' };
+  const normalizedPaths: string[] = [];
+  for (const componentPath of componentPaths) {
+    if (path.isAbsolute(componentPath)) {
+      return { valid: false, error: 'componentPaths must be project-relative paths' };
+    }
+
+    const resolvedPath = path.resolve(projectDir, componentPath);
+    if (!isPathSafe(resolvedPath, projectDir)) {
+      return { valid: false, error: 'componentPaths must stay within the project directory' };
+    }
+    normalizedPaths.push(resolvedPath);
   }
 
   return {
     valid: true,
-    value: componentPaths.map((componentPath) => path.resolve(projectDir, componentPath)),
+    value: normalizedPaths,
   };
 }
 

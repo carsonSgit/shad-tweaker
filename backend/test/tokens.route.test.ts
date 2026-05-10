@@ -29,7 +29,7 @@ async function writeComponent(
   root: string,
   relativePath: string,
   content: string
-): Promise<string> {
+): Promise<{ absolutePath: string; relativePath: string }> {
   const filePath = path.join(root, relativePath);
   await fs.outputFile(filePath, content);
   const stats = await fs.stat(filePath);
@@ -43,7 +43,7 @@ async function writeComponent(
     },
   };
   await recordScannedComponents([component], root);
-  return filePath;
+  return { absolutePath: filePath, relativePath };
 }
 
 afterEach(async () => {
@@ -128,23 +128,23 @@ describe('token routes', () => {
 
   it('rejects invalid component override payloads', async () => {
     const root = await createTempRoot();
-    const filePath = await writeComponent(root, 'components/ui/button.tsx', '<button />');
+    const { relativePath } = await writeComponent(root, 'components/ui/button.tsx', '<button />');
     const tokenSet = await createTokenSet({ name: 'Override Tokens' });
 
     const unsafeTokenSet = await request(app)
-      .put(`/api/tokens/components/${encodeURIComponent(filePath)}/overrides`)
+      .put(`/api/tokens/components/${encodeURIComponent(relativePath)}/overrides`)
       .send({
         overrides: [{ tokenSetId: '../bad', overrides: { radius: { card: 'rounded-lg' } } }],
       });
     const unknownTokenSet = await request(app)
-      .put(`/api/tokens/components/${encodeURIComponent(filePath)}/overrides`)
+      .put(`/api/tokens/components/${encodeURIComponent(relativePath)}/overrides`)
       .send({
         overrides: [
           { tokenSetId: 'token_set_missing', overrides: { radius: { card: 'rounded-lg' } } },
         ],
       });
     const badCategory = await request(app)
-      .put(`/api/tokens/components/${encodeURIComponent(filePath)}/overrides`)
+      .put(`/api/tokens/components/${encodeURIComponent(relativePath)}/overrides`)
       .send({
         overrides: [{ tokenSetId: tokenSet.id, overrides: { nope: { card: 'rounded-lg' } } }],
       });
@@ -156,7 +156,7 @@ describe('token routes', () => {
 
   it('verifies preview and apply response shapes', async () => {
     const root = await createTempRoot();
-    const filePath = await writeComponent(
+    const { relativePath } = await writeComponent(
       root,
       'components/ui/button.tsx',
       '<button className="rounded-md px-4" />'
@@ -167,20 +167,20 @@ describe('token routes', () => {
       .post('/api/tokens/patch/preview')
       .send({
         tokenSetId: tokenSet.id,
-        componentPaths: [filePath],
+        componentPaths: [relativePath],
         changes: [{ category: 'radius', from: 'rounded-md', to: 'rounded-lg' }],
       });
     const apply = await request(app)
       .post('/api/tokens/patch/apply')
       .send({
         tokenSetId: tokenSet.id,
-        componentPaths: [filePath],
+        componentPaths: [relativePath],
         changes: [{ category: 'spacing', from: 'px-4', to: 'px-6', tokenName: 'button-inline' }],
         createBackup: false,
         recordOverrides: true,
       });
     const overrides = await request(app).get(
-      `/api/tokens/components/${encodeURIComponent(filePath)}/overrides`
+      `/api/tokens/components/${encodeURIComponent(relativePath)}/overrides`
     );
 
     assert.equal(preview.status, 200);
