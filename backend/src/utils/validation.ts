@@ -188,6 +188,28 @@ export function isSafeTokenName(value: string): boolean {
   return value.length > 0 && value.length <= 96 && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(value);
 }
 
+const SAFE_TOKEN_COMPONENT_PATH_PATTERN =
+  /^(?:[A-Za-z0-9._-]+[\\/])*[A-Za-z0-9._-]+\.(?:[jt]sx?|vue|svelte|html|css|scss|less)$/;
+
+export function sanitizeTokenComponentPath(componentPath: string): string | null {
+  if (
+    componentPath.length === 0 ||
+    componentPath.length > 512 ||
+    componentPath.includes('\0') ||
+    path.isAbsolute(componentPath) ||
+    !SAFE_TOKEN_COMPONENT_PATH_PATTERN.test(componentPath)
+  ) {
+    return null;
+  }
+
+  const normalized = path.normalize(componentPath).replace(/\\/g, '/');
+  if (normalized === '..' || normalized.startsWith('../') || normalized.includes('/../')) {
+    return null;
+  }
+
+  return normalized;
+}
+
 export function validateTokenComponentPath(
   componentPath: unknown,
   projectDir: string
@@ -196,16 +218,18 @@ export function validateTokenComponentPath(
     return { valid: false, error: 'Component path must be a non-empty string' };
   }
 
-  if (path.isAbsolute(componentPath)) {
-    return { valid: false, error: 'Component path must be project-relative' };
+  const sanitizedPath = sanitizeTokenComponentPath(componentPath);
+  if (!sanitizedPath) {
+    return { valid: false, error: 'Component path must be a safe project-relative file path' };
   }
 
-  const resolvedPath = path.resolve(projectDir, componentPath);
-  if (!isPathSafe(resolvedPath, projectDir)) {
+  const resolvedProjectDir = path.resolve(projectDir);
+  const resolvedPath = path.resolve(resolvedProjectDir, sanitizedPath);
+  if (!isPathSafe(resolvedPath, resolvedProjectDir)) {
     return { valid: false, error: 'Component path must stay within the project directory' };
   }
 
-  return { valid: true, value: resolvedPath };
+  return { valid: true, value: sanitizedPath };
 }
 
 export function validateTokenComponentPaths(
@@ -228,15 +252,20 @@ export function validateTokenComponentPaths(
 
   const normalizedPaths: string[] = [];
   for (const componentPath of componentPaths) {
-    if (path.isAbsolute(componentPath)) {
-      return { valid: false, error: 'componentPaths must be project-relative paths' };
+    const sanitizedPath = sanitizeTokenComponentPath(componentPath);
+    if (!sanitizedPath) {
+      return {
+        valid: false,
+        error: 'componentPaths must contain safe project-relative file paths',
+      };
     }
 
-    const resolvedPath = path.resolve(projectDir, componentPath);
-    if (!isPathSafe(resolvedPath, projectDir)) {
+    const resolvedProjectDir = path.resolve(projectDir);
+    const resolvedPath = path.resolve(resolvedProjectDir, sanitizedPath);
+    if (!isPathSafe(resolvedPath, resolvedProjectDir)) {
       return { valid: false, error: 'componentPaths must stay within the project directory' };
     }
-    normalizedPaths.push(resolvedPath);
+    normalizedPaths.push(sanitizedPath);
   }
 
   return {

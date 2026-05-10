@@ -16,7 +16,11 @@ import type {
   TokenPatchChange,
   TokenPatchPreviewResult,
 } from '../types/index.js';
-import { createEmptyTokenMap, isPathSafe } from '../utils/validation.js';
+import {
+  createEmptyTokenMap,
+  isPathSafe,
+  sanitizeTokenComponentPath,
+} from '../utils/validation.js';
 import { createBackup } from './backup.js';
 import { createPreview } from './differ.js';
 import { parseComponentSource } from './parser.js';
@@ -94,10 +98,14 @@ function getProjectRoot(): string {
 async function resolveSafeExistingComponentPath(componentPath: string): Promise<string | null> {
   const projectRoot = getProjectRoot();
   const resolvedProjectRoot = path.resolve(projectRoot);
-  const candidatePath = path.isAbsolute(componentPath)
-    ? path.normalize(componentPath)
-    : path.resolve(projectRoot, componentPath);
-  const resolvedPath = path.resolve(candidatePath);
+  const relativePath = path.isAbsolute(componentPath)
+    ? path.relative(resolvedProjectRoot, componentPath)
+    : componentPath;
+  const sanitizedPath = sanitizeTokenComponentPath(relativePath);
+  if (!sanitizedPath) {
+    return null;
+  }
+  const resolvedPath = path.resolve(resolvedProjectRoot, sanitizedPath);
 
   // First enforce lexical containment, then realpath containment below to catch symlinks.
   if (!isPathSafe(resolvedPath, resolvedProjectRoot)) {
