@@ -2,6 +2,7 @@ import path from 'node:path';
 import type {
   ApplyRequest,
   BatchActionRequest,
+  DesignToken,
   DesignTokenMap,
   EditRequest,
   TemplateRule,
@@ -178,6 +179,99 @@ export function isTokenCategory(value: unknown): value is TokenCategory {
 
 export function createEmptyTokenMap(): DesignTokenMap {
   return Object.fromEntries(TOKEN_CATEGORIES.map((category) => [category, {}])) as DesignTokenMap;
+}
+
+export function normalizeDesignTokenMap(
+  value: unknown,
+  options: {
+    strict?: boolean;
+    now?: string;
+    fallbackCreatedAt?: string;
+    fallbackUpdatedAt?: string;
+  } = {}
+): DesignTokenMap | null {
+  const strict = options.strict ?? false;
+  const now = options.now ?? new Date().toISOString();
+  const fallbackCreatedAt = options.fallbackCreatedAt ?? now;
+  const fallbackUpdatedAt = options.fallbackUpdatedAt ?? now;
+  const map = createEmptyTokenMap();
+
+  if (value === undefined) {
+    return map;
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
+  }
+
+  const tokenGroups = value as Record<string, unknown>;
+  for (const [category, tokens] of Object.entries(tokenGroups)) {
+    if (!isTokenCategory(category)) {
+      if (strict) {
+        return null;
+      }
+      if (typeof tokens === 'string' || typeof tokens === 'number') {
+        map.colors[category] = {
+          name: category,
+          category: 'colors',
+          value: String(tokens),
+          createdAt: fallbackCreatedAt,
+          updatedAt: fallbackUpdatedAt,
+        };
+      }
+      continue;
+    }
+    if (typeof tokens !== 'object' || tokens === null || Array.isArray(tokens)) {
+      if (strict) {
+        return null;
+      }
+      continue;
+    }
+
+    for (const [name, token] of Object.entries(tokens as Record<string, unknown>)) {
+      if (!isSafeTokenName(name)) {
+        if (strict) {
+          return null;
+        }
+        continue;
+      }
+      if (token && typeof token === 'object' && 'value' in token) {
+        const candidate = token as Partial<DesignToken>;
+        if (
+          typeof candidate.value !== 'string' ||
+          (strict && candidate.name !== undefined && typeof candidate.name !== 'string')
+        ) {
+          if (strict) {
+            return null;
+          }
+          continue;
+        }
+        map[category][name] = {
+          name: typeof candidate.name === 'string' ? candidate.name : name,
+          category,
+          value: candidate.value,
+          description:
+            typeof candidate.description === 'string' ? candidate.description : undefined,
+          aliases: Array.isArray(candidate.aliases)
+            ? candidate.aliases.filter((alias): alias is string => typeof alias === 'string')
+            : undefined,
+          createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
+          updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
+        };
+      } else if (!strict && (typeof token === 'string' || typeof token === 'number')) {
+        map[category][name] = {
+          name,
+          category,
+          value: String(token),
+          createdAt: fallbackCreatedAt,
+          updatedAt: fallbackUpdatedAt,
+        };
+      } else if (strict) {
+        return null;
+      }
+    }
+  }
+
+  return map;
 }
 
 export function isSafeTokenSetId(value: string): boolean {

@@ -12,16 +12,17 @@ import {
   previewTokenPatch,
   putComponentOverrides,
   TokenSetConflictError,
+  TokenSetReferenceError,
   updateTokenSet,
 } from '../services/tokens.js';
 import { getWorkingDirectory } from '../services/workspace.js';
 import type { ComponentTokenOverride, DesignTokenMap } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import {
-  createEmptyTokenMap,
   isSafeTokenName,
   isSafeTokenSetId,
   isTokenCategory,
+  normalizeDesignTokenMap,
   validateTokenComponentPath,
   validateTokenComponentPaths,
   validateTokenPatchChanges,
@@ -73,46 +74,7 @@ async function writeOverrides(
 }
 
 function validateTokenMap(value: unknown): DesignTokenMap | null {
-  const map = { ...createEmptyTokenMap() };
-  if (value === undefined) {
-    return map;
-  }
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return null;
-  }
-
-  for (const [category, tokens] of Object.entries(value as Record<string, unknown>)) {
-    if (!isTokenCategory(category) || typeof tokens !== 'object' || tokens === null) {
-      return null;
-    }
-    for (const [name, token] of Object.entries(tokens as Record<string, unknown>)) {
-      if (!isSafeTokenName(name) || typeof token !== 'object' || token === null) {
-        return null;
-      }
-      const candidate = token as Record<string, unknown>;
-      if (
-        typeof candidate.value !== 'string' ||
-        (candidate.name !== undefined && typeof candidate.name !== 'string')
-      ) {
-        return null;
-      }
-      map[category][name] = {
-        name: typeof candidate.name === 'string' ? candidate.name : name,
-        category,
-        value: candidate.value,
-        description: typeof candidate.description === 'string' ? candidate.description : undefined,
-        aliases: Array.isArray(candidate.aliases)
-          ? candidate.aliases.filter((alias): alias is string => typeof alias === 'string')
-          : undefined,
-        createdAt:
-          typeof candidate.createdAt === 'string' ? candidate.createdAt : new Date().toISOString(),
-        updatedAt:
-          typeof candidate.updatedAt === 'string' ? candidate.updatedAt : new Date().toISOString(),
-      };
-    }
-  }
-
-  return map;
+  return normalizeDesignTokenMap(value, { strict: true });
 }
 
 type ComponentTokenOverrideInput = Omit<ComponentTokenOverride, 'componentPath'>;
@@ -175,20 +137,21 @@ async function sendComponentOverrides(
   componentPath: string,
   overrides: ComponentTokenOverrideInput[]
 ): Promise<void> {
-  const tokenSetIds = new Set((await listTokenSets()).map((tokenSet) => tokenSet.id));
-  for (const override of overrides) {
-    if (!tokenSetIds.has(override.tokenSetId)) {
-      sendValidation(res, `Unknown token set: ${override.tokenSetId}`);
+  try {
+    res.json({
+      success: true,
+      overrides: await putComponentOverrides(
+        componentPath,
+        overrides.map((override) => ({ ...override, componentPath }))
+      ),
+    });
+  } catch (error) {
+    if (error instanceof TokenSetReferenceError) {
+      sendValidation(res, error.message);
       return;
     }
+    throw error;
   }
-  res.json({
-    success: true,
-    overrides: await putComponentOverrides(
-      componentPath,
-      overrides.map((override) => ({ ...override, componentPath }))
-    ),
-  });
 }
 
 router.get('/sets', async (_req: Request, res: Response) => {

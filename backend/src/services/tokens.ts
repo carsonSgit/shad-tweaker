@@ -76,6 +76,13 @@ export class TokenSetConflictError extends Error {
   }
 }
 
+export class TokenSetReferenceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TokenSetReferenceError';
+  }
+}
+
 function slugify(value: string): string {
   return value
     .trim()
@@ -87,6 +94,10 @@ function slugify(value: string): string {
 
 function createTokenSetId(name: string): string {
   return `token_set_${slugify(name) || crypto.randomUUID().slice(0, 8)}`;
+}
+
+function normalizeTokenSetNameForConflict(name: string): string {
+  return name.trim().toLowerCase();
 }
 
 function normalizeTokenSet(tokenSet: DesignTokenSet): DesignTokenSet {
@@ -289,7 +300,12 @@ export async function createTokenSet(input: {
     if (manifest.tokenSets.some((tokenSet) => tokenSet.id === id)) {
       throw new TokenSetConflictError(`Token set already exists: ${id}`);
     }
-    if (manifest.tokenSets.some((tokenSet) => tokenSet.name === input.name)) {
+    const normalizedName = normalizeTokenSetNameForConflict(input.name);
+    if (
+      manifest.tokenSets.some(
+        (tokenSet) => normalizeTokenSetNameForConflict(tokenSet.name) === normalizedName
+      )
+    ) {
       throw new TokenSetConflictError(`Token set name already exists: ${input.name}`);
     }
     const tokenSet: DesignTokenSet = {
@@ -319,7 +335,13 @@ export async function updateTokenSet(
     if (!existing) {
       return { manifest, result: null };
     }
-    if (manifest.tokenSets.some((tokenSet) => tokenSet.id !== id && tokenSet.name === input.name)) {
+    const normalizedName = normalizeTokenSetNameForConflict(input.name);
+    if (
+      manifest.tokenSets.some(
+        (tokenSet) =>
+          tokenSet.id !== id && normalizeTokenSetNameForConflict(tokenSet.name) === normalizedName
+      )
+    ) {
       throw new TokenSetConflictError(`Token set name already exists: ${input.name}`);
     }
 
@@ -593,6 +615,7 @@ export async function applyTokenPatch(options: {
     }
   }
 
+  // Create the backup after preflight succeeds and before writes begin, so it covers write-phase partial failures.
   if ((options.createBackup ?? true) && errors.length === 0 && patchPlans.length > 0) {
     const backup = await createBackup(patchPlans.map((plan) => plan.path));
     backupId = backup.id;
@@ -687,10 +710,64 @@ export async function putComponentOverrides(
   if (!relativePath) {
     return [];
   }
-  await recordComponentOverrides(
+  const replaced = await replaceComponentOverrides(
+    relativePath,
     overrides.map((override) => ({ ...override, componentPath: relativePath }))
   );
+  if (!replaced) {
+    return [];
+  }
   return getComponentOverrides(relativePath);
+}
+
+async function replaceComponentOverrides(
+  componentPath: string,
+  overrides: ComponentTokenOverride[]
+): Promise<boolean> {
+  const safePath = await resolveSafeExistingComponentPath(componentPath);
+  if (!safePath) {
+    return false;
+  }
+  const relativePath = toProjectRelativeExistingPath(safePath);
+  if (!relativePath) {
+    return false;
+  }
+
+  await mutateWorkspaceManifest(async (manifest) => {
+    const tokenSetIds = new Set(manifest.tokenSets.map((tokenSet) => tokenSet.id));
+    for (const override of overrides) {
+      if (!tokenSetIds.has(override.tokenSetId)) {
+        throw new TokenSetReferenceError(`Unknown token set: ${override.tokenSetId}`);
+      }
+    }
+
+    const componentTokenOverrides = new Map<string, ComponentTokenOverride[]>();
+    for (const [storedPath, storedOverrides] of Object.entries(manifest.componentTokenOverrides)) {
+      const storedRelativePath = toProjectRelativeExistingPath(storedPath);
+      if (storedRelativePath && storedRelativePath !== relativePath) {
+        componentTokenOverrides.set(
+          storedRelativePath,
+          storedOverrides.map((override) => ({ ...override, componentPath: storedRelativePath }))
+        );
+      }
+    }
+    if (overrides.length > 0) {
+      componentTokenOverrides.set(
+        relativePath,
+        overrides.map((override) => ({ ...override, componentPath: relativePath }))
+      );
+    }
+
+    return {
+      manifest: {
+        ...manifest,
+        componentTokenOverrides: Object.fromEntries(componentTokenOverrides.entries()),
+      },
+      result: undefined,
+    };
+  });
+
+  return true;
 }
 
 async function recordComponentOverrides(overrides: ComponentTokenOverride[]): Promise<void> {

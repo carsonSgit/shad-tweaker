@@ -6,7 +6,6 @@ import type {
   BackupMetadata,
   Component,
   ComponentTokenOverride,
-  DesignToken,
   DesignTokenSet,
   Preset,
   RegistrySource,
@@ -16,7 +15,11 @@ import type {
 } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { isSafeProjectRelativePath } from '../utils/paths.js';
-import { createEmptyTokenMap, TOKEN_CATEGORIES } from '../utils/validation.js';
+import {
+  createEmptyTokenMap,
+  normalizeDesignTokenMap,
+  TOKEN_CATEGORIES,
+} from '../utils/validation.js';
 
 const WORKSPACE_DIR = '.shadcn-tweaker';
 const MANIFEST_FILE = 'manifest.json';
@@ -78,67 +81,18 @@ function createDefaultManifest(now: string = new Date().toISOString()): Workspac
 
 function normalizeDesignTokenSet(raw: DesignTokenSet): DesignTokenSet {
   const tokenSet = raw as DesignTokenSet & { tokens?: Record<string, unknown> };
-  const tokens = createEmptyTokenMap();
   const now = new Date().toISOString();
-
-  if (tokenSet.tokens && typeof tokenSet.tokens === 'object') {
-    for (const category of TOKEN_CATEGORIES) {
-      const grouped = tokenSet.tokens[category];
-      if (!grouped || typeof grouped !== 'object' || Array.isArray(grouped)) {
-        continue;
-      }
-
-      for (const [name, value] of Object.entries(grouped as Record<string, unknown>)) {
-        if (value && typeof value === 'object' && 'value' in value) {
-          const candidate = value as Partial<DesignToken>;
-          if (typeof candidate.value !== 'string') {
-            continue;
-          }
-          tokens[category][name] = {
-            name: typeof candidate.name === 'string' ? candidate.name : name,
-            category,
-            value: candidate.value,
-            description:
-              typeof candidate.description === 'string' ? candidate.description : undefined,
-            aliases: Array.isArray(candidate.aliases)
-              ? candidate.aliases.filter((alias): alias is string => typeof alias === 'string')
-              : undefined,
-            createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
-            updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
-          };
-        } else if (typeof value === 'string' || typeof value === 'number') {
-          tokens[category][name] = {
-            name,
-            category,
-            value: String(value),
-            createdAt: tokenSet.createdAt || now,
-            updatedAt: tokenSet.updatedAt || now,
-          };
-        }
-      }
-    }
-
-    for (const [name, value] of Object.entries(tokenSet.tokens)) {
-      if ((TOKEN_CATEGORIES as string[]).includes(name)) {
-        continue;
-      }
-      if (typeof value === 'string' || typeof value === 'number') {
-        tokens.colors[name] = {
-          name,
-          category: 'colors',
-          value: String(value),
-          createdAt: tokenSet.createdAt || now,
-          updatedAt: tokenSet.updatedAt || now,
-        };
-      }
-    }
-  }
+  const tokens = normalizeDesignTokenMap(tokenSet.tokens, {
+    now,
+    fallbackCreatedAt: tokenSet.createdAt || now,
+    fallbackUpdatedAt: tokenSet.updatedAt || now,
+  });
 
   return {
     id: tokenSet.id,
     name: tokenSet.name,
     description: tokenSet.description,
-    tokens,
+    tokens: tokens ?? createEmptyTokenMap(),
     createdAt: tokenSet.createdAt,
     updatedAt: tokenSet.updatedAt,
   };

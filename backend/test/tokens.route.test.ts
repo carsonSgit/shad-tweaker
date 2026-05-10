@@ -74,6 +74,23 @@ describe('token routes', () => {
     assert.equal(missingRes.body.error.code, 'TOKEN_SET_NOT_FOUND');
   });
 
+  it('rejects token set names that only differ by case', async () => {
+    await createTempRoot();
+
+    const created = await request(app).post('/api/tokens/sets').send({ name: 'App Tokens' });
+    const duplicateCreate = await request(app).post('/api/tokens/sets').send({
+      name: 'app tokens',
+    });
+    const second = await request(app).post('/api/tokens/sets').send({ name: 'Other Tokens' });
+    const duplicateUpdate = await request(app)
+      .put(`/api/tokens/sets/${second.body.tokenSet.id}`)
+      .send({ name: 'APP TOKENS', tokens: second.body.tokenSet.tokens });
+
+    assert.equal(created.status, 201);
+    assert.equal(duplicateCreate.status, 409);
+    assert.equal(duplicateUpdate.status, 409);
+  });
+
   it('rejects unsafe token IDs and bad categories', async () => {
     await createTempRoot();
 
@@ -239,6 +256,41 @@ describe('token routes', () => {
     assert.equal(get.status, 200);
     assert.equal(get.body.overrides[0].componentPath, relativePath);
     assert.equal(get.body.overrides[0].overrides.radius.card, 'rounded-lg');
+  });
+
+  it('replaces all component overrides on PUT', async () => {
+    const root = await createTempRoot();
+    const { relativePath } = await writeComponent(
+      root,
+      'components/ui/replace-button.tsx',
+      '<button />'
+    );
+    const first = await createTokenSet({ name: 'First Override Tokens' });
+    const second = await createTokenSet({ name: 'Second Override Tokens' });
+
+    const initial = await request(app)
+      .put('/api/tokens/components/overrides')
+      .send({
+        componentPath: relativePath,
+        overrides: [
+          { tokenSetId: first.id, overrides: { radius: { card: 'rounded-lg' } } },
+          { tokenSetId: second.id, overrides: { radius: { card: 'rounded-sm' } } },
+        ],
+      });
+    const replaced = await request(app)
+      .put('/api/tokens/components/overrides')
+      .send({
+        componentPath: relativePath,
+        overrides: [{ tokenSetId: first.id, overrides: { radius: { card: 'rounded-xl' } } }],
+      });
+
+    assert.equal(initial.status, 200);
+    assert.equal(replaced.status, 200);
+    assert.deepEqual(
+      replaced.body.overrides.map((override: { tokenSetId: string }) => override.tokenSetId),
+      [first.id]
+    );
+    assert.equal(replaced.body.overrides[0].overrides.radius.card, 'rounded-xl');
   });
 
   it('does not expose slash-encoded component override path routes', async () => {

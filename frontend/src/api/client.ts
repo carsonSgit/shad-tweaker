@@ -313,6 +313,7 @@ export async function extractTokens(
 export async function getTokenFrequencyReport(
   componentPath?: string
 ): Promise<ApiResponse<{ report: TokenFrequencyReport }>> {
+  // The API currently supports a single componentPath query filter, not a multi-path report filter.
   const query = componentPath ? `?componentPath=${encodeURIComponent(componentPath)}` : '';
   return request(`/api/tokens/reports/frequency${query}`);
 }
@@ -320,6 +321,7 @@ export async function getTokenFrequencyReport(
 export async function getTokenInconsistencyReport(
   componentPath?: string
 ): Promise<ApiResponse<{ report: TokenInconsistencyReport }>> {
+  // The API currently supports a single componentPath query filter, not a multi-path report filter.
   const query = componentPath ? `?componentPath=${encodeURIComponent(componentPath)}` : '';
   return request(`/api/tokens/reports/inconsistencies${query}`);
 }
