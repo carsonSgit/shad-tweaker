@@ -325,7 +325,6 @@ export async function getTokenInconsistencyReport(
 }
 
 export async function previewTokenPatch(input: {
-  tokenSetId: string;
   componentPaths: string[];
   changes: TokenPatchChange[];
 }): Promise<ApiResponse<{ previews: Preview[]; totalChanges: number }>> {

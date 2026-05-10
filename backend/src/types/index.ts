@@ -514,7 +514,7 @@ export interface WorkspaceManifest {
   sources: RegistrySource[];
   packages: ComponentPackage[];
   tokenSets: DesignTokenSet[];
-  componentTokenOverrides?: Record<string, ComponentTokenOverride[]>;
+  componentTokenOverrides: Record<string, ComponentTokenOverride[]>;
   presets: Preset[];
   backups: BackupMetadata[];
 }

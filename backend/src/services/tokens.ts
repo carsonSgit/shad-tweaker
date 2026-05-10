@@ -96,6 +96,7 @@ async function resolveSafeExistingComponentPath(componentPath: string): Promise<
   const resolvedProjectRoot = path.resolve(projectRoot);
   const resolvedPath = path.resolve(projectRoot, componentPath);
 
+  // First enforce lexical containment, then realpath containment below to catch symlinks.
   if (!isPathSafe(resolvedPath, resolvedProjectRoot)) {
     return null;
   }
@@ -304,7 +305,7 @@ export async function deleteTokenSet(id: string): Promise<boolean> {
     }
 
     const overrides = Object.fromEntries(
-      Object.entries(manifest.componentTokenOverrides ?? {})
+      Object.entries(manifest.componentTokenOverrides)
         .map(([componentPath, componentOverrides]) => [
           componentPath,
           componentOverrides.filter((override) => override.tokenSetId !== id),
@@ -550,7 +551,7 @@ export async function getComponentOverrides(
     return [];
   }
   return (
-    Object.entries(manifest.componentTokenOverrides ?? {}).find(
+    Object.entries(manifest.componentTokenOverrides).find(
       ([storedPath]) => storedPath === safePath
     )?.[1] ?? []
   );
@@ -573,7 +574,7 @@ export async function putComponentOverrides(
 async function recordComponentOverrides(overrides: ComponentTokenOverride[]): Promise<void> {
   await mutateWorkspaceManifest(async (manifest) => {
     const componentTokenOverrides = new Map<string, ComponentTokenOverride[]>(
-      Object.entries(manifest.componentTokenOverrides ?? {})
+      Object.entries(manifest.componentTokenOverrides)
     );
     for (const override of overrides) {
       const safePath = await resolveSafeExistingComponentPath(override.componentPath);

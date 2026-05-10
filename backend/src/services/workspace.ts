@@ -5,6 +5,7 @@ import type {
   BackupManifest,
   BackupMetadata,
   Component,
+  ComponentTokenOverride,
   DesignToken,
   DesignTokenSet,
   Preset,
@@ -143,6 +144,68 @@ function normalizeDesignTokenSet(raw: DesignTokenSet): DesignTokenSet {
   };
 }
 
+function normalizeComponentTokenOverrides(raw: unknown): Record<string, ComponentTokenOverride[]> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return {};
+  }
+
+  const overrides: Record<string, ComponentTokenOverride[]> = {};
+
+  for (const [componentPath, componentOverrides] of Object.entries(raw)) {
+    if (typeof componentPath !== 'string' || !Array.isArray(componentOverrides)) {
+      continue;
+    }
+
+    const normalized = componentOverrides
+      .map((override): ComponentTokenOverride | null => {
+        if (typeof override !== 'object' || override === null) {
+          return null;
+        }
+
+        const candidate = override as Partial<ComponentTokenOverride>;
+        if (typeof candidate.tokenSetId !== 'string') {
+          return null;
+        }
+
+        const normalizedOverrides: ComponentTokenOverride['overrides'] = {};
+        const rawOverrides = candidate.overrides;
+        if (typeof rawOverrides !== 'object' || rawOverrides === null) {
+          return null;
+        }
+
+        for (const category of TOKEN_CATEGORIES) {
+          const categoryOverrides = rawOverrides[category];
+          if (
+            !categoryOverrides ||
+            typeof categoryOverrides !== 'object' ||
+            Array.isArray(categoryOverrides)
+          ) {
+            continue;
+          }
+
+          normalizedOverrides[category] = Object.fromEntries(
+            Object.entries(categoryOverrides).filter(
+              (entry): entry is [string, string] => typeof entry[1] === 'string'
+            )
+          );
+        }
+
+        return {
+          componentPath,
+          tokenSetId: candidate.tokenSetId,
+          overrides: normalizedOverrides,
+        };
+      })
+      .filter((override): override is ComponentTokenOverride => override !== null);
+
+    if (normalized.length > 0) {
+      overrides[componentPath] = normalized;
+    }
+  }
+
+  return overrides;
+}
+
 function normalizeManifest(raw: unknown): WorkspaceManifest {
   if (typeof raw !== 'object' || raw === null) {
     throw new Error('Workspace manifest must be a JSON object');
@@ -171,10 +234,7 @@ function normalizeManifest(raw: unknown): WorkspaceManifest {
     tokenSets: Array.isArray(candidate.tokenSets)
       ? candidate.tokenSets.map(normalizeDesignTokenSet)
       : [],
-    componentTokenOverrides:
-      typeof candidate.componentTokenOverrides === 'object' && candidate.componentTokenOverrides
-        ? candidate.componentTokenOverrides
-        : {},
+    componentTokenOverrides: normalizeComponentTokenOverrides(candidate.componentTokenOverrides),
     presets: Array.isArray(candidate.presets) ? candidate.presets : [],
     backups: Array.isArray(candidate.backups) ? candidate.backups : [],
   };
