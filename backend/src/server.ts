@@ -24,19 +24,31 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const studioDistPath = path.join(__dirname, 'studio');
 
-const studioAssetLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: {
-      message: 'Too many studio asset requests. Please try again later.',
-      code: 'RATE_LIMIT_EXCEEDED',
+function readPositiveInteger(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function createStudioAssetLimiter(
+  max = readPositiveInteger(process.env.STUDIO_ASSET_RATE_LIMIT_PER_MINUTE, 1000)
+) {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: {
+        message: 'Too many studio asset requests. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+      },
     },
-  },
-});
+  });
+}
+
+const studioAssetLimiter = createStudioAssetLimiter();
 
 // CORS configuration - restrict to local development
 app.use(

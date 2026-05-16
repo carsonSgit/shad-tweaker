@@ -131,7 +131,15 @@ export function readComponentIdentifier(identifier: string): string | null {
 export function hasUnsafeComponentIdentifierUrl(originalUrl: string): boolean {
   const lowerUrl = originalUrl.toLowerCase();
 
-  return lowerUrl.includes('/..') || lowerUrl.includes('%2e%2e') || lowerUrl.includes('%252e%252e');
+  return (
+    lowerUrl.includes('/..') ||
+    lowerUrl.includes('%2e%2e') ||
+    lowerUrl.includes('%252e%252e') ||
+    lowerUrl.includes('%2f') ||
+    lowerUrl.includes('%252f') ||
+    lowerUrl.includes('%5c') ||
+    lowerUrl.includes('%255c')
+  );
 }
 
 // ============================================

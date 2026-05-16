@@ -109,6 +109,86 @@ export interface ComponentTokenOverride {
   overrides: Partial<Record<TokenCategory, Record<string, string>>>;
 }
 
+export interface ComponentSource {
+  originRegistry?: string;
+  originalPackageName?: string;
+  originalComponentName?: string;
+  importedAt?: string;
+  lastModifiedAt?: string;
+  localComponentName?: string;
+  dependencies?: RegistryDependency[];
+}
+
+export interface RegistryDependency {
+  name: string;
+  type: 'package' | 'registry' | 'local';
+  version?: string;
+  source?: string;
+}
+
+export interface RegistryItemFile {
+  path: string;
+  content?: string;
+  type?: string;
+}
+
+export interface ComponentPackage {
+  id: string;
+  name: string;
+  type: 'component' | 'hook' | 'utility' | 'page' | 'registry-item';
+  source?: ComponentSource;
+  files: string[];
+  registryFiles?: RegistryItemFile[];
+  dependencies: RegistryDependency[];
+  devDependencies?: RegistryDependency[];
+  registryDependencies: RegistryDependency[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TokenPatch {
+  category: string;
+  token: string;
+  value: string;
+}
+
+export interface ClassTransform {
+  find: string;
+  replace: string;
+  isRegex: boolean;
+}
+
+export interface AstTransform {
+  kind: string;
+  target: string;
+  value: unknown;
+}
+
+export interface MotionPatch {
+  target: string;
+  property: string;
+  value: string;
+}
+
+export interface VariantRecipe {
+  component?: string;
+  axis: string;
+  values: Record<string, string>;
+}
+
+export interface Preset {
+  id: string;
+  name: string;
+  description?: string;
+  created?: string;
+  migratedFromTemplateId?: string;
+  tokenOverrides: TokenPatch[];
+  classTransforms: ClassTransform[];
+  astTransforms: AstTransform[];
+  motionOverrides: MotionPatch[];
+  variantRecipes: VariantRecipe[];
+}
+
 export interface TokenCandidate {
   category: TokenCategory;
   value: string;
@@ -303,7 +383,10 @@ export interface WorkspaceManifest {
   config: WorkspaceConfig;
   components: Array<{ id: string; name: string; path: string; lastScannedAt?: string }>;
   sources: RegistrySource[];
+  packages: ComponentPackage[];
   tokenSets: DesignTokenSet[];
+  componentTokenOverrides: Record<string, ComponentTokenOverride[]>;
+  presets: Preset[];
   backups: Backup[];
 }
 
@@ -333,7 +416,7 @@ export interface StudioSummary {
     components: VariantComponentSummary[];
   };
   backups: {
-    backups: Backup[];
+    backups: BackupListItem[];
   };
   health: {
     status: string;

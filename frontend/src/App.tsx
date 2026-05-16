@@ -353,7 +353,6 @@ export function App() {
         selectedCount={selectedPaths.size}
         totalCount={components.length}
         dirty={dirty}
-        projectPath={summary?.workspace.cwd}
         notification={notification}
       />
     </Box>

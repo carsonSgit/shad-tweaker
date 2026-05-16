@@ -6,7 +6,7 @@ import express from 'express';
 import fs from 'fs-extra';
 import request from 'supertest';
 import backendPackage from '../package.json' with { type: 'json' };
-import studioRouter from '../src/routes/studio.js';
+import studioRouter, { createStudioSummaryLimiter } from '../src/routes/studio.js';
 
 const app = express();
 app.use(express.json());
@@ -61,12 +61,41 @@ describe('studio summary route', () => {
     assert.equal(res.body.health.version, backendPackage.version);
   });
 
+  it('returns backup component counts in the summary backup list', async () => {
+    const root = await createTempRoot();
+    const backupPath = path.join(root, '.shadcn-tweaker/backups/backup_2026-01-01_00-00-00');
+    const filePath = path.join(backupPath, 'button.tsx');
+    await fs.outputFile(filePath, 'backup content');
+    await fs.writeJson(path.join(backupPath, 'manifest.json'), {
+      id: 'backup_2026-01-01_00-00-00',
+      timestamp: '2026-01-01T00:00:00.000Z',
+      files: [
+        {
+          originalPath: 'components/ui/button.tsx',
+          backupPath: filePath,
+        },
+        {
+          originalPath: 'components/ui/card.tsx',
+          backupPath: filePath,
+        },
+      ],
+    });
+
+    const res = await request(app).get('/api/studio/summary');
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.backups.backups[0].components, 2);
+  });
+
   it('rate limits repeated summary requests', async () => {
-    await createTempRoot();
+    const limitedApp = express();
+    limitedApp.get('/limited-summary', createStudioSummaryLimiter(2), (_req, res) => {
+      res.json({ success: true });
+    });
 
     let limited: request.Response | undefined;
-    for (let index = 0; index < 61; index += 1) {
-      const res = await request(app).get('/api/studio/summary');
+    for (let index = 0; index < 3; index += 1) {
+      const res = await request(limitedApp).get('/limited-summary');
       if (res.status === 429) {
         limited = res;
         break;

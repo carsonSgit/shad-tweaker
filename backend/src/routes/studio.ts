@@ -21,19 +21,31 @@ import { logger } from '../utils/logger.js';
 
 const router = Router();
 
-const summaryLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: {
-      message: 'Too many studio summary requests. Please try again later.',
-      code: 'RATE_LIMIT_EXCEEDED',
+function readPositiveInteger(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function createStudioSummaryLimiter(
+  max = readPositiveInteger(process.env.STUDIO_SUMMARY_RATE_LIMIT_PER_MINUTE, 600)
+) {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: {
+        message: 'Too many studio summary requests. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+      },
     },
-  },
-});
+  });
+}
+
+const summaryLimiter = createStudioSummaryLimiter();
 
 async function readSafely<T>(label: string, loader: () => Promise<T>, fallback: T): Promise<T> {
   try {
@@ -120,7 +132,12 @@ router.get('/summary', summaryLimiter, async (_req: Request, res: Response) => {
       components: variantComponents,
     },
     backups: {
-      backups,
+      backups: backups.map((backup) => ({
+        id: backup.id,
+        timestamp: backup.timestamp,
+        components: backup.components.length,
+        size: backup.size,
+      })),
     },
     health: {
       status: 'ok',

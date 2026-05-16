@@ -63,6 +63,15 @@ function invalidComponentIdentifierResponse(): ReturnType<typeof componentLibrar
   );
 }
 
+router.use('/library', (req, res, next) => {
+  if (hasUnsafeComponentIdentifierUrl(req.originalUrl)) {
+    sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+    return;
+  }
+
+  next();
+});
+
 router.get('/library/inventory', async (_req: Request, res: Response) => {
   try {
     res.json({ components: await listComponentLibrary(getWorkingDirectory()) });
@@ -132,15 +141,6 @@ function readName(body: unknown): string | null {
   const name = (body as { name?: unknown }).name;
   return typeof name === 'string' ? name : null;
 }
-
-router.use('/library', (req, res, next) => {
-  if (hasUnsafeComponentIdentifierUrl(req.originalUrl)) {
-    sendComponentLibraryError(res, invalidComponentIdentifierResponse());
-    return;
-  }
-
-  next();
-});
 
 router.post('/library/:identifier/rename', async (req: Request, res: Response) => {
   try {

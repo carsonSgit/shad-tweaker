@@ -231,6 +231,10 @@ describe('variant builder routes', () => {
     const urls = [
       '/api/variants/components/..',
       '/api/variants/components/%2E%2E',
+      '/api/variants/components/item%2Fsecret',
+      '/api/variants/components/item%252Fsecret',
+      '/api/variants/components/item%5Csecret',
+      '/api/variants/components/item%255Csecret',
       '/api/variants/components/item%2F..%2Fsecret',
       '/api/variants/components/item%252F..%252Fsecret',
       '/api/variants/components/button%00',

@@ -17,7 +17,7 @@ interface WorkbenchPanelProps {
 }
 
 function countBackupComponents(value: StudioSummary['backups']['backups'][number]): number {
-  return value.components.length;
+  return value.components;
 }
 
 function tokenCategories(summary: StudioSummary | null): string[] {
