@@ -1,16 +1,18 @@
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { getStudioSummary, updateWorkspaceConfig } from '../../frontend/src/api/client.js';
-import type { StudioSummary, WorkspaceConfig } from '../../frontend/src/types/index.js';
 import {
+  getStudioSummary,
   getWorkbenchAreaMeta,
+  type StudioSummary,
+  updateWorkspaceConfig,
   WORKBENCH_AREAS,
   type WorkbenchArea,
-} from '../../frontend/src/workbench.js';
+  type WorkspaceConfig,
+} from '../../frontend/src/index.js';
 import './styles.css';
 
 function backupComponentCount(backup: StudioSummary['backups']['backups'][number]): number {
-  return Array.isArray(backup.components) ? backup.components.length : backup.components;
+  return backup.components.length;
 }
 
 function activeTokenCategories(summary: StudioSummary | null): string[] {

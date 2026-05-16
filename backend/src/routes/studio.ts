@@ -11,6 +11,7 @@ import {
 } from '../services/tokens.js';
 import { listVariantComponents } from '../services/variants.js';
 import {
+  DEFAULT_WORKSPACE_CONFIG,
   getWorkingDirectory,
   listRegistrySources,
   loadWorkspaceManifest,
@@ -50,14 +51,7 @@ function createFallbackManifest(): WorkspaceManifest {
     version: 1,
     createdAt: now,
     updatedAt: now,
-    config: {
-      componentDirectory: './components/ui',
-      backupRetentionDays: 30,
-      maxBackups: 20,
-      autoBackup: true,
-      validateAfterEdit: true,
-      port: 3001,
-    },
+    config: { ...DEFAULT_WORKSPACE_CONFIG },
     components: [],
     sources: [],
     packages: [],

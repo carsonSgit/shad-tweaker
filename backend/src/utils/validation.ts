@@ -10,6 +10,8 @@ import type {
   TokenPatchChange,
 } from '../types/index.js';
 
+export const INVALID_COMPONENT_IDENTIFIER_MESSAGE = 'Invalid component identifier.';
+
 // ============================================
 // Path Traversal Protection
 // ============================================
@@ -109,13 +111,27 @@ export function validateComponentIdentifier(identifier: string): {
     decoded.includes('\0') ||
     decoded.includes('/') ||
     decoded.includes('\\') ||
-    decoded.split('.').includes('..') ||
+    decoded === '..' ||
+    decoded.startsWith('..') ||
+    decoded.endsWith('..') ||
+    decoded.includes('..') ||
     !/^[A-Za-z0-9_.-]+$/.test(decoded)
   ) {
     return { valid: false };
   }
 
   return { valid: true, value: decoded };
+}
+
+export function readComponentIdentifier(identifier: string): string | null {
+  const validation = validateComponentIdentifier(identifier);
+  return validation.valid ? (validation.value ?? identifier) : null;
+}
+
+export function hasUnsafeComponentIdentifierUrl(originalUrl: string): boolean {
+  const lowerUrl = originalUrl.toLowerCase();
+
+  return lowerUrl.includes('/..') || lowerUrl.includes('%2e%2e') || lowerUrl.includes('%252e%252e');
 }
 
 // ============================================

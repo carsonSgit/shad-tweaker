@@ -109,6 +109,8 @@ describe('component library routes', () => {
     await createTempRoot();
 
     const urls = [
+      '/api/components/library/detail/..',
+      '/api/components/library/detail/%2E%2E',
       '/api/components/library/detail/item%2F..%2Fsecret',
       '/api/components/library/detail/item%252F..%252Fsecret',
       '/api/components/library/detail/button%00',

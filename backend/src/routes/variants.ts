@@ -13,7 +13,11 @@ import {
 import { getWorkingDirectory } from '../services/workspace.js';
 import type { VariantPreviewOperation } from '../types/index.js';
 import { logger } from '../utils/logger.js';
-import { validateComponentIdentifier } from '../utils/validation.js';
+import {
+  hasUnsafeComponentIdentifierUrl,
+  INVALID_COMPONENT_IDENTIFIER_MESSAGE,
+  readComponentIdentifier,
+} from '../utils/validation.js';
 
 const router = Router();
 const MAX_PREVIEW_PATH_LENGTH = 1024;
@@ -57,15 +61,23 @@ function sendError(res: Response, response: ReturnType<typeof variantErrorRespon
 
 function invalidComponentIdentifierResponse(): ReturnType<typeof variantErrorResponse> {
   return variantErrorResponse(
-    new ComponentLibraryValidationError('Invalid component identifier.'),
+    new ComponentLibraryValidationError(INVALID_COMPONENT_IDENTIFIER_MESSAGE),
     'Failed to get variant component detail'
   );
 }
 
-function readComponentIdentifier(raw: string): string | null {
-  const validation = validateComponentIdentifier(raw);
-  return validation.valid ? (validation.value ?? raw) : null;
-}
+router.use((req, res, next) => {
+  if (hasUnsafeComponentIdentifierUrl(req.originalUrl)) {
+    sendError(res, invalidComponentIdentifierResponse());
+    return;
+  }
+
+  next();
+});
+
+router.get('/', async (_req: Request, res: Response) => {
+  sendError(res, invalidComponentIdentifierResponse());
+});
 
 router.get('/components', async (_req: Request, res: Response) => {
   try {

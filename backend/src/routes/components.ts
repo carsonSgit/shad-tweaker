@@ -20,7 +20,12 @@ import {
   scanComponents,
 } from '../services/scanner.js';
 import { logger } from '../utils/logger.js';
-import { validateComponentIdentifier, validateCustomPath } from '../utils/validation.js';
+import {
+  hasUnsafeComponentIdentifierUrl,
+  INVALID_COMPONENT_IDENTIFIER_MESSAGE,
+  readComponentIdentifier,
+  validateCustomPath,
+} from '../utils/validation.js';
 
 const router = Router();
 
@@ -53,14 +58,9 @@ function sendComponentLibraryError(
 
 function invalidComponentIdentifierResponse(): ReturnType<typeof componentLibraryErrorResponse> {
   return componentLibraryErrorResponse(
-    new ComponentLibraryValidationError('Invalid component identifier.'),
+    new ComponentLibraryValidationError(INVALID_COMPONENT_IDENTIFIER_MESSAGE),
     'Invalid component identifier'
   );
-}
-
-function readComponentIdentifier(raw: string): string | null {
-  const validation = validateComponentIdentifier(raw);
-  return validation.valid ? (validation.value ?? raw) : null;
 }
 
 router.get('/library/inventory', async (_req: Request, res: Response) => {
@@ -123,11 +123,24 @@ router.get('/library/detail/*', async (_req: Request, res: Response) => {
   sendComponentLibraryError(res, invalidComponentIdentifierResponse());
 });
 
+router.get('/library', async (_req: Request, res: Response) => {
+  sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+});
+
 function readName(body: unknown): string | null {
   if (typeof body !== 'object' || body === null) return null;
   const name = (body as { name?: unknown }).name;
   return typeof name === 'string' ? name : null;
 }
+
+router.use('/library', (req, res, next) => {
+  if (hasUnsafeComponentIdentifierUrl(req.originalUrl)) {
+    sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+    return;
+  }
+
+  next();
+});
 
 router.post('/library/:identifier/rename', async (req: Request, res: Response) => {
   try {

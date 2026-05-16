@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import backendPackage from '../package.json' with { type: 'json' };
 import backupRouter from './routes/backup.js';
 import componentsRouter from './routes/components.js';
@@ -22,6 +23,20 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const studioDistPath = path.join(__dirname, 'studio');
+
+const studioAssetLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      message: 'Too many studio asset requests. Please try again later.',
+      code: 'RATE_LIMIT_EXCEEDED',
+    },
+  },
+});
 
 // CORS configuration - restrict to local development
 app.use(
@@ -65,6 +80,7 @@ app.use('/api/variants', variantsRouter);
 app.use('/api/studio', studioRouter);
 
 // Serve built browser studio assets first, then fall back to index.html for SPA routes.
+app.use('/studio', studioAssetLimiter);
 app.use('/studio', express.static(studioDistPath));
 app.get(['/studio', '/studio/*'], (_req, res) => {
   res.sendFile(path.join(studioDistPath, 'index.html'), (error) => {
@@ -168,4 +184,8 @@ async function start() {
   }
 }
 
-start();
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  start();
+}
+
+export { app };
