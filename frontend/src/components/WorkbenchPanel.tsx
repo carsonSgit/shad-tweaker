@@ -71,6 +71,7 @@ export function WorkbenchPanel({
 
   return (
     <Box flexDirection="column">
+      {/* TODO(studio-shell): Replace milestone stub panels as each workbench area graduates. */}
       <Box marginBottom={1}>
         <Text bold color={THEME.highlight}>
           {SYMBOLS.diamond} {meta.label}

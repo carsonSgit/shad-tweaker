@@ -391,6 +391,9 @@ export interface WorkspaceManifest {
 }
 
 export interface StudioSummary {
+  _meta?: {
+    errors: Array<{ label: string; message: string }>;
+  };
   workspace: {
     cwd: string;
     backendUrl?: string;

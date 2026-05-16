@@ -11,6 +11,7 @@ import type {
 } from '../types/index.js';
 
 export const INVALID_COMPONENT_IDENTIFIER_MESSAGE = 'Invalid component identifier.';
+export const MAX_COMPONENT_IDENTIFIER_LENGTH = 128;
 
 // ============================================
 // Path Traversal Protection
@@ -108,9 +109,13 @@ export function validateComponentIdentifier(identifier: string): {
 
   if (
     decoded.length === 0 ||
+    decoded.length > MAX_COMPONENT_IDENTIFIER_LENGTH ||
     decoded.includes('\0') ||
     decoded.includes('/') ||
     decoded.includes('\\') ||
+    decoded.startsWith('.') ||
+    decoded.endsWith('.') ||
+    /^\.+$/.test(decoded) ||
     decoded === '..' ||
     decoded.startsWith('..') ||
     decoded.endsWith('..') ||
@@ -125,7 +130,7 @@ export function validateComponentIdentifier(identifier: string): {
 
 export function readComponentIdentifier(identifier: string): string | null {
   const validation = validateComponentIdentifier(identifier);
-  return validation.valid ? (validation.value ?? identifier) : null;
+  return validation.valid ? (validation.value ?? null) : null;
 }
 
 export function hasUnsafeComponentIdentifierUrl(originalUrl: string): boolean {
@@ -501,7 +506,7 @@ export function validateEditRequest(body: unknown): body is EditRequest {
 export function validateApplyRequest(body: unknown): body is ApplyRequest {
   if (!validateEditRequest(body)) return false;
 
-  const req = body as unknown as Record<string, unknown>;
+  const req = body as EditRequest & { createBackup?: unknown };
   if (req.createBackup !== undefined && typeof req.createBackup !== 'boolean') {
     return false;
   }

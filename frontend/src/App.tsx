@@ -110,7 +110,7 @@ export function App() {
 
     const areaIndex = WORKBENCH_AREAS.findIndex((area) => area.id === screen);
     if ((key.tab || input === ']') && areaIndex >= 0) {
-      const nextArea = WORKBENCH_AREAS[(Math.max(areaIndex, 0) + 1) % WORKBENCH_AREAS.length];
+      const nextArea = WORKBENCH_AREAS[(areaIndex + 1) % WORKBENCH_AREAS.length];
       navigate(nextArea.id);
     }
     if (input === '[' && areaIndex >= 0) {

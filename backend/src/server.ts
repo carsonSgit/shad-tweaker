@@ -18,17 +18,12 @@ import workspaceRouter from './routes/workspace.js';
 import { initializeDefaultTemplates } from './services/template.js';
 import { initializeWorkspace } from './services/workspace.js';
 import { logger } from './utils/logger.js';
+import { readPositiveInteger } from './utils/numbers.js';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const studioDistPath = path.join(__dirname, 'studio');
-
-function readPositiveInteger(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
 
 export function createStudioAssetLimiter(
   max = readPositiveInteger(process.env.STUDIO_ASSET_RATE_LIMIT_PER_MINUTE, 1000)

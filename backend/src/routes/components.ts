@@ -1,4 +1,5 @@
 import { type NextFunction, type Request, type Response, Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   ComponentLibraryConflictError,
   ComponentLibraryNotFoundError,
@@ -19,10 +20,11 @@ import {
   getWorkingDirectory,
   scanComponents,
 } from '../services/scanner.js';
+import { createInvalidComponentIdentifierError } from '../utils/componentIdentifier.js';
 import { logger } from '../utils/logger.js';
+import { readPositiveInteger } from '../utils/numbers.js';
 import {
   hasUnsafeComponentIdentifierUrl,
-  INVALID_COMPONENT_IDENTIFIER_MESSAGE,
   readComponentIdentifier,
   validateCustomPath,
 } from '../utils/validation.js';
@@ -58,10 +60,30 @@ function sendComponentLibraryError(
 
 function invalidComponentIdentifierResponse(): ReturnType<typeof componentLibraryErrorResponse> {
   return componentLibraryErrorResponse(
-    new ComponentLibraryValidationError(INVALID_COMPONENT_IDENTIFIER_MESSAGE),
+    createInvalidComponentIdentifierError(),
     'Invalid component identifier'
   );
 }
+
+export function createComponentLibraryMutationLimiter(
+  max = readPositiveInteger(process.env.COMPONENT_LIBRARY_MUTATION_RATE_LIMIT_PER_MINUTE, 60)
+) {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: {
+        message: 'Too many component library requests. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+      },
+    },
+  });
+}
+
+const componentLibraryMutationLimiter = createComponentLibraryMutationLimiter();
 
 router.use('/library', (req, res, next) => {
   if (hasUnsafeComponentIdentifierUrl(req.originalUrl)) {
@@ -142,81 +164,97 @@ function readName(body: unknown): string | null {
   return typeof name === 'string' ? name : null;
 }
 
-router.post('/library/:identifier/rename', async (req: Request, res: Response) => {
-  try {
-    const identifier = readComponentIdentifier(req.params.identifier);
-    if (!identifier) {
-      sendComponentLibraryError(res, invalidComponentIdentifierResponse());
-      return;
+router.post(
+  '/library/:identifier/rename',
+  componentLibraryMutationLimiter,
+  async (req: Request, res: Response) => {
+    try {
+      const identifier = readComponentIdentifier(req.params.identifier);
+      if (!identifier) {
+        sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+        return;
+      }
+
+      const name = readName(req.body);
+      if (!name) throw new ComponentLibraryValidationError('Name is required.');
+      res.json({
+        result: await renameComponentLibraryItem(getWorkingDirectory(), identifier, name),
+      });
+    } catch (error) {
+      logger.error(`Failed to rename component: ${req.params.identifier}`, error);
+      const response = componentLibraryErrorResponse(error, 'Failed to rename component');
+      res.status(response.status).json({ success: false, error: response });
     }
-
-    const name = readName(req.body);
-    if (!name) throw new ComponentLibraryValidationError('Name is required.');
-    res.json({
-      result: await renameComponentLibraryItem(getWorkingDirectory(), identifier, name),
-    });
-  } catch (error) {
-    logger.error(`Failed to rename component: ${req.params.identifier}`, error);
-    const response = componentLibraryErrorResponse(error, 'Failed to rename component');
-    res.status(response.status).json({ success: false, error: response });
   }
-});
+);
 
-router.post('/library/:identifier/fork', async (req: Request, res: Response) => {
-  try {
-    const identifier = readComponentIdentifier(req.params.identifier);
-    if (!identifier) {
-      sendComponentLibraryError(res, invalidComponentIdentifierResponse());
-      return;
+router.post(
+  '/library/:identifier/fork',
+  componentLibraryMutationLimiter,
+  async (req: Request, res: Response) => {
+    try {
+      const identifier = readComponentIdentifier(req.params.identifier);
+      if (!identifier) {
+        sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+        return;
+      }
+
+      const name = readName(req.body);
+      if (!name) throw new ComponentLibraryValidationError('Name is required.');
+      res.json({
+        result: await forkComponentLibraryItem(getWorkingDirectory(), identifier, name),
+      });
+    } catch (error) {
+      logger.error(`Failed to fork component: ${req.params.identifier}`, error);
+      const response = componentLibraryErrorResponse(error, 'Failed to fork component');
+      res.status(response.status).json({ success: false, error: response });
     }
-
-    const name = readName(req.body);
-    if (!name) throw new ComponentLibraryValidationError('Name is required.');
-    res.json({
-      result: await forkComponentLibraryItem(getWorkingDirectory(), identifier, name),
-    });
-  } catch (error) {
-    logger.error(`Failed to fork component: ${req.params.identifier}`, error);
-    const response = componentLibraryErrorResponse(error, 'Failed to fork component');
-    res.status(response.status).json({ success: false, error: response });
   }
-});
+);
 
-router.post('/library/:identifier/detach', async (req: Request, res: Response) => {
-  try {
-    const identifier = readComponentIdentifier(req.params.identifier);
-    if (!identifier) {
-      sendComponentLibraryError(res, invalidComponentIdentifierResponse());
-      return;
+router.post(
+  '/library/:identifier/detach',
+  componentLibraryMutationLimiter,
+  async (req: Request, res: Response) => {
+    try {
+      const identifier = readComponentIdentifier(req.params.identifier);
+      if (!identifier) {
+        sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+        return;
+      }
+
+      res.json({
+        result: await detachComponentLibraryItem(getWorkingDirectory(), identifier),
+      });
+    } catch (error) {
+      logger.error(`Failed to detach component: ${req.params.identifier}`, error);
+      const response = componentLibraryErrorResponse(error, 'Failed to detach component');
+      res.status(response.status).json({ success: false, error: response });
     }
-
-    res.json({
-      result: await detachComponentLibraryItem(getWorkingDirectory(), identifier),
-    });
-  } catch (error) {
-    logger.error(`Failed to detach component: ${req.params.identifier}`, error);
-    const response = componentLibraryErrorResponse(error, 'Failed to detach component');
-    res.status(response.status).json({ success: false, error: response });
   }
-});
+);
 
-router.post('/library/:identifier/reset', async (req: Request, res: Response) => {
-  try {
-    const identifier = readComponentIdentifier(req.params.identifier);
-    if (!identifier) {
-      sendComponentLibraryError(res, invalidComponentIdentifierResponse());
-      return;
+router.post(
+  '/library/:identifier/reset',
+  componentLibraryMutationLimiter,
+  async (req: Request, res: Response) => {
+    try {
+      const identifier = readComponentIdentifier(req.params.identifier);
+      if (!identifier) {
+        sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+        return;
+      }
+
+      res.json({
+        result: await resetComponentLibraryItem(getWorkingDirectory(), identifier),
+      });
+    } catch (error) {
+      logger.error(`Failed to reset component: ${req.params.identifier}`, error);
+      const response = componentLibraryErrorResponse(error, 'Failed to reset component');
+      res.status(response.status).json({ success: false, error: response });
     }
-
-    res.json({
-      result: await resetComponentLibraryItem(getWorkingDirectory(), identifier),
-    });
-  } catch (error) {
-    logger.error(`Failed to reset component: ${req.params.identifier}`, error);
-    const response = componentLibraryErrorResponse(error, 'Failed to reset component');
-    res.status(response.status).json({ success: false, error: response });
   }
-});
+);
 
 router.get('/library/:identifier/compare', async (req: Request, res: Response) => {
   try {

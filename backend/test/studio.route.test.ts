@@ -6,7 +6,11 @@ import express from 'express';
 import fs from 'fs-extra';
 import request from 'supertest';
 import backendPackage from '../package.json' with { type: 'json' };
-import studioRouter, { createStudioSummaryLimiter } from '../src/routes/studio.js';
+import studioRouter, {
+  createStudioRouter,
+  createStudioSummaryLimiter,
+  defaultStudioSummaryLoaders,
+} from '../src/routes/studio.js';
 
 const app = express();
 app.use(express.json());
@@ -49,6 +53,90 @@ describe('studio summary route', () => {
     assert.equal(res.body.workspace.cwd, root);
     assert.equal(res.body.workspace.manifest.config.componentDirectory, './components/ui');
     assert.deepEqual(res.body.workspace.manifest.components, []);
+    assert.ok(
+      res.body._meta.errors.some((error: { label: string }) => error.label === 'workspace manifest')
+    );
+  });
+
+  it('returns partial summary metadata when one loader fails', async () => {
+    await createTempRoot();
+    const degradedApp = express();
+    degradedApp.use(express.json());
+    degradedApp.use(
+      '/api/studio',
+      createStudioRouter({
+        ...defaultStudioSummaryLoaders,
+        listComponentLibrary: async () => {
+          throw new Error('inventory unavailable');
+        },
+      })
+    );
+
+    const res = await request(degradedApp).get('/api/studio/summary');
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.deepEqual(res.body.components.inventory, []);
+    assert.ok(
+      res.body._meta.errors.some(
+        (error: { label: string; message: string }) =>
+          error.label === 'components' && error.message === 'inventory unavailable'
+      )
+    );
+  });
+
+  it('returns fallback data when a summary loader times out', async () => {
+    const root = await createTempRoot();
+    const timeoutApp = express();
+    timeoutApp.use(express.json());
+    timeoutApp.use(
+      '/api/studio',
+      createStudioRouter(
+        {
+          loadWorkspaceManifest: async () => ({
+            version: 1,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            config: {
+              componentDirectory: './components/ui',
+              backupRetentionDays: 30,
+              maxBackups: 20,
+              autoBackup: true,
+              validateAfterEdit: true,
+              port: 3001,
+            },
+            components: [],
+            sources: [],
+            packages: [],
+            tokenSets: [],
+            componentTokenOverrides: {},
+            presets: [],
+            backups: [],
+          }),
+          listComponentLibrary: async () => [],
+          listRegistrySources: async () => [],
+          getRegistrySourceHealth: async () => [],
+          listRegistryItemsBySource: async () => ({ items: [], warnings: [] }),
+          listTokenSets: async () => [],
+          createFrequencyReport: async () => ({ entries: [], totalOccurrences: 0 }),
+          createInconsistencyReport: async () => ({ entries: [] }),
+          listVariantComponents: async () => [],
+          listBackups: () => new Promise(() => {}),
+        },
+        5
+      )
+    );
+
+    const res = await request(timeoutApp).get('/api/studio/summary');
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.workspace.cwd, root);
+    assert.deepEqual(res.body.backups.backups, []);
+    assert.ok(
+      res.body._meta.errors.some((error: { label: string; message: string }) => {
+        return error.label === 'backups' && /timed out/.test(error.message);
+      })
+    );
   });
 
   it('returns cache headers and the backend package version', async () => {

@@ -12,12 +12,9 @@ import {
 } from '../services/variants.js';
 import { getWorkingDirectory } from '../services/workspace.js';
 import type { VariantPreviewOperation } from '../types/index.js';
+import { createInvalidComponentIdentifierError } from '../utils/componentIdentifier.js';
 import { logger } from '../utils/logger.js';
-import {
-  hasUnsafeComponentIdentifierUrl,
-  INVALID_COMPONENT_IDENTIFIER_MESSAGE,
-  readComponentIdentifier,
-} from '../utils/validation.js';
+import { hasUnsafeComponentIdentifierUrl, readComponentIdentifier } from '../utils/validation.js';
 
 const router = Router();
 const MAX_PREVIEW_PATH_LENGTH = 1024;
@@ -61,7 +58,7 @@ function sendError(res: Response, response: ReturnType<typeof variantErrorRespon
 
 function invalidComponentIdentifierResponse(): ReturnType<typeof variantErrorResponse> {
   return variantErrorResponse(
-    new ComponentLibraryValidationError(INVALID_COMPONENT_IDENTIFIER_MESSAGE),
+    createInvalidComponentIdentifierError(),
     'Failed to get variant component detail'
   );
 }

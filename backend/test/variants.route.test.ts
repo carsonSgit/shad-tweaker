@@ -250,6 +250,62 @@ describe('variant builder routes', () => {
     }
   });
 
+  it('rejects mixed-case encoded traversal markers', async () => {
+    await createTempRoot();
+
+    const urls = [
+      '/api/variants/components/%2E%2E',
+      '/api/variants/components/item%2Fsecret',
+      '/api/variants/components/item%5Csecret',
+    ];
+
+    for (const url of urls) {
+      const res = await request(app).get(url);
+
+      assert.equal(res.status, 400, url);
+      assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_VALIDATION_ERROR', url);
+    }
+  });
+
+  it('rejects leading, trailing, pure-dot, and over-length identifiers', async () => {
+    await createTempRoot();
+
+    const urls = [
+      '/api/variants/components/.button',
+      '/api/variants/components/button.',
+      '/api/variants/components/...',
+      `/api/variants/components/${'a'.repeat(129)}`,
+    ];
+
+    for (const url of urls) {
+      const res = await request(app).get(url);
+
+      assert.equal(res.status, 400, url);
+      assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_VALIDATION_ERROR', url);
+    }
+  });
+
+  it('allows identifiers at the maximum length', async () => {
+    const root = await createTempRoot();
+    const name = 'a'.repeat(128);
+    await fs.outputFile(
+      path.join(root, 'components/ui', `${name}.tsx`),
+      `
+import { cva } from "class-variance-authority";
+const variants = cva("block", {
+  variants: { size: { sm: "text-sm" } },
+  defaultVariants: { size: "sm" },
+});
+export function LongName() { return <div />; }
+`
+    );
+
+    const res = await request(app).get(`/api/variants/components/${name}`);
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.component.name, name);
+  });
+
   it('allows dotted and dashed component identifiers', async () => {
     const root = await createTempRoot();
     await fs.outputFile(
