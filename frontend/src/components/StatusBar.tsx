@@ -6,6 +6,8 @@ interface StatusBarProps {
   screen: Screen;
   selectedCount: number;
   totalCount: number;
+  dirty: boolean;
+  projectPath?: string;
   notification: { message: string; type: 'success' | 'error' } | null;
 }
 
@@ -18,9 +20,22 @@ const screenLabels: Record<Screen, { label: string; icon: string }> = {
   templates: { label: 'Templates', icon: '@' },
   backups: { label: 'Backups', icon: '+' },
   help: { label: 'Help', icon: '?' },
+  registries: { label: 'Registries', icon: 'r' },
+  tokens: { label: 'Tokens', icon: 't' },
+  variants: { label: 'Variants', icon: 'v' },
+  motion: { label: 'Motion', icon: 'm' },
+  diff: { label: 'Diff', icon: 'd' },
+  settings: { label: 'Settings', icon: 's' },
 };
 
-export function StatusBar({ screen, selectedCount, totalCount, notification }: StatusBarProps) {
+export function StatusBar({
+  screen,
+  selectedCount,
+  totalCount,
+  dirty,
+  projectPath,
+  notification,
+}: StatusBarProps) {
   const screenInfo = screenLabels[screen];
 
   return (
@@ -60,6 +75,16 @@ export function StatusBar({ screen, selectedCount, totalCount, notification }: S
                 {SYMBOLS.box} {selectedCount}
               </Text>
               <Text color={THEME.muted}>/{totalCount}</Text>
+            </>
+          )}
+          <Text color={THEME.muted}> │ </Text>
+          <Text color={dirty ? THEME.accent : THEME.success}>
+            {dirty ? 'Unapplied changes' : 'Clean'}
+          </Text>
+          {projectPath && (
+            <>
+              <Text color={THEME.muted}> │ </Text>
+              <Text color={THEME.muted}>{projectPath}</Text>
             </>
           )}
         </Box>
