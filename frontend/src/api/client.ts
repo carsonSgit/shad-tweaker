@@ -14,16 +14,25 @@ import type {
   ImportConflictResolution,
   ImportPlan,
   Preview,
+  RegistryItemSummary,
+  RegistrySource,
+  RegistrySourceHealth,
+  StudioSummary,
   Template,
   TokenCandidate,
   TokenFrequencyReport,
   TokenInconsistencyReport,
   TokenPatchChange,
+  VariantComponentDetail,
+  VariantComponentSummary,
+  WorkspaceConfig,
+  WorkspaceManifest,
 } from '../types/index.js';
 
 // Get backend URL from environment variable (set by CLI wrapper)
 // Falls back to localhost:3001 for development
-const BASE_URL = process.env.BACKEND_URL || 'http://localhost:3001';
+const BASE_URL =
+  typeof process !== 'undefined' && process.env?.BACKEND_URL ? process.env.BACKEND_URL : '';
 
 // Export for debugging/status display
 export function getBackendUrl(): string {
@@ -378,7 +387,64 @@ export async function putComponentTokenOverrides(
   });
 }
 
+// Workspace / Registry
+export async function getWorkspace(): Promise<ApiResponse<{ manifest: WorkspaceManifest }>> {
+  return request('/api/workspace');
+}
+
+export async function updateWorkspaceConfig(updates: Partial<WorkspaceConfig>): Promise<
+  ApiResponse<{
+    manifest: WorkspaceManifest;
+    restartRequired?: boolean;
+    restartRequiredReason?: string;
+  }>
+> {
+  return request('/api/workspace/config', {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function getRegistrySources(): Promise<ApiResponse<{ sources: RegistrySource[] }>> {
+  return request('/api/workspace/registry-sources');
+}
+
+export async function getRegistrySourceHealth(): Promise<
+  ApiResponse<{ health: RegistrySourceHealth[] }>
+> {
+  return request('/api/workspace/registry-sources/health');
+}
+
+export async function getRegistryItems(): Promise<
+  ApiResponse<{
+    items: RegistryItemSummary[];
+    warnings: Array<{ sourceId: string; sourceName: string; message: string }>;
+  }>
+> {
+  return request('/api/workspace/registry-items');
+}
+
+// Variants
+export async function getVariantComponents(): Promise<
+  ApiResponse<{ components: VariantComponentSummary[] }>
+> {
+  return request('/api/variants/components');
+}
+
+export async function getVariantComponent(
+  identifier: string
+): Promise<ApiResponse<{ component: VariantComponentDetail }>> {
+  return request(`/api/variants/components/${encodeURIComponent(identifier)}`);
+}
+
+// Studio
+export async function getStudioSummary(): Promise<ApiResponse<StudioSummary>> {
+  return request('/api/studio/summary');
+}
+
 // Health check
-export async function healthCheck(): Promise<ApiResponse<{ status: string }>> {
+export async function healthCheck(): Promise<
+  ApiResponse<{ status: string; version?: string; timestamp?: string }>
+> {
   return request('/api/health');
 }
