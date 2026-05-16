@@ -9,8 +9,10 @@ import { HelpScreen } from './components/HelpScreen.js';
 import { PreviewView } from './components/Preview.js';
 import { StatusBar } from './components/StatusBar.js';
 import { TemplateManager } from './components/TemplateManager.js';
+import { useStudioSummary, WorkbenchPanel } from './components/WorkbenchPanel.js';
 import { useComponents, useNavigation } from './hooks/useComponents.js';
 import type { Component, Screen } from './types/index.js';
+import { getWorkbenchAreaMeta, WORKBENCH_AREAS, type WorkbenchArea } from './workbench.js';
 
 // Visual constants for consistent theming
 export const THEME = {
@@ -42,7 +44,8 @@ export const SYMBOLS = {
 
 export function App() {
   const { exit } = useApp();
-  const { screen, navigate, goBack } = useNavigation('dashboard');
+  const { screen, navigate, goBack } = useNavigation('components');
+  const { summary, loading: summaryLoading, error: summaryError, refresh } = useStudioSummary();
   const {
     components,
     selectedPaths,
@@ -58,6 +61,7 @@ export function App() {
 
   const [currentComponent, setCurrentComponent] = useState<Component | null>(null);
   const [editState, setEditState] = useState({ find: '', replace: '', isRegex: false });
+  const [hasUnappliedPreview, setHasUnappliedPreview] = useState(false);
   const [notification, setNotification] = useState<{
     message: string;
     type: 'success' | 'error';
@@ -79,7 +83,7 @@ export function App() {
   }, [notification]);
 
   // Global keyboard shortcuts
-  useInput((input, _key) => {
+  useInput((input, key) => {
     // Don't handle input when in editor mode or loading
     if (loading) return;
 
@@ -93,6 +97,25 @@ export function App() {
 
     if (input === '?') {
       navigate('help');
+    }
+
+    const numericShortcut = Number.parseInt(input, 10);
+    if (
+      Number.isInteger(numericShortcut) &&
+      numericShortcut >= 1 &&
+      numericShortcut <= WORKBENCH_AREAS.length
+    ) {
+      navigate(WORKBENCH_AREAS[numericShortcut - 1].id);
+    }
+
+    const areaIndex = WORKBENCH_AREAS.findIndex((area) => area.id === screen);
+    if ((key.tab || input === ']') && areaIndex >= 0) {
+      const nextArea = WORKBENCH_AREAS[(areaIndex + 1) % WORKBENCH_AREAS.length];
+      navigate(nextArea.id);
+    }
+    if (input === '[' && areaIndex >= 0) {
+      const previousIndex = areaIndex <= 0 ? WORKBENCH_AREAS.length - 1 : areaIndex - 1;
+      navigate(WORKBENCH_AREAS[previousIndex].id);
     }
   });
 
@@ -116,12 +139,17 @@ export function App() {
 
   const handlePreview = (find: string, replace: string, isRegex: boolean) => {
     setEditState({ find, replace, isRegex });
+    setHasUnappliedPreview(true);
     navigate('preview');
   };
 
   const handleApplySuccess = (message: string) => {
     setNotification({ message, type: 'success' });
+    setEditState({ find: '', replace: '', isRegex: false });
+    setHasUnappliedPreview(false);
+    deselectAll();
     scanComponents(); // Refresh component list
+    refresh();
     navigate('components');
   };
 
@@ -174,7 +202,27 @@ export function App() {
             replace={editState.replace}
             isRegex={editState.isRegex}
             onApply={handleApplySuccess}
-            onCancel={() => goBack()}
+            onCancel={() => {
+              setHasUnappliedPreview(false);
+              goBack();
+            }}
+          />
+        );
+
+      case 'registries':
+      case 'tokens':
+      case 'variants':
+      case 'motion':
+      case 'diff':
+      case 'settings':
+        return (
+          <WorkbenchPanel
+            area={screen}
+            summary={summary}
+            loading={summaryLoading}
+            error={summaryError}
+            onRefresh={refresh}
+            onNavigate={handleNavigate}
           />
         );
 
@@ -220,6 +268,15 @@ export function App() {
     }
   };
 
+  const areaScreen = WORKBENCH_AREAS.some((area) => area.id === screen)
+    ? (screen as WorkbenchArea)
+    : null;
+  const dirty =
+    selectedPaths.size > 0 ||
+    editState.find.length > 0 ||
+    editState.replace.length > 0 ||
+    hasUnappliedPreview;
+
   return (
     <Box flexDirection="column" paddingX={1}>
       {/* Header */}
@@ -256,9 +313,38 @@ export function App() {
         </Box>
       </Box>
 
+      <Box marginBottom={1}>
+        <Text color={THEME.muted}>Project </Text>
+        <Text color={THEME.secondary}>{summary?.workspace.cwd || process.cwd()}</Text>
+        <Text color={THEME.muted}> │ Components </Text>
+        <Text color={THEME.secondary}>
+          {summary?.workspace.manifest.config.componentDirectory || 'unknown'}
+        </Text>
+      </Box>
+
       {/* Main Content */}
-      <Box flexDirection="column" minHeight={15}>
-        {renderScreen()}
+      <Box minHeight={15}>
+        <Box flexDirection="column" width={18} marginRight={2}>
+          {WORKBENCH_AREAS.map((area, index) => {
+            const selected = areaScreen === area.id;
+            const meta = getWorkbenchAreaMeta(area.id);
+            return (
+              <Box key={area.id}>
+                <Text color={selected ? THEME.primary : THEME.muted}>
+                  {selected ? SYMBOLS.arrow : ' '}
+                </Text>
+                <Text color={selected ? THEME.secondary : THEME.highlight}>
+                  {' '}
+                  {index + 1}. {meta.shortLabel}
+                </Text>
+              </Box>
+            );
+          })}
+        </Box>
+
+        <Box flexDirection="column" flexGrow={1}>
+          {renderScreen()}
+        </Box>
       </Box>
 
       {/* Status Bar */}
@@ -266,6 +352,7 @@ export function App() {
         screen={screen}
         selectedCount={selectedPaths.size}
         totalCount={components.length}
+        dirty={dirty}
         notification={notification}
       />
     </Box>

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import chalk from 'chalk';
 import { Command } from 'commander';
+import inquirer from 'inquirer';
 import { configExists, resolveComponentsPath } from './config.js';
 import { runInit } from './init.js';
 
@@ -48,6 +49,14 @@ interface CLIOptions {
   path?: string;
   port?: string;
 }
+
+interface StudioOptions extends CLIOptions {
+  tui?: boolean;
+  web?: boolean;
+  open?: boolean;
+}
+
+type StudioSurface = 'tui' | 'web';
 
 async function startBackend(
   port: number,
@@ -103,6 +112,121 @@ async function startFrontend(backendUrl: string, cwd: string): Promise<ChildProc
   return frontend;
 }
 
+async function prepareBackend(options: CLIOptions): Promise<{
+  backend: ChildProcess;
+  backendUrl: string;
+  cwd: string;
+}> {
+  const cwd = process.cwd();
+  const hasConfig = await configExists(cwd);
+  const componentsPath = await resolveComponentsPath(options.path, cwd);
+
+  if (!componentsPath && !hasConfig) {
+    process.exit(1);
+  }
+
+  const port = options.port ? Number.parseInt(options.port, 10) : await findAvailablePort();
+  const backendUrl = `http://localhost:${port}`;
+  const backend = await startBackend(port, componentsPath, cwd);
+  const serverReady = await waitForServer(backendUrl);
+
+  if (!serverReady) {
+    console.error(chalk.red('Failed to start backend server'));
+    backend.kill();
+    process.exit(1);
+  }
+
+  return { backend, backendUrl, cwd };
+}
+
+async function launchTui(options: CLIOptions): Promise<void> {
+  const { backend, backendUrl, cwd } = await prepareBackend(options);
+  const frontend = await startFrontend(backendUrl, cwd);
+
+  const cleanup = () => {
+    frontend.kill();
+    backend.kill();
+    process.exit(0);
+  };
+
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
+
+  frontend.on('exit', (code) => {
+    backend.kill();
+    process.exit(code || 0);
+  });
+
+  backend.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      console.error(chalk.red(`Backend exited with code ${code}`));
+      frontend.kill();
+      process.exit(code);
+    }
+  });
+}
+
+function openBrowser(url: string): void {
+  const command =
+    process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
+  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
+  const opener = spawn(command, args, {
+    detached: true,
+    stdio: 'ignore',
+  });
+  opener.on('error', () => {
+    console.log(chalk.yellow(`Could not open a browser automatically. Open ${url}`));
+  });
+  opener.unref();
+}
+
+async function launchWebStudio(options: StudioOptions): Promise<void> {
+  const { backend, backendUrl } = await prepareBackend(options);
+  const studioUrl = `${backendUrl}/studio`;
+
+  console.log(chalk.cyan(`Studio available at ${studioUrl}`));
+  if (options.open !== false) {
+    openBrowser(studioUrl);
+  }
+
+  const cleanup = () => {
+    backend.kill();
+    process.exit(0);
+  };
+
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
+
+  backend.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      console.error(chalk.red(`Backend exited with code ${code}`));
+      process.exit(code);
+    }
+  });
+}
+
+async function chooseStudioSurface(options: StudioOptions): Promise<StudioSurface> {
+  if (options.tui && options.web) {
+    console.error(chalk.red('Choose only one studio surface: --tui or --web.'));
+    process.exit(1);
+  }
+  if (options.tui) return 'tui';
+  if (options.web) return 'web';
+
+  const answer = await inquirer.prompt<{ surface: StudioSurface }>([
+    {
+      type: 'list',
+      name: 'surface',
+      message: 'Launch which studio surface?',
+      choices: [
+        { name: 'Terminal workbench', value: 'tui' },
+        { name: 'Browser studio', value: 'web' },
+      ],
+    },
+  ]);
+  return answer.surface;
+}
+
 async function main() {
   const program = new Command();
 
@@ -122,62 +246,34 @@ async function main() {
     .option('-p, --path <path>', 'Path to shadcn components directory')
     .option('--port <port>', 'Backend server port (default: auto-detect)')
     .action(async (options: CLIOptions) => {
-      const cwd = process.cwd();
+      await launchTui(options);
+    });
 
-      // Check if config exists, suggest init if not
-      const hasConfig = await configExists(cwd);
-
-      // Resolve components path
-      const componentsPath = await resolveComponentsPath(options.path, cwd);
-
-      if (!componentsPath && !hasConfig) {
-        process.exit(1);
+  program
+    .command('studio')
+    .description('Launch the local studio shell')
+    .option('-p, --path <path>', 'Path to shadcn components directory')
+    .option('--port <port>', 'Backend server port (default: auto-detect)')
+    .option('--tui', 'Launch the terminal workbench')
+    .option('--web', 'Launch the browser studio')
+    .option('--no-open', 'Print the browser studio URL without opening it')
+    .action(async (options: StudioOptions) => {
+      const surface = await chooseStudioSurface(options);
+      if (surface === 'web') {
+        await launchWebStudio(options);
+        return;
       }
+      await launchTui(options);
+    });
 
-      // Find available port
-      const port = options.port ? Number.parseInt(options.port, 10) : await findAvailablePort();
-      const backendUrl = `http://localhost:${port}`;
-
-      if (componentsPath) {
-      }
-
-      // Start backend server
-      const backend = await startBackend(port, componentsPath, cwd);
-
-      // Wait for backend to be ready
-      const serverReady = await waitForServer(backendUrl);
-
-      if (!serverReady) {
-        console.error(chalk.red('Failed to start backend server'));
-        backend.kill();
-        process.exit(1);
-      }
-
-      // Start frontend TUI
-      const frontend = await startFrontend(backendUrl, cwd);
-
-      // Handle cleanup
-      const cleanup = () => {
-        frontend.kill();
-        backend.kill();
-        process.exit(0);
-      };
-
-      process.on('SIGINT', cleanup);
-      process.on('SIGTERM', cleanup);
-
-      frontend.on('exit', (code) => {
-        backend.kill();
-        process.exit(code || 0);
-      });
-
-      backend.on('exit', (code) => {
-        if (code !== 0 && code !== null) {
-          console.error(chalk.red(`Backend exited with code ${code}`));
-          frontend.kill();
-          process.exit(code);
-        }
-      });
+  program
+    .command('visual')
+    .description('Launch the browser studio shell')
+    .option('-p, --path <path>', 'Path to shadcn components directory')
+    .option('--port <port>', 'Backend server port (default: auto-detect)')
+    .option('--no-open', 'Print the browser studio URL without opening it')
+    .action(async (options: StudioOptions) => {
+      await launchWebStudio({ ...options, web: true });
     });
 
   await program.parseAsync(process.argv);

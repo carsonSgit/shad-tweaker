@@ -10,6 +10,9 @@ import type {
   TokenPatchChange,
 } from '../types/index.js';
 
+export const INVALID_COMPONENT_IDENTIFIER_MESSAGE = 'Invalid component identifier.';
+export const MAX_COMPONENT_IDENTIFIER_LENGTH = 128;
+
 // ============================================
 // Path Traversal Protection
 // ============================================
@@ -86,6 +89,62 @@ export function validateComponentPaths(
   }
 
   return { valid: true };
+}
+
+export function validateComponentIdentifier(identifier: string): {
+  valid: boolean;
+  value?: string;
+} {
+  let decoded = identifier;
+
+  try {
+    for (let depth = 0; depth < 2; depth += 1) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) break;
+      decoded = next;
+    }
+  } catch {
+    return { valid: false };
+  }
+
+  if (
+    decoded.length === 0 ||
+    decoded.length > MAX_COMPONENT_IDENTIFIER_LENGTH ||
+    decoded.includes('\0') ||
+    decoded.includes('/') ||
+    decoded.includes('\\') ||
+    decoded.startsWith('.') ||
+    decoded.endsWith('.') ||
+    /^\.+$/.test(decoded) ||
+    decoded === '..' ||
+    decoded.startsWith('..') ||
+    decoded.endsWith('..') ||
+    decoded.includes('..') ||
+    !/^[A-Za-z0-9_.-]+$/.test(decoded)
+  ) {
+    return { valid: false };
+  }
+
+  return { valid: true, value: decoded };
+}
+
+export function readComponentIdentifier(identifier: string): string | null {
+  const validation = validateComponentIdentifier(identifier);
+  return validation.valid ? (validation.value ?? null) : null;
+}
+
+export function hasUnsafeComponentIdentifierUrl(originalUrl: string): boolean {
+  const lowerUrl = originalUrl.toLowerCase();
+
+  return (
+    lowerUrl.includes('/..') ||
+    lowerUrl.includes('%2e%2e') ||
+    lowerUrl.includes('%252e%252e') ||
+    lowerUrl.includes('%2f') ||
+    lowerUrl.includes('%252f') ||
+    lowerUrl.includes('%5c') ||
+    lowerUrl.includes('%255c')
+  );
 }
 
 // ============================================
@@ -447,7 +506,7 @@ export function validateEditRequest(body: unknown): body is EditRequest {
 export function validateApplyRequest(body: unknown): body is ApplyRequest {
   if (!validateEditRequest(body)) return false;
 
-  const req = body as unknown as Record<string, unknown>;
+  const req = body as EditRequest & { createBackup?: unknown };
   if (req.createBackup !== undefined && typeof req.createBackup !== 'boolean') {
     return false;
   }

@@ -222,6 +222,122 @@ describe('variant builder routes', () => {
 
     assert.equal(res.status, 400);
     assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_VALIDATION_ERROR');
+    assert.equal(res.body.error.message, 'Invalid component identifier.');
+  });
+
+  it('rejects encoded slash, double-encoded traversal, null byte, and malformed identifiers', async () => {
+    await createTempRoot();
+
+    const urls = [
+      '/api/variants/components/..',
+      '/api/variants/components/%2E%2E',
+      '/api/variants/components/item%2Fsecret',
+      '/api/variants/components/item%252Fsecret',
+      '/api/variants/components/item%5Csecret',
+      '/api/variants/components/item%255Csecret',
+      '/api/variants/components/item%2F..%2Fsecret',
+      '/api/variants/components/item%252F..%252Fsecret',
+      '/api/variants/components/button%00',
+      '/api/variants/components/%E0%A4%A',
+    ];
+
+    for (const url of urls) {
+      const res = await request(app).get(url);
+
+      assert.equal(res.status, 400, url);
+      assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_VALIDATION_ERROR', url);
+      assert.equal(res.body.error.message, 'Invalid component identifier.', url);
+    }
+  });
+
+  it('rejects mixed-case encoded traversal markers', async () => {
+    await createTempRoot();
+
+    const urls = [
+      '/api/variants/components/%2E%2E',
+      '/api/variants/components/item%2Fsecret',
+      '/api/variants/components/item%5Csecret',
+    ];
+
+    for (const url of urls) {
+      const res = await request(app).get(url);
+
+      assert.equal(res.status, 400, url);
+      assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_VALIDATION_ERROR', url);
+    }
+  });
+
+  it('rejects leading, trailing, pure-dot, and over-length identifiers', async () => {
+    await createTempRoot();
+
+    const urls = [
+      '/api/variants/components/.button',
+      '/api/variants/components/button.',
+      '/api/variants/components/...',
+      `/api/variants/components/${'a'.repeat(129)}`,
+    ];
+
+    for (const url of urls) {
+      const res = await request(app).get(url);
+
+      assert.equal(res.status, 400, url);
+      assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_VALIDATION_ERROR', url);
+    }
+  });
+
+  it('allows identifiers at the maximum length', async () => {
+    const root = await createTempRoot();
+    const name = 'a'.repeat(128);
+    await fs.outputFile(
+      path.join(root, 'components/ui', `${name}.tsx`),
+      `
+import { cva } from "class-variance-authority";
+const variants = cva("block", {
+  variants: { size: { sm: "text-sm" } },
+  defaultVariants: { size: "sm" },
+});
+export function LongName() { return <div />; }
+`
+    );
+
+    const res = await request(app).get(`/api/variants/components/${name}`);
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.component.name, name);
+  });
+
+  it('allows dotted and dashed component identifiers', async () => {
+    const root = await createTempRoot();
+    await fs.outputFile(
+      path.join(root, 'components/ui/chart.axis.tsx'),
+      `
+import { cva } from "class-variance-authority";
+const chartAxisVariants = cva("block", {
+  variants: { side: { bottom: "bottom-0" } },
+  defaultVariants: { side: "bottom" },
+});
+export function ChartAxis() { return <div />; }
+`
+    );
+    await fs.outputFile(
+      path.join(root, 'components/ui/date-picker.tsx'),
+      `
+import { cva } from "class-variance-authority";
+const datePickerVariants = cva("block", {
+  variants: { size: { sm: "text-sm" } },
+  defaultVariants: { size: "sm" },
+});
+export function DatePicker() { return <div />; }
+`
+    );
+
+    const dotted = await request(app).get('/api/variants/components/chart.axis');
+    const dashed = await request(app).get('/api/variants/components/date-picker');
+
+    assert.equal(dotted.status, 200);
+    assert.equal(dotted.body.component.name, 'chart.axis');
+    assert.equal(dashed.status, 200);
+    assert.equal(dashed.body.component.name, 'date-picker');
   });
 
   it('returns 404 for missing components', async () => {

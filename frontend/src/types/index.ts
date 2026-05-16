@@ -109,6 +109,86 @@ export interface ComponentTokenOverride {
   overrides: Partial<Record<TokenCategory, Record<string, string>>>;
 }
 
+export interface ComponentSource {
+  originRegistry?: string;
+  originalPackageName?: string;
+  originalComponentName?: string;
+  importedAt?: string;
+  lastModifiedAt?: string;
+  localComponentName?: string;
+  dependencies?: RegistryDependency[];
+}
+
+export interface RegistryDependency {
+  name: string;
+  type: 'package' | 'registry' | 'local';
+  version?: string;
+  source?: string;
+}
+
+export interface RegistryItemFile {
+  path: string;
+  content?: string;
+  type?: string;
+}
+
+export interface ComponentPackage {
+  id: string;
+  name: string;
+  type: 'component' | 'hook' | 'utility' | 'page' | 'registry-item';
+  source?: ComponentSource;
+  files: string[];
+  registryFiles?: RegistryItemFile[];
+  dependencies: RegistryDependency[];
+  devDependencies?: RegistryDependency[];
+  registryDependencies: RegistryDependency[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TokenPatch {
+  category: string;
+  token: string;
+  value: string;
+}
+
+export interface ClassTransform {
+  find: string;
+  replace: string;
+  isRegex: boolean;
+}
+
+export interface AstTransform {
+  kind: string;
+  target: string;
+  value: unknown;
+}
+
+export interface MotionPatch {
+  target: string;
+  property: string;
+  value: string;
+}
+
+export interface VariantRecipe {
+  component?: string;
+  axis: string;
+  values: Record<string, string>;
+}
+
+export interface Preset {
+  id: string;
+  name: string;
+  description?: string;
+  created?: string;
+  migratedFromTemplateId?: string;
+  tokenOverrides: TokenPatch[];
+  classTransforms: ClassTransform[];
+  astTransforms: AstTransform[];
+  motionOverrides: MotionPatch[];
+  variantRecipes: VariantRecipe[];
+}
+
 export interface TokenCandidate {
   category: TokenCategory;
   value: string;
@@ -247,6 +327,105 @@ export interface Backup {
   id: string;
   timestamp: string;
   components: string[];
+  size?: number;
+}
+
+export interface BackupListItem {
+  id: string;
+  timestamp: string;
+  components: number;
+  size?: number;
+}
+
+export interface WorkspaceConfig {
+  componentDirectory: string;
+  backupRetentionDays: number;
+  maxBackups: number;
+  autoBackup: boolean;
+  validateAfterEdit: boolean;
+  port: number;
+}
+
+export interface RegistrySource {
+  id: string;
+  name: string;
+  type: 'shadcn-registry' | 'url-list' | 'local-folder' | 'npm-package';
+  baseUrl?: string;
+  registryJsonUrl?: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type RegistryHealthStatus = 'healthy' | 'degraded' | 'unhealthy';
+
+export interface RegistrySourceHealth {
+  sourceId: string;
+  sourceName: string;
+  sourceType: RegistrySource['type'];
+  status: RegistryHealthStatus;
+  checkedAt: string;
+  issues: Array<{ code: string; message: string }>;
+}
+
+export interface RegistryItemSummary {
+  id: string;
+  name: string;
+  type: string;
+  sourceId: string;
+  sourceName: string;
+}
+
+export interface WorkspaceManifest {
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  config: WorkspaceConfig;
+  components: Array<{ id: string; name: string; path: string; lastScannedAt?: string }>;
+  sources: RegistrySource[];
+  packages: ComponentPackage[];
+  tokenSets: DesignTokenSet[];
+  componentTokenOverrides: Record<string, ComponentTokenOverride[]>;
+  presets: Preset[];
+  backups: Backup[];
+}
+
+export interface StudioSummary {
+  _meta?: {
+    errors: Array<{ label: string; message: string }>;
+  };
+  workspace: {
+    cwd: string;
+    backendUrl?: string;
+    manifest: WorkspaceManifest;
+  };
+  components: {
+    count: number;
+    selectedCount?: number;
+    inventory: ComponentLibraryInventoryItem[];
+  };
+  registries: {
+    sources: RegistrySource[];
+    health: RegistrySourceHealth[];
+    items: RegistryItemSummary[];
+    warnings: Array<{ sourceId: string; sourceName: string; message: string }>;
+  };
+  tokens: {
+    tokenSets: DesignTokenSet[];
+    frequency?: TokenFrequencyReport;
+    inconsistencies?: TokenInconsistencyReport;
+  };
+  variants: {
+    components: VariantComponentSummary[];
+  };
+  backups: {
+    backups: BackupListItem[];
+  };
+  health: {
+    status: string;
+    timestamp?: string;
+    version?: string;
+  };
 }
 
 export interface PlannedFile {
@@ -304,8 +483,14 @@ export interface ApiResponse<T> {
 
 // Screen navigation types
 export type Screen =
-  | 'dashboard'
   | 'components'
+  | 'registries'
+  | 'tokens'
+  | 'variants'
+  | 'motion'
+  | 'diff'
+  | 'settings'
+  | 'dashboard'
   | 'component-view'
   | 'editor'
   | 'preview'

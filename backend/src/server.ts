@@ -1,11 +1,16 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
+import backendPackage from '../package.json' with { type: 'json' };
 import backupRouter from './routes/backup.js';
 import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
 import importsRouter from './routes/imports.js';
 import parserRouter from './routes/parser.js';
 import primitiveStartersRouter from './routes/primitiveStarters.js';
+import studioRouter from './routes/studio.js';
 import templatesRouter from './routes/templates.js';
 import tokensRouter from './routes/tokens.js';
 import variantsRouter from './routes/variants.js';
@@ -13,8 +18,32 @@ import workspaceRouter from './routes/workspace.js';
 import { initializeDefaultTemplates } from './services/template.js';
 import { initializeWorkspace } from './services/workspace.js';
 import { logger } from './utils/logger.js';
+import { readPositiveInteger } from './utils/numbers.js';
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const studioDistPath = path.join(__dirname, 'studio');
+
+export function createStudioAssetLimiter(
+  max = readPositiveInteger(process.env.STUDIO_ASSET_RATE_LIMIT_PER_MINUTE, 1000)
+) {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: {
+        message: 'Too many studio asset requests. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+      },
+    },
+  });
+}
+
+const studioAssetLimiter = createStudioAssetLimiter();
 
 // CORS configuration - restrict to local development
 app.use(
@@ -40,7 +69,7 @@ app.use((req, _res, next) => {
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
-    version: '1.0.0',
+    version: backendPackage.version,
     timestamp: new Date().toISOString(),
   });
 });
@@ -55,6 +84,24 @@ app.use('/api/imports', importsRouter);
 app.use('/api/primitive-starters', primitiveStartersRouter);
 app.use('/api/tokens', tokensRouter);
 app.use('/api/variants', variantsRouter);
+app.use('/api/studio', studioRouter);
+
+// Serve built browser studio assets first, then fall back to index.html for SPA routes.
+app.use('/studio', studioAssetLimiter);
+app.use('/studio', express.static(studioDistPath));
+app.get(['/studio', '/studio/*'], (_req, res) => {
+  res.sendFile(path.join(studioDistPath, 'index.html'), (error) => {
+    if (error && !res.headersSent) {
+      res.status(404).json({
+        success: false,
+        error: {
+          message: 'Studio browser assets are not built. Run the web build first.',
+          code: 'STUDIO_ASSETS_MISSING',
+        },
+      });
+    }
+  });
+});
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', err);
@@ -135,6 +182,8 @@ async function start() {
       logger.info('  GET  /api/workspace/registry-items - List registry items');
       logger.info('  GET  /api/workspace/registry-items/:itemName - Find registry item by name');
       logger.info('  GET  /api/workspace/registry-items/:sourceId/:itemName - Fetch registry item');
+      logger.info('  GET  /api/studio/summary - Get local studio summary');
+      logger.info('  GET  /studio - Open browser studio shell');
     });
   } catch (error) {
     logger.error('Failed to start server', error);
@@ -142,4 +191,8 @@ async function start() {
   }
 }
 
-start();
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  start();
+}
+
+export { app };

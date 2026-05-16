@@ -29,7 +29,7 @@ const BACKUP_DIR = 'backups';
 const ensuredWorkspaceDirs = new Set<string>();
 const manifestWriteQueues = new Map<string, Promise<void>>();
 
-const DEFAULT_CONFIG: WorkspaceConfig = {
+export const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
   componentDirectory: './components/ui',
   backupRetentionDays: 30,
   maxBackups: 20,
@@ -68,7 +68,7 @@ function createDefaultManifest(now: string = new Date().toISOString()): Workspac
     version: 1,
     createdAt: now,
     updatedAt: now,
-    config: { ...DEFAULT_CONFIG },
+    config: { ...DEFAULT_WORKSPACE_CONFIG },
     components: [],
     sources: [],
     packages: [],
@@ -200,7 +200,7 @@ function normalizeWorkspaceConfig(rawConfig: unknown): WorkspaceConfig {
   }
 
   const candidate = rawConfig as Partial<WorkspaceConfig>;
-  const config = { ...DEFAULT_CONFIG };
+  const config = { ...DEFAULT_WORKSPACE_CONFIG };
 
   if (candidate.componentDirectory !== undefined) {
     if (
@@ -597,7 +597,7 @@ export async function updateWorkspaceConfig(
 ): Promise<WorkspaceManifest> {
   return withManifestWriteLock(cwd, async () => {
     const manifest = await loadWorkspaceManifestUnsafe(cwd);
-    const allowedKeys = Object.keys(DEFAULT_CONFIG) as Array<keyof WorkspaceConfig>;
+    const allowedKeys = Object.keys(DEFAULT_WORKSPACE_CONFIG) as Array<keyof WorkspaceConfig>;
     const nextConfig = { ...manifest.config };
 
     for (const key of allowedKeys) {
