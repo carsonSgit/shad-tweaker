@@ -16,6 +16,16 @@ shadcn-tweaker init
 
 # Launch the TUI
 shadcn-tweaker
+
+# Choose between the terminal workbench and browser studio
+shadcn-tweaker studio
+
+# Launch a specific studio surface
+shadcn-tweaker studio --tui
+shadcn-tweaker studio --web
+
+# Launch the browser studio directly
+shadcn-tweaker visual
 ```
 
 ## What It Does
@@ -29,6 +39,16 @@ shadcn-tweaker
 | Save templates | Reuse tweak combinations across projects |
 | Auto-backup | Restore original files anytime |
 | Primitive starters | Generate wrapper components from Radix, Base UI, or blank templates |
+| Local Studio Shell | Browse Components, Registries, Tokens, Variants, Motion, Preview, Diff, Backups, and Settings |
+
+## Studio Shell
+
+`shadcn-tweaker studio` starts the local backend and lets you choose a surface:
+
+- Terminal workbench: the existing Ink UI expanded with the full studio shell.
+- Browser studio: a local Vite/React shell served by the backend at `/studio`.
+
+The browser studio is local-only in this milestone. It exposes workbench navigation, project status, summaries, settings, and dirty-state visibility; hosted publishing, iframe previews, pixel inspection, and motion authoring belong to later milestones.
 
 ## Available Tweaks
 
