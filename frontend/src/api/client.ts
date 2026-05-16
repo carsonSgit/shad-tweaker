@@ -1,7 +1,7 @@
 import type {
   ApiResponse,
   ApplyImportPlanResult,
-  Backup,
+  BackupListItem,
   Component,
   ComponentDetail,
   ComponentLibraryCompareResult,
@@ -232,7 +232,7 @@ export async function restoreBackup(backupId: string): Promise<ApiResponse<{ suc
   });
 }
 
-export async function listBackups(): Promise<ApiResponse<{ backups: Backup[] }>> {
+export async function listBackups(): Promise<ApiResponse<{ backups: BackupListItem[] }>> {
   return request('/api/backup/list');
 }
 

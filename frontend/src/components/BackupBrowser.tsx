@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { SYMBOLS, THEME } from '../App.js';
 import type { BackupFilePreview } from '../api/client.js';
 import * as api from '../api/client.js';
-import type { Backup } from '../types/index.js';
+import type { BackupListItem } from '../types/index.js';
 
 interface BackupBrowserProps {
   onRestore: (message: string) => void;
@@ -15,7 +15,7 @@ interface BackupBrowserProps {
 type Mode = 'list' | 'preview';
 
 export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
-  const [backups, setBackups] = useState<Backup[]>([]);
+  const [backups, setBackups] = useState<BackupListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -396,10 +396,7 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
                 <Box marginLeft={3}>
                   <Text color={THEME.muted}>
                     {dateStr} {timeStr} {SYMBOLS.line}{' '}
-                    {typeof backup.components === 'number'
-                      ? backup.components
-                      : backup.components?.length || 0}{' '}
-                    files
+                    {backup.components} files
                   </Text>
                 </Box>
               </Box>

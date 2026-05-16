@@ -26,7 +26,7 @@ export const WORKBENCH_AREAS: WorkbenchAreaMeta[] = [
   {
     id: 'registries',
     label: 'Registries',
-    shortLabel: 'Registries',
+    shortLabel: 'Registry',
     description: 'Review configured component registry sources and item availability.',
   },
   {
@@ -38,7 +38,7 @@ export const WORKBENCH_AREAS: WorkbenchAreaMeta[] = [
   {
     id: 'variants',
     label: 'Variants',
-    shortLabel: 'Variants',
+    shortLabel: 'Variant',
     description: 'Review detected variant systems, axes, and parser diagnostics.',
   },
   {
@@ -68,7 +68,7 @@ export const WORKBENCH_AREAS: WorkbenchAreaMeta[] = [
   {
     id: 'settings',
     label: 'Settings',
-    shortLabel: 'Settings',
+    shortLabel: 'Config',
     description: 'Review workspace configuration and local studio status.',
   },
 ];

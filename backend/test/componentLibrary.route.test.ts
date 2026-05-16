@@ -102,6 +102,46 @@ describe('component library routes', () => {
 
     assert.equal(res.status, 400);
     assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_VALIDATION_ERROR');
+    assert.equal(res.body.error.message, 'Invalid component identifier.');
+  });
+
+  it('rejects encoded slash, double-encoded traversal, null byte, and malformed identifiers', async () => {
+    await createTempRoot();
+
+    const urls = [
+      '/api/components/library/detail/item%2F..%2Fsecret',
+      '/api/components/library/detail/item%252F..%252Fsecret',
+      '/api/components/library/detail/button%00',
+      '/api/components/library/detail/%E0%A4%A',
+    ];
+
+    for (const url of urls) {
+      const res = await request(app).get(url);
+
+      assert.equal(res.status, 400, url);
+      assert.equal(res.body.error.code, 'COMPONENT_LIBRARY_VALIDATION_ERROR', url);
+      assert.equal(res.body.error.message, 'Invalid component identifier.', url);
+    }
+  });
+
+  it('allows dotted and dashed component detail identifiers', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/chart.axis.tsx'),
+      `export function ChartAxis() { return <div />; }`
+    );
+    await fs.writeFile(
+      path.join(root, 'components/ui/date-picker.tsx'),
+      `export function DatePicker() { return <div />; }`
+    );
+
+    const dotted = await request(app).get('/api/components/library/detail/chart.axis');
+    const dashed = await request(app).get('/api/components/library/detail/date-picker');
+
+    assert.equal(dotted.status, 200);
+    assert.equal(dotted.body.component.name, 'chart.axis');
+    assert.equal(dashed.status, 200);
+    assert.equal(dashed.body.component.name, 'date-picker');
   });
 
   it('renames a component through the route', async () => {

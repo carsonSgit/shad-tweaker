@@ -88,6 +88,36 @@ export function validateComponentPaths(
   return { valid: true };
 }
 
+export function validateComponentIdentifier(identifier: string): {
+  valid: boolean;
+  value?: string;
+} {
+  let decoded = identifier;
+
+  try {
+    for (let depth = 0; depth < 2; depth += 1) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) break;
+      decoded = next;
+    }
+  } catch {
+    return { valid: false };
+  }
+
+  if (
+    decoded.length === 0 ||
+    decoded.includes('\0') ||
+    decoded.includes('/') ||
+    decoded.includes('\\') ||
+    decoded.split('.').includes('..') ||
+    !/^[A-Za-z0-9_.-]+$/.test(decoded)
+  ) {
+    return { valid: false };
+  }
+
+  return { valid: true, value: decoded };
+}
+
 // ============================================
 // Backup ID Validation
 // ============================================

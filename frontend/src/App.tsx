@@ -109,11 +109,11 @@ export function App() {
     }
 
     const areaIndex = WORKBENCH_AREAS.findIndex((area) => area.id === screen);
-    if (key.tab || input === ']') {
+    if ((key.tab || input === ']') && areaIndex >= 0) {
       const nextArea = WORKBENCH_AREAS[(Math.max(areaIndex, 0) + 1) % WORKBENCH_AREAS.length];
       navigate(nextArea.id);
     }
-    if (input === '[') {
+    if (input === '[' && areaIndex >= 0) {
       const previousIndex = areaIndex <= 0 ? WORKBENCH_AREAS.length - 1 : areaIndex - 1;
       navigate(WORKBENCH_AREAS[previousIndex].id);
     }
@@ -151,10 +151,6 @@ export function App() {
     scanComponents(); // Refresh component list
     refresh();
     navigate('components');
-  };
-
-  const navigateArea = (area: WorkbenchArea) => {
-    handleNavigate(area);
   };
 
   const renderScreen = () => {
@@ -226,7 +222,7 @@ export function App() {
             loading={summaryLoading}
             error={summaryError}
             onRefresh={refresh}
-            onNavigate={navigateArea}
+            onNavigate={handleNavigate}
           />
         );
 
@@ -318,10 +314,7 @@ export function App() {
       </Box>
 
       <Box marginBottom={1}>
-        <Text color={dirty ? THEME.accent : THEME.success}>
-          {dirty ? 'Unapplied changes' : 'Clean'}
-        </Text>
-        <Text color={THEME.muted}> │ Project </Text>
+        <Text color={THEME.muted}>Project </Text>
         <Text color={THEME.secondary}>{summary?.workspace.cwd || process.cwd()}</Text>
         <Text color={THEME.muted}> │ Components </Text>
         <Text color={THEME.secondary}>

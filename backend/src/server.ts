@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
+import backendPackage from '../package.json' with { type: 'json' };
 import backupRouter from './routes/backup.js';
 import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
@@ -46,7 +47,7 @@ app.use((req, _res, next) => {
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
-    version: '1.0.0',
+    version: backendPackage.version,
     timestamp: new Date().toISOString(),
   });
 });
@@ -63,6 +64,7 @@ app.use('/api/tokens', tokensRouter);
 app.use('/api/variants', variantsRouter);
 app.use('/api/studio', studioRouter);
 
+// Serve built browser studio assets first, then fall back to index.html for SPA routes.
 app.use('/studio', express.static(studioDistPath));
 app.get(['/studio', '/studio/*'], (_req, res) => {
   res.sendFile(path.join(studioDistPath, 'index.html'), (error) => {

@@ -1,4 +1,4 @@
-import { type Request, type Response, Router } from 'express';
+import { type NextFunction, type Request, type Response, Router } from 'express';
 import {
   ComponentLibraryNotFoundError,
   ComponentLibraryValidationError,
@@ -13,24 +13,11 @@ import {
 import { getWorkingDirectory } from '../services/workspace.js';
 import type { VariantPreviewOperation } from '../types/index.js';
 import { logger } from '../utils/logger.js';
+import { validateComponentIdentifier } from '../utils/validation.js';
 
 const router = Router();
 const MAX_PREVIEW_PATH_LENGTH = 1024;
 const MAX_PREVIEW_IDENTIFIER_LENGTH = 260;
-
-router.use((req, res, next) => {
-  if (req.originalUrl.toLowerCase().includes('%5c')) {
-    sendError(
-      res,
-      variantErrorResponse(
-        new ComponentLibraryValidationError('Invalid component identifier.'),
-        'Failed to get variant component detail'
-      )
-    );
-    return;
-  }
-  next();
-});
 
 interface PreviewRequestBody {
   componentPath?: unknown;
@@ -68,6 +55,18 @@ function sendError(res: Response, response: ReturnType<typeof variantErrorRespon
   });
 }
 
+function invalidComponentIdentifierResponse(): ReturnType<typeof variantErrorResponse> {
+  return variantErrorResponse(
+    new ComponentLibraryValidationError('Invalid component identifier.'),
+    'Failed to get variant component detail'
+  );
+}
+
+function readComponentIdentifier(raw: string): string | null {
+  const validation = validateComponentIdentifier(raw);
+  return validation.valid ? (validation.value ?? raw) : null;
+}
+
 router.get('/components', async (_req: Request, res: Response) => {
   try {
     res.json({ success: true, components: await listVariantComponents(getWorkingDirectory()) });
@@ -79,9 +78,15 @@ router.get('/components', async (_req: Request, res: Response) => {
 
 router.get('/components/:identifier', async (req: Request, res: Response) => {
   try {
+    const identifier = readComponentIdentifier(req.params.identifier);
+    if (!identifier) {
+      sendError(res, invalidComponentIdentifierResponse());
+      return;
+    }
+
     res.json({
       success: true,
-      component: await getVariantComponentDetail(getWorkingDirectory(), req.params.identifier),
+      component: await getVariantComponentDetail(getWorkingDirectory(), identifier),
     });
   } catch (error) {
     logger.error(`Failed to get variant component detail: ${req.params.identifier}`, error);
@@ -89,12 +94,8 @@ router.get('/components/:identifier', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/components/*', async (req: Request, res: Response) => {
-  const response = variantErrorResponse(
-    new ComponentLibraryValidationError(`Invalid component identifier: ${req.params[0]}`),
-    'Failed to get variant component detail'
-  );
-  sendError(res, response);
+router.get('/components/*', async (_req: Request, res: Response) => {
+  sendError(res, invalidComponentIdentifierResponse());
 });
 
 router.post('/preview', async (req: Request, res: Response) => {
@@ -196,5 +197,14 @@ function readString(value: unknown, field: string, maxLength: number): string {
   }
   return trimmed;
 }
+
+router.use((error: Error, _req: Request, res: Response, next: NextFunction): void => {
+  if (error instanceof URIError) {
+    sendError(res, invalidComponentIdentifierResponse());
+    return;
+  }
+
+  next(error);
+});
 
 export default router;

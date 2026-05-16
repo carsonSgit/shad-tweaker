@@ -1,4 +1,4 @@
-import { type Request, type Response, Router } from 'express';
+import { type NextFunction, type Request, type Response, Router } from 'express';
 import {
   ComponentLibraryConflictError,
   ComponentLibraryNotFoundError,
@@ -20,27 +20,9 @@ import {
   scanComponents,
 } from '../services/scanner.js';
 import { logger } from '../utils/logger.js';
-import { validateCustomPath } from '../utils/validation.js';
+import { validateComponentIdentifier, validateCustomPath } from '../utils/validation.js';
 
 const router = Router();
-
-router.use((req, res, next) => {
-  if (req.originalUrl.toLowerCase().includes('%5c')) {
-    const response = componentLibraryErrorResponse(
-      new ComponentLibraryValidationError('Invalid component identifier.'),
-      'Invalid component identifier'
-    );
-    res.status(response.status).json({
-      success: false,
-      error: {
-        message: response.message,
-        code: response.code,
-      },
-    });
-    return;
-  }
-  next();
-});
 
 function componentLibraryErrorResponse(error: unknown, fallback: string) {
   if (error instanceof ComponentLibraryNotFoundError) {
@@ -54,6 +36,31 @@ function componentLibraryErrorResponse(error: unknown, fallback: string) {
   }
   const message = error instanceof Error ? error.message : fallback;
   return { status: 500, message, code: 'COMPONENT_LIBRARY_ERROR' };
+}
+
+function sendComponentLibraryError(
+  res: Response,
+  response: ReturnType<typeof componentLibraryErrorResponse>
+): void {
+  res.status(response.status).json({
+    success: false,
+    error: {
+      message: response.message,
+      code: response.code,
+    },
+  });
+}
+
+function invalidComponentIdentifierResponse(): ReturnType<typeof componentLibraryErrorResponse> {
+  return componentLibraryErrorResponse(
+    new ComponentLibraryValidationError('Invalid component identifier.'),
+    'Invalid component identifier'
+  );
+}
+
+function readComponentIdentifier(raw: string): string | null {
+  const validation = validateComponentIdentifier(raw);
+  return validation.valid ? (validation.value ?? raw) : null;
 }
 
 router.get('/library/inventory', async (_req: Request, res: Response) => {
@@ -90,8 +97,14 @@ router.get('/library/duplicates', async (_req: Request, res: Response) => {
 
 router.get('/library/detail/:identifier', async (req: Request, res: Response) => {
   try {
+    const identifier = readComponentIdentifier(req.params.identifier);
+    if (!identifier) {
+      sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+      return;
+    }
+
     res.json({
-      component: await getComponentLibraryDetail(getWorkingDirectory(), req.params.identifier),
+      component: await getComponentLibraryDetail(getWorkingDirectory(), identifier),
     });
   } catch (error) {
     logger.error(`Failed to get component library detail: ${req.params.identifier}`, error);
@@ -106,17 +119,8 @@ router.get('/library/detail/:identifier', async (req: Request, res: Response) =>
   }
 });
 
-router.get('/library/detail/*', async (req: Request, res: Response) => {
-  const identifier = req.params[0];
-  const error = new ComponentLibraryValidationError(`Invalid component identifier: ${identifier}`);
-  const response = componentLibraryErrorResponse(error, 'Failed to get component detail');
-  res.status(response.status).json({
-    success: false,
-    error: {
-      message: response.message,
-      code: response.code,
-    },
-  });
+router.get('/library/detail/*', async (_req: Request, res: Response) => {
+  sendComponentLibraryError(res, invalidComponentIdentifierResponse());
 });
 
 function readName(body: unknown): string | null {
@@ -127,10 +131,16 @@ function readName(body: unknown): string | null {
 
 router.post('/library/:identifier/rename', async (req: Request, res: Response) => {
   try {
+    const identifier = readComponentIdentifier(req.params.identifier);
+    if (!identifier) {
+      sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+      return;
+    }
+
     const name = readName(req.body);
     if (!name) throw new ComponentLibraryValidationError('Name is required.');
     res.json({
-      result: await renameComponentLibraryItem(getWorkingDirectory(), req.params.identifier, name),
+      result: await renameComponentLibraryItem(getWorkingDirectory(), identifier, name),
     });
   } catch (error) {
     logger.error(`Failed to rename component: ${req.params.identifier}`, error);
@@ -141,10 +151,16 @@ router.post('/library/:identifier/rename', async (req: Request, res: Response) =
 
 router.post('/library/:identifier/fork', async (req: Request, res: Response) => {
   try {
+    const identifier = readComponentIdentifier(req.params.identifier);
+    if (!identifier) {
+      sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+      return;
+    }
+
     const name = readName(req.body);
     if (!name) throw new ComponentLibraryValidationError('Name is required.');
     res.json({
-      result: await forkComponentLibraryItem(getWorkingDirectory(), req.params.identifier, name),
+      result: await forkComponentLibraryItem(getWorkingDirectory(), identifier, name),
     });
   } catch (error) {
     logger.error(`Failed to fork component: ${req.params.identifier}`, error);
@@ -155,8 +171,14 @@ router.post('/library/:identifier/fork', async (req: Request, res: Response) => 
 
 router.post('/library/:identifier/detach', async (req: Request, res: Response) => {
   try {
+    const identifier = readComponentIdentifier(req.params.identifier);
+    if (!identifier) {
+      sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+      return;
+    }
+
     res.json({
-      result: await detachComponentLibraryItem(getWorkingDirectory(), req.params.identifier),
+      result: await detachComponentLibraryItem(getWorkingDirectory(), identifier),
     });
   } catch (error) {
     logger.error(`Failed to detach component: ${req.params.identifier}`, error);
@@ -167,8 +189,14 @@ router.post('/library/:identifier/detach', async (req: Request, res: Response) =
 
 router.post('/library/:identifier/reset', async (req: Request, res: Response) => {
   try {
+    const identifier = readComponentIdentifier(req.params.identifier);
+    if (!identifier) {
+      sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+      return;
+    }
+
     res.json({
-      result: await resetComponentLibraryItem(getWorkingDirectory(), req.params.identifier),
+      result: await resetComponentLibraryItem(getWorkingDirectory(), identifier),
     });
   } catch (error) {
     logger.error(`Failed to reset component: ${req.params.identifier}`, error);
@@ -179,8 +207,14 @@ router.post('/library/:identifier/reset', async (req: Request, res: Response) =>
 
 router.get('/library/:identifier/compare', async (req: Request, res: Response) => {
   try {
+    const identifier = readComponentIdentifier(req.params.identifier);
+    if (!identifier) {
+      sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+      return;
+    }
+
     res.json({
-      compare: await compareComponentLibraryItem(getWorkingDirectory(), req.params.identifier),
+      compare: await compareComponentLibraryItem(getWorkingDirectory(), identifier),
     });
   } catch (error) {
     logger.error(`Failed to compare component: ${req.params.identifier}`, error);
@@ -289,6 +323,15 @@ router.get('/:name', async (req: Request, res: Response) => {
       },
     });
   }
+});
+
+router.use((error: Error, _req: Request, res: Response, next: NextFunction): void => {
+  if (error instanceof URIError) {
+    sendComponentLibraryError(res, invalidComponentIdentifierResponse());
+    return;
+  }
+
+  next(error);
 });
 
 export default router;

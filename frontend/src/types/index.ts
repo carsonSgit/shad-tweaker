@@ -246,7 +246,14 @@ export interface Template {
 export interface Backup {
   id: string;
   timestamp: string;
-  components: string[] | number;
+  components: string[];
+  size?: number;
+}
+
+export interface BackupListItem {
+  id: string;
+  timestamp: string;
+  components: number;
   size?: number;
 }
 
