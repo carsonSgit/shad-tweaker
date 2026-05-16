@@ -18,6 +18,20 @@ const router = Router();
 const MAX_PREVIEW_PATH_LENGTH = 1024;
 const MAX_PREVIEW_IDENTIFIER_LENGTH = 260;
 
+router.use((req, res, next) => {
+  if (req.originalUrl.toLowerCase().includes('%5c')) {
+    sendError(
+      res,
+      variantErrorResponse(
+        new ComponentLibraryValidationError('Invalid component identifier.'),
+        'Failed to get variant component detail'
+      )
+    );
+    return;
+  }
+  next();
+});
+
 interface PreviewRequestBody {
   componentPath?: unknown;
   targetDefinition?: unknown;
@@ -73,6 +87,14 @@ router.get('/components/:identifier', async (req: Request, res: Response) => {
     logger.error(`Failed to get variant component detail: ${req.params.identifier}`, error);
     sendError(res, variantErrorResponse(error, 'Failed to get variant component detail'));
   }
+});
+
+router.get('/components/*', async (req: Request, res: Response) => {
+  const response = variantErrorResponse(
+    new ComponentLibraryValidationError(`Invalid component identifier: ${req.params[0]}`),
+    'Failed to get variant component detail'
+  );
+  sendError(res, response);
 });
 
 router.post('/preview', async (req: Request, res: Response) => {

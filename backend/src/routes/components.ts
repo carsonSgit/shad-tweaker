@@ -24,6 +24,24 @@ import { validateCustomPath } from '../utils/validation.js';
 
 const router = Router();
 
+router.use((req, res, next) => {
+  if (req.originalUrl.toLowerCase().includes('%5c')) {
+    const response = componentLibraryErrorResponse(
+      new ComponentLibraryValidationError('Invalid component identifier.'),
+      'Invalid component identifier'
+    );
+    res.status(response.status).json({
+      success: false,
+      error: {
+        message: response.message,
+        code: response.code,
+      },
+    });
+    return;
+  }
+  next();
+});
+
 function componentLibraryErrorResponse(error: unknown, fallback: string) {
   if (error instanceof ComponentLibraryNotFoundError) {
     return { status: 404, message: error.message, code: error.code };
@@ -86,6 +104,19 @@ router.get('/library/detail/:identifier', async (req: Request, res: Response) =>
       },
     });
   }
+});
+
+router.get('/library/detail/*', async (req: Request, res: Response) => {
+  const identifier = req.params[0];
+  const error = new ComponentLibraryValidationError(`Invalid component identifier: ${identifier}`);
+  const response = componentLibraryErrorResponse(error, 'Failed to get component detail');
+  res.status(response.status).json({
+    success: false,
+    error: {
+      message: response.message,
+      code: response.code,
+    },
+  });
 });
 
 function readName(body: unknown): string | null {
