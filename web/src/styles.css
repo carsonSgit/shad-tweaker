@@ -14,7 +14,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -208,6 +209,96 @@ h1 {
   gap: 10px;
 }
 
+.preview-workspace {
+  gap: 18px;
+}
+
+.preview-toolbar,
+.preview-controls {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.preview-toolbar label,
+.preview-controls label {
+  color: #4f5661;
+  display: grid;
+  font-size: 13px;
+  gap: 6px;
+}
+
+.preview-toolbar select,
+.preview-controls select {
+  background: #ffffff;
+  border: 1px solid #cfd5dd;
+  border-radius: 6px;
+  color: #202124;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.preview-frame-shell {
+  background: #fbfbfc;
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  overflow: auto;
+  padding: 10px;
+}
+
+.preview-frame-header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.preview-frame-header span {
+  color: #6f7680;
+  font-size: 13px;
+}
+
+.preview-frame {
+  background: #ffffff;
+  border: 1px solid #dfe3e8;
+  border-radius: 6px;
+}
+
+.preview-section {
+  display: grid;
+  gap: 10px;
+}
+
+.preview-section h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.preview-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.compact-grid .preview-frame {
+  height: 260px !important;
+}
+
+.preview-diagnostic,
+.preview-diagnostics {
+  background: #fff4f2;
+  border: 1px solid #f0b8b1;
+  border-radius: 6px;
+  color: #8f1f18;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
 @media (max-width: 760px) {
   .studio {
     grid-template-columns: 1fr;
@@ -230,5 +321,10 @@ h1 {
   .row,
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .preview-frame {
+    height: 520px !important;
+    width: 100% !important;
   }
 }
