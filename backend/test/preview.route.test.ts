@@ -225,11 +225,15 @@ export function ButtonIcon() {
   it('rejects unsupported preview enum options', async () => {
     await createTempRoot();
 
-    for (const [field, value] of [
-      ['viewport', 'watch'],
-      ['theme', 'sepia'],
-      ['density', 'spacious'],
-      ['state', 'dragging'],
+    for (const [field, value, message] of [
+      ['viewport', 'watch', 'viewport must be one of: desktop, tablet, mobile.'],
+      ['theme', 'sepia', 'theme must be one of: light, dark, system.'],
+      ['density', 'spacious', 'density must be one of: comfortable, default, compact.'],
+      [
+        'state',
+        'dragging',
+        'state must be one of: default, hover, focus, disabled, loading, open, selected.',
+      ],
     ]) {
       const res = await request(app)
         .get('/studio/preview/frame')
@@ -237,7 +241,7 @@ export function ButtonIcon() {
 
       assert.equal(res.status, 400);
       assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
-      assert.equal(res.body.error.message, 'Unsupported preview option value.');
+      assert.equal(res.body.error.message, message);
     }
   });
 
@@ -382,11 +386,34 @@ export function ButtonIcon() {
     assert.doesNotMatch(res.text, /postMessage\([^;]+,\s*'\*'\)/s);
     assert.match(res.text, /data-preview-state/);
     assert.match(res.text, /data-preview-label/);
+    assert.match(res.text, /data-force-hover/);
     assert.doesNotMatch(res.text, /"children":/);
     assert.match(res.text, /React\.createElement\(PreviewErrorBoundary, null,/);
     assert.match(res.text, /React\.createElement\(Component, previewProps\)/);
     assert.match(res.text, /"aria-selected": true/);
     assert.match(res.text, /"tone": "muted"/);
+  });
+
+  it('returns preview frame and runtime markup that can simulate hover state', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/hover-card.tsx'),
+      `export function HoverCard() { return <button>Hover</button>; }`
+    );
+
+    const frameRes = await request(app).get('/studio/preview/frame').query({
+      componentPath: 'components/ui/hover-card.tsx',
+      state: 'hover',
+    });
+    const runtimeRes = await request(app).get('/studio/preview/runtime').query({
+      componentPath: 'components/ui/hover-card.tsx',
+      state: 'hover',
+    });
+
+    assert.equal(frameRes.status, 200);
+    assert.match(frameRes.text, /\[data-force-hover="true"\]/);
+    assert.equal(runtimeRes.status, 200);
+    assert.match(runtimeRes.text, /"data-force-hover": true/);
   });
 
   it('returns a component import module for a safe local component path', async () => {

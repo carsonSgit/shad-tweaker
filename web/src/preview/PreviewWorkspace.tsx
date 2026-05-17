@@ -58,7 +58,7 @@ export function PreviewWorkspace({ selectedComponents, summary }: PreviewWorkspa
   }, [componentPath, loadManifest]);
 
   const variantDefinition = manifest?.variants[0];
-  const variantSelections = useMemo(
+  const variantGrid = useMemo(
     () => variantGridSelections(variantDefinition?.axes ?? []),
     [variantDefinition]
   );
@@ -109,8 +109,13 @@ export function PreviewWorkspace({ selectedComponents, summary }: PreviewWorkspa
 
           <section className="preview-section">
             <h2>Variant Grid</h2>
+            {variantGrid.truncated ? (
+              <p className="preview-note">
+                Showing {variantGrid.selections.length} of {variantGrid.total} variant combinations.
+              </p>
+            ) : null}
             <div className="preview-grid">
-              {variantSelections.map((variants) => (
+              {variantGrid.selections.map((variants) => (
                 <PreviewFrame
                   key={JSON.stringify(variants)}
                   label={describeVariants(variants)}

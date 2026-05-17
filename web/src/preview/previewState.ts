@@ -11,6 +11,7 @@ export const DEFAULT_VIEWPORT: PreviewViewport = 'desktop';
 export const DEFAULT_THEME: PreviewTheme = 'light';
 export const DEFAULT_DENSITY: PreviewDensity = 'default';
 export const DEFAULT_STATE: PreviewState = 'default';
+export const VARIANT_GRID_LIMIT = 20;
 
 export interface PreviewSelection {
   componentPath: string;
@@ -55,18 +56,33 @@ export function defaultVariantSelection(axes: VariantAxis[]): Record<string, str
   );
 }
 
-export function variantGridSelections(axes: VariantAxis[]): Array<Record<string, string>> {
-  if (axes.length === 0) return [{}];
-  return axes.reduce<Array<Record<string, string>>>(
-    (rows, axis) =>
-      rows.flatMap((row) =>
-        axis.values.map((value) => ({
-          ...row,
-          [axis.name]: value.name,
-        }))
-      ),
-    [{}]
-  );
+export interface VariantGridSelections {
+  selections: Array<Record<string, string>>;
+  total: number;
+  truncated: boolean;
+}
+
+export function variantGridSelections(
+  axes: VariantAxis[],
+  limit = VARIANT_GRID_LIMIT
+): VariantGridSelections {
+  const total = axes.reduce((count, axis) => count * Math.max(axis.values.length, 1), 1);
+  if (axes.length === 0) return { selections: [{}], total, truncated: false };
+
+  const selections: Array<Record<string, string>> = [{}];
+  for (const axis of axes) {
+    const rows = selections.splice(0, selections.length);
+    for (const row of rows) {
+      for (const value of axis.values) {
+        if (selections.length >= limit) {
+          return { selections, total, truncated: total > selections.length };
+        }
+        selections.push({ ...row, [axis.name]: value.name });
+      }
+    }
+  }
+
+  return { selections, total, truncated: total > selections.length };
 }
 
 export function previewFrameUrl(selection: PreviewSelection, baseFrameUrl: string): string {

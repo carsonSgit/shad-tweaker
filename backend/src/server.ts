@@ -1,3 +1,4 @@
+import type { Server } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
@@ -128,10 +129,11 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 export function createPreviewApp() {
   const previewApp = express();
+  previewApp.use(express.json({ limit: '1mb' }));
   previewApp.use(express.urlencoded({ extended: true, limit: '1mb' }));
   previewApp.use('/studio/preview', previewBrowserLimiter, createPreviewBrowserRouter());
   previewApp.use((req, res, next) => {
-    previewViteMiddleware(req, res, next).catch(next);
+    Promise.resolve(previewViteMiddleware.handler(req, res, next)).catch(next);
   });
   previewApp.use(
     (err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -168,6 +170,32 @@ app.use((_req, res) => {
 });
 
 async function start() {
+  let backendServer: Server | undefined;
+  let previewServer: Server | undefined;
+
+  async function shutdown(signal: NodeJS.Signals): Promise<void> {
+    logger.info(`Received ${signal}; shutting down preview services.`);
+    await Promise.all([
+      closeHttpServer(backendServer),
+      closeHttpServer(previewServer),
+      previewViteMiddleware.close(),
+    ]);
+    process.exit(0);
+  }
+
+  process.once('SIGINT', () => {
+    shutdown('SIGINT').catch((error) => {
+      logger.error('Failed to shut down cleanly', error);
+      process.exit(1);
+    });
+  });
+  process.once('SIGTERM', () => {
+    shutdown('SIGTERM').catch((error) => {
+      logger.error('Failed to shut down cleanly', error);
+      process.exit(1);
+    });
+  });
+
   try {
     await initializeDefaultTemplates();
     const { manifest } = await initializeWorkspace();
@@ -179,7 +207,7 @@ async function start() {
       );
     }
 
-    app.listen(port, () => {
+    backendServer = app.listen(port, () => {
       logger.info(`Shadcn Tweaker Backend running on http://localhost:${port}`);
       logger.info('Available endpoints:');
       logger.info('  GET  /api/components/scan - Scan for components');
@@ -228,7 +256,7 @@ async function start() {
       logger.info('  GET  /api/studio/summary - Get local studio summary');
       logger.info('  GET  /studio - Open browser studio shell');
     });
-    createPreviewApp().listen(getPreviewPort(String(port)), () => {
+    previewServer = createPreviewApp().listen(getPreviewPort(String(port)), () => {
       logger.info(
         `Shadcn Tweaker Preview running on http://127.0.0.1:${getPreviewPort(String(port))}`
       );
@@ -237,6 +265,16 @@ async function start() {
     logger.error('Failed to start server', error);
     process.exit(1);
   }
+}
+
+function closeHttpServer(server: Server | undefined): Promise<void> {
+  if (!server) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    server.close((error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {

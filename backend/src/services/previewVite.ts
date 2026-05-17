@@ -14,6 +14,11 @@ interface PreviewViteMiddlewareOptions {
   reactPlugin?: CreateReactPlugin;
 }
 
+interface PreviewViteMiddlewareHandle {
+  handler: express.RequestHandler;
+  close: () => Promise<void>;
+}
+
 interface PreviewViteServerCache {
   rootPath: string;
   server: Promise<PreviewViteServer>;
@@ -28,7 +33,9 @@ async function closePreviewViteServer(cache: PreviewViteServerCache): Promise<vo
   }
 }
 
-export function createPreviewViteMiddleware(options: PreviewViteMiddlewareOptions = {}) {
+export function createPreviewViteMiddleware(
+  options: PreviewViteMiddlewareOptions = {}
+): PreviewViteMiddlewareHandle {
   const createPreviewViteServer = options.createServer ?? createServer;
   const readWorkingDirectory = options.getWorkingDirectory ?? getWorkingDirectory;
   const createReactPlugin = options.reactPlugin ?? react;
@@ -61,7 +68,7 @@ export function createPreviewViteMiddleware(options: PreviewViteMiddlewareOption
     return previewViteServerCache.server;
   }
 
-  return async function previewViteMiddleware(
+  async function handler(
     req: express.Request,
     res: express.Response,
     next: express.NextFunction
@@ -73,7 +80,16 @@ export function createPreviewViteMiddleware(options: PreviewViteMiddlewareOption
 
     const vite = await getPreviewViteServer();
     vite.middlewares(req, res, next);
-  };
+  }
+
+  async function close(): Promise<void> {
+    if (!previewViteServerCache) return;
+    const cache = previewViteServerCache;
+    previewViteServerCache = null;
+    await closePreviewViteServer(cache);
+  }
+
+  return { handler, close };
 }
 
 function shouldHandleWithVite(requestPath: string): boolean {

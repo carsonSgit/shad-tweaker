@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import express from 'express';
 import request from 'supertest';
-import { createStudioAssetLimiter, app as serverApp } from '../src/server.js';
+import { createPreviewApp, createStudioAssetLimiter, app as serverApp } from '../src/server.js';
 
 describe('server routes', () => {
   it('rate limits repeated studio asset fallback requests', async () => {
@@ -36,5 +36,16 @@ describe('server routes', () => {
     } else {
       assert.match(res.text, /<html/i);
     }
+  });
+
+  it('preview app parses JSON and returns preview 404 responses for unknown routes', async () => {
+    const res = await request(createPreviewApp())
+      .post('/studio/preview/unknown')
+      .send({ probe: true });
+
+    assert.equal(res.status, 404);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.error.code, 'NOT_FOUND');
+    assert.equal(res.body.error.message, 'Preview endpoint not found');
   });
 });

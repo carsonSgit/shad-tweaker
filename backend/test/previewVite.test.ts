@@ -55,8 +55,8 @@ describe('preview Vite middleware', () => {
       reactPlugin: createFakeReactPlugin,
     });
 
-    await middleware(createRequest('/components/ui/button.tsx'), createResponse(), noop);
-    await middleware(createRequest('/components/ui/card.tsx'), createResponse(), noop);
+    await middleware.handler(createRequest('/components/ui/button.tsx'), createResponse(), noop);
+    await middleware.handler(createRequest('/components/ui/card.tsx'), createResponse(), noop);
 
     assert.deepEqual(createdRoots, [path.resolve(root)]);
   });
@@ -79,10 +79,10 @@ describe('preview Vite middleware', () => {
       reactPlugin: createFakeReactPlugin,
     });
 
-    await middleware(createRequest('/components/ui/button.tsx'), createResponse(), noop);
+    await middleware.handler(createRequest('/components/ui/button.tsx'), createResponse(), noop);
 
     currentRoot = secondRoot;
-    await middleware(createRequest('/components/ui/card.tsx'), createResponse(), noop);
+    await middleware.handler(createRequest('/components/ui/card.tsx'), createResponse(), noop);
 
     assert.deepEqual(createdRoots, [path.resolve(firstRoot), path.resolve(secondRoot)]);
     assert.equal(servers[0].closeCalls, 1);
@@ -106,10 +106,10 @@ describe('preview Vite middleware', () => {
     });
 
     await assert.rejects(
-      () => middleware(createRequest('/components/ui/button.tsx'), createResponse(), noop),
+      () => middleware.handler(createRequest('/components/ui/button.tsx'), createResponse(), noop),
       /Vite unavailable/
     );
-    await middleware(createRequest('/components/ui/button.tsx'), createResponse(), noop);
+    await middleware.handler(createRequest('/components/ui/button.tsx'), createResponse(), noop);
 
     assert.equal(attempts, 2);
   });
@@ -127,9 +127,13 @@ describe('preview Vite middleware', () => {
       reactPlugin: createFakeReactPlugin,
     });
 
-    await middleware(createRequest('/node_modules/react/index.js'), createResponse(), () => {
-      nextCalls += 1;
-    });
+    await middleware.handler(
+      createRequest('/node_modules/react/index.js'),
+      createResponse(),
+      () => {
+        nextCalls += 1;
+      }
+    );
 
     assert.equal(createServerCalls, 0);
     assert.equal(nextCalls, 1);
@@ -153,10 +157,14 @@ describe('preview Vite middleware', () => {
       reactPlugin: createFakeReactPlugin,
     });
 
-    await middleware(createRequest('/components/ui/button.tsx'), createResponse(), noop);
-    await middleware(createRequest('/src/lib/utils.ts'), createResponse(), noop);
-    await middleware(createRequest('/node_modules/.vite/deps/react.js'), createResponse(), noop);
-    await middleware(createRequest('/@vite/client'), createResponse(), noop);
+    await middleware.handler(createRequest('/components/ui/button.tsx'), createResponse(), noop);
+    await middleware.handler(createRequest('/src/lib/utils.ts'), createResponse(), noop);
+    await middleware.handler(
+      createRequest('/node_modules/.vite/deps/react.js'),
+      createResponse(),
+      noop
+    );
+    await middleware.handler(createRequest('/@vite/client'), createResponse(), noop);
 
     assert.deepEqual(handledPaths, [
       '/components/ui/button.tsx',
@@ -164,6 +172,44 @@ describe('preview Vite middleware', () => {
       '/node_modules/.vite/deps/react.js',
       '/@vite/client',
     ]);
+  });
+
+  it('closes the cached Vite server on request', async () => {
+    const root = await createTempRoot();
+    const server = createFakeViteServer();
+    const middleware = createPreviewViteMiddleware({
+      createServer: async () => server,
+      getWorkingDirectory: () => root,
+      reactPlugin: createFakeReactPlugin,
+    });
+
+    await middleware.handler(createRequest('/components/ui/button.tsx'), createResponse(), noop);
+    await middleware.close();
+
+    assert.equal(server.closeCalls, 1);
+  });
+
+  it('allows close after failed initialization and retries later', async () => {
+    const root = await createTempRoot();
+    let attempts = 0;
+    const middleware = createPreviewViteMiddleware({
+      createServer: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error('Vite unavailable');
+        return createFakeViteServer();
+      },
+      getWorkingDirectory: () => root,
+      reactPlugin: createFakeReactPlugin,
+    });
+
+    await assert.rejects(
+      () => middleware.handler(createRequest('/components/ui/button.tsx'), createResponse(), noop),
+      /Vite unavailable/
+    );
+    await middleware.close();
+    await middleware.handler(createRequest('/components/ui/button.tsx'), createResponse(), noop);
+
+    assert.equal(attempts, 2);
   });
 });
 

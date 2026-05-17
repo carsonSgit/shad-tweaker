@@ -70,10 +70,14 @@ export function normalizePreviewRequest(input: unknown): ComponentPreviewRequest
   return {
     componentPath,
     exportName: readExportName(record.exportName),
-    viewport: readAllowed(record.viewport, Object.keys(PREVIEW_VIEWPORTS) as PreviewViewport[]),
-    theme: readAllowed(record.theme, PREVIEW_THEMES),
-    density: readAllowed(record.density, PREVIEW_DENSITIES),
-    state: readAllowed(record.state, PREVIEW_STATES),
+    viewport: readAllowed(
+      record.viewport,
+      Object.keys(PREVIEW_VIEWPORTS) as PreviewViewport[],
+      'viewport'
+    ),
+    theme: readAllowed(record.theme, PREVIEW_THEMES, 'theme'),
+    density: readAllowed(record.density, PREVIEW_DENSITIES, 'density'),
+    state: readAllowed(record.state, PREVIEW_STATES, 'state'),
     parentOrigin: readPreviewOrigin(record.parentOrigin),
     variants:
       record.variants && typeof record.variants === 'object' && !Array.isArray(record.variants)
@@ -122,10 +126,16 @@ function readVariantsRecord(input: Record<string, unknown>): Record<string, stri
   return Object.keys(variants).length > 0 ? variants : undefined;
 }
 
-function readAllowed<T extends string>(value: unknown, allowed: T[]): T | undefined {
+function readAllowed<T extends string>(
+  value: unknown,
+  allowed: T[],
+  fieldName: string
+): T | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== 'string' || !allowed.includes(value as T)) {
-    throw new ComponentPreviewValidationError('Unsupported preview option value.');
+    throw new ComponentPreviewValidationError(
+      `${fieldName} must be one of: ${allowed.join(', ')}.`
+    );
   }
   return value as T;
 }
@@ -252,14 +262,18 @@ export function createPreviewFrameHtml(request: ComponentPreviewRequest): string
     <style>
       :root {
         color-scheme: light;
+        --preview-frame-background: #ffffff;
+        --preview-frame-foreground: #202124;
+        --preview-frame-error-border: #c7372f;
+        --preview-frame-error-foreground: #8f1f18;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #ffffff;
-        color: #202124;
+        background: var(--preview-frame-background);
+        color: var(--preview-frame-foreground);
       }
       :root[data-theme="dark"] {
         color-scheme: dark;
-        background: #18191c;
-        color: #f7f7f4;
+        --preview-frame-background: #18191c;
+        --preview-frame-foreground: #f7f7f4;
       }
       body {
         margin: 0;
@@ -274,15 +288,20 @@ export function createPreviewFrameHtml(request: ComponentPreviewRequest): string
       :root[data-density="compact"] #preview-root { --preview-padding: 16px; }
       :root[data-density="comfortable"] #preview-root { --preview-padding: 48px; }
       .preview-error {
-        border: 1px solid #c7372f;
+        border: 1px solid var(--preview-frame-error-border);
         border-radius: 8px;
-        color: #8f1f18;
+        color: var(--preview-frame-error-foreground);
         max-width: 680px;
         padding: 16px;
       }
       .preview-error pre {
         overflow: auto;
         white-space: pre-wrap;
+      }
+      [data-force-hover="true"] :is(button, a, [role="button"]) {
+        filter: brightness(0.96);
+        outline: 2px solid currentColor;
+        outline-offset: 2px;
       }
     </style>
   </head>
@@ -368,6 +387,7 @@ if (!Component) {
       React.createElement('div', {
         'data-preview-state': previewProps['data-preview-state'],
         'data-preview-label': previewProps['data-preview-label'],
+        'data-force-hover': previewProps['data-force-hover'],
         'data-preview-variants': JSON.stringify(previewProps.variants ?? {}),
       }, React.createElement(Component, previewProps))
     )
@@ -397,6 +417,7 @@ function createPreviewProps(request: ComponentPreviewRequest): Record<string, un
     open: state === 'open' || undefined,
     'aria-selected': state === 'selected' ? true : undefined,
     'data-state': state === 'open' ? 'open' : state === 'selected' ? 'selected' : undefined,
+    'data-force-hover': state === 'hover' ? true : undefined,
     'data-preview-state': state,
     'data-preview-label': previewLabel(request),
     variants: request.variants ?? {},

@@ -210,6 +210,16 @@ h1 {
 }
 
 .preview-workspace {
+  --preview-surface: #fbfbfc;
+  --preview-panel-border: #dfe3e8;
+  --preview-control-background: #ffffff;
+  --preview-control-border: #cfd5dd;
+  --preview-text: #202124;
+  --preview-muted-text: #4f5661;
+  --preview-subtle-text: #6f7680;
+  --preview-danger-background: #fff4f2;
+  --preview-danger-border: #f0b8b1;
+  --preview-danger-text: #8f1f18;
   gap: 18px;
 }
 
@@ -223,7 +233,7 @@ h1 {
 
 .preview-toolbar label,
 .preview-controls label {
-  color: #4f5661;
+  color: var(--preview-muted-text);
   display: grid;
   font-size: 13px;
   gap: 6px;
@@ -231,17 +241,17 @@ h1 {
 
 .preview-toolbar select,
 .preview-controls select {
-  background: #ffffff;
-  border: 1px solid #cfd5dd;
+  background: var(--preview-control-background);
+  border: 1px solid var(--preview-control-border);
   border-radius: 6px;
-  color: #202124;
+  color: var(--preview-text);
   min-width: 0;
   padding: 8px 10px;
 }
 
 .preview-frame-shell {
-  background: #fbfbfc;
-  border: 1px solid #dfe3e8;
+  background: var(--preview-surface);
+  border: 1px solid var(--preview-panel-border);
   border-radius: 8px;
   display: grid;
   gap: 8px;
@@ -258,13 +268,13 @@ h1 {
 }
 
 .preview-frame-header span {
-  color: #6f7680;
+  color: var(--preview-subtle-text);
   font-size: 13px;
 }
 
 .preview-frame {
-  background: #ffffff;
-  border: 1px solid #dfe3e8;
+  background: var(--preview-control-background);
+  border: 1px solid var(--preview-panel-border);
   border-radius: 6px;
 }
 
@@ -275,6 +285,12 @@ h1 {
 
 .preview-section h2 {
   font-size: 16px;
+  margin: 0;
+}
+
+.preview-note {
+  color: var(--preview-muted-text);
+  font-size: 13px;
   margin: 0;
 }
 
@@ -290,10 +306,10 @@ h1 {
 
 .preview-diagnostic,
 .preview-diagnostics {
-  background: #fff4f2;
-  border: 1px solid #f0b8b1;
+  background: var(--preview-danger-background);
+  border: 1px solid var(--preview-danger-border);
   border-radius: 6px;
-  color: #8f1f18;
+  color: var(--preview-danger-text);
   display: grid;
   gap: 4px;
   padding: 10px;

@@ -145,9 +145,3 @@ export function createPreviewBrowserRouter(): Router {
 
   return router;
 }
-
-const router = Router();
-router.use(createPreviewApiRouter());
-router.use(createPreviewBrowserRouter());
-
-export default router;
