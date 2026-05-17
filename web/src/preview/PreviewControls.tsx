@@ -19,20 +19,6 @@ export function PreviewControls({ manifest, selection, onChange }: PreviewContro
   return (
     <div className="preview-controls">
       <label>
-        Export
-        <select
-          onChange={(event) => onChange({ ...selection, exportName: event.target.value })}
-          value={selection.exportName}
-        >
-          {manifest.component.exports.map((exportName) => (
-            <option key={exportName} value={exportName}>
-              {exportName}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label>
         Viewport
         <select
           onChange={(event) =>

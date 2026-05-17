@@ -73,7 +73,6 @@ export function previewFrameUrl(selection: PreviewSelection, baseFrameUrl: strin
   const url = new URL(baseFrameUrl, window.location.href);
   const params = url.searchParams;
   params.set('componentPath', selection.componentPath);
-  params.set('exportName', selection.exportName);
   params.set('parentOrigin', window.location.origin);
   params.set('viewport', selection.viewport);
   params.set('theme', selection.theme);

@@ -39,8 +39,6 @@ export const PREVIEW_VIEWPORTS: Record<PreviewViewport, { width: number; height:
 export const PREVIEW_THEMES: PreviewTheme[] = ['light', 'dark', 'system'];
 export const PREVIEW_DENSITIES: PreviewDensity[] = ['comfortable', 'default', 'compact'];
 
-const JS_IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const JS_IDENTIFIER_PATH = /^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$/;
 const SAFE_COMPONENT_IMPORT_PATH = /^[A-Za-z0-9._/-]+$/;
 const PREVIEW_VARIANT_TOKEN = /^[A-Za-z0-9_-]+$/;
 const SAFE_LOCAL_ORIGIN = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d{1,5})?$/;
@@ -93,12 +91,7 @@ function readExportName(value: unknown): string | undefined {
   const trimmed = value.trim();
   if (trimmed.length === 0) return undefined;
   if (trimmed === 'default') return trimmed;
-  if (!JS_IDENTIFIER.test(trimmed) && !JS_IDENTIFIER_PATH.test(trimmed)) {
-    throw new ComponentPreviewValidationError(
-      'exportName must be "default" or a valid JavaScript export identifier path.'
-    );
-  }
-  return trimmed;
+  throw new ComponentPreviewValidationError('exportName must be "default".');
 }
 
 function readVariantQueryEntries(
@@ -204,7 +197,7 @@ export async function createComponentPreviewManifest(
     densities: PREVIEW_DENSITIES,
     frameUrl: createPreviewFrameUrl({
       ...request,
-      exportName: defaultExport,
+      exportName: defaultExport === 'default' ? defaultExport : undefined,
     }),
     diagnostics: variantDetail.diagnostics.map((diagnostic) => ({
       severity: diagnostic.severity,
@@ -234,7 +227,6 @@ export function createPreviewFrameUrl(request: ComponentPreviewRequest): string 
 function buildPreviewParams(request: ComponentPreviewRequest): URLSearchParams {
   const params = new URLSearchParams();
   params.set('componentPath', request.componentPath);
-  if (request.exportName) params.set('exportName', request.exportName);
   if (request.parentOrigin) params.set('parentOrigin', request.parentOrigin);
   params.set('viewport', request.viewport ?? 'desktop');
   params.set('theme', request.theme ?? 'light');
@@ -310,7 +302,8 @@ export async function createPreviewRuntimeModule(
   const componentModulePath = `/studio/preview/component/${encodeURIComponent(
     request.componentPath
   )}`;
-  const exportName = request.exportName ?? 'default';
+  const detail = await getComponentLibraryDetail(cwd, request.componentPath);
+  const exportName = chooseDefaultExport(detail.exports);
   const parentOrigin = request.parentOrigin ?? getStudioOrigin();
   const previewProps = createPreviewProps(request);
 

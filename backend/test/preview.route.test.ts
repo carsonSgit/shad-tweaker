@@ -101,6 +101,8 @@ export function ButtonIcon() {
       res.body.manifest.frameUrl,
       /^http:\/\/127\.0\.0\.1:\d+\/studio\/preview\/frame\?/
     );
+    assert.doesNotMatch(res.body.manifest.frameUrl, /exportName=Button/);
+    assert.doesNotMatch(res.body.manifest.frameUrl, /exportName=/);
     assert.ok(Array.isArray(res.body.manifest.diagnostics));
   });
 
@@ -185,7 +187,6 @@ export function ButtonIcon() {
 
     const runtimeRes = await request(app).get('/studio/preview/runtime').query({
       componentPath: 'components/ui/card.tsx',
-      exportName: 'Card',
       'variant.tone': ' muted ',
       'variant.bad.key': 'value',
       'variant.__proto__': 'polluted',
@@ -322,7 +323,6 @@ export function ButtonIcon() {
 
     const res = await request(app).get('/studio/preview/runtime').query({
       componentPath: 'components/ui/escaped.tsx',
-      exportName: 'Escaped',
     });
 
     assert.equal(res.status, 400);
@@ -349,7 +349,7 @@ export function ButtonIcon() {
 
     const res = await request(app)
       .get('/studio/preview/frame')
-      .query({ componentPath: 'components/ui/badge.tsx', exportName: 'Badge' });
+      .query({ componentPath: 'components/ui/badge.tsx' });
 
     assert.equal(res.status, 200);
     assert.match(res.headers['content-type'], /html/);
@@ -368,7 +368,6 @@ export function ButtonIcon() {
 
     const res = await request(app).get('/studio/preview/runtime').query({
       componentPath: 'components/ui/card.tsx',
-      exportName: 'Card',
       state: 'selected',
       'variant.tone': 'muted',
     });
