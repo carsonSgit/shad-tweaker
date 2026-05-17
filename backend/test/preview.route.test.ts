@@ -162,4 +162,21 @@ export function ButtonIcon() {
     assert.match(res.text, /"aria-selected": true/);
     assert.match(res.text, /"tone": "muted"/);
   });
+
+  it('returns a component import module for a safe local component path', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/switch.tsx'),
+      `export function Switch() { return <button>Switch</button>; }`
+    );
+
+    const res = await request(app).get(
+      `/studio/preview/component/${encodeURIComponent('components/ui/switch.tsx')}`
+    );
+
+    assert.equal(res.status, 200);
+    assert.match(res.headers['content-type'], /javascript/);
+    assert.match(res.text, /export \* from "\/components\/ui\/switch.tsx"/);
+    assert.match(res.text, /export \{ default \} from "\/components\/ui\/switch.tsx"/);
+  });
 });

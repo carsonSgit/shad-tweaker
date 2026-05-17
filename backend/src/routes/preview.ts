@@ -2,6 +2,7 @@ import { type Request, type Response, Router } from 'express';
 import {
   ComponentPreviewNotFoundError,
   ComponentPreviewValidationError,
+  createPreviewComponentImportModule,
   createPreviewFrameHtml,
   createPreviewRuntimeModule,
   createComponentPreviewManifest,
@@ -71,6 +72,25 @@ router.get('/runtime', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Failed to create component preview runtime', error);
     const response = previewErrorResponse(error, 'Failed to create component preview runtime');
+    res.status(response.status).json({
+      success: false,
+      error: {
+        message: response.message,
+        code: response.code,
+      },
+    });
+  }
+});
+
+router.get('/component/:componentPath', async (req: Request, res: Response) => {
+  try {
+    res
+      .status(200)
+      .type('application/javascript')
+      .send(createPreviewComponentImportModule(req.params.componentPath));
+  } catch (error) {
+    logger.error('Failed to create component preview import module', error);
+    const response = previewErrorResponse(error, 'Failed to create component preview import module');
     res.status(response.status).json({
       success: false,
       error: {
