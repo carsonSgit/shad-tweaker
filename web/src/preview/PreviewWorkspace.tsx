@@ -27,7 +27,7 @@ export function PreviewWorkspace({ selectedComponents, summary }: PreviewWorkspa
   const [selection, setSelection] = useState<PreviewSelection | null>(
     componentPath ? createInitialSelection(componentPath) : null
   );
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(componentPath));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

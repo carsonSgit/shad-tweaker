@@ -5,12 +5,16 @@ import { after, afterEach, describe, it } from 'node:test';
 import express from 'express';
 import fs from 'fs-extra';
 import request from 'supertest';
-import previewRouter from '../src/routes/preview.js';
+import {
+  createPreviewApiLimiter,
+  createPreviewApiRouter,
+  createPreviewBrowserRouter,
+} from '../src/routes/preview.js';
 
 const app = express();
 app.use(express.json());
-app.use('/api/studio/preview', previewRouter);
-app.use('/studio/preview', previewRouter);
+app.use('/api/studio/preview', createPreviewApiRouter());
+app.use('/studio/preview', createPreviewBrowserRouter());
 
 const tempRoots: string[] = [];
 const testWorkspaceBase = path.join(
@@ -93,19 +97,28 @@ export function ButtonIcon() {
       'selected',
     ]);
     assert.equal(res.body.manifest.viewports.mobile.width, 390);
-    assert.match(res.body.manifest.frameUrl, /^\/studio\/preview\/frame\?/);
+    assert.match(
+      res.body.manifest.frameUrl,
+      /^http:\/\/127\.0\.0\.1:\d+\/studio\/preview\/frame\?/
+    );
     assert.ok(Array.isArray(res.body.manifest.diagnostics));
   });
 
   it('rejects unsafe preview component paths', async () => {
     await createTempRoot();
 
-    const res = await request(app)
-      .post('/api/studio/preview/manifest')
-      .send({ componentPath: '../secret.tsx' });
+    for (const componentPath of [
+      '../secret.tsx',
+      '/tmp/secret.tsx',
+      'components/ui/card.ts',
+      'components/ui/card<script>.tsx',
+      'components/ui/card.tsx\0.js',
+    ]) {
+      const res = await request(app).post('/api/studio/preview/manifest').send({ componentPath });
 
-    assert.equal(res.status, 400);
-    assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+      assert.equal(res.status, 400);
+      assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+    }
   });
 
   it('rejects unsafe preview export names for manifests', async () => {
@@ -138,6 +151,52 @@ export function ButtonIcon() {
 
     assert.equal(res.status, 400);
     assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+  });
+
+  it('sanitizes preview variants from request bodies and query strings', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/card.tsx'),
+      `export function Card() { return <section>Card</section>; }`
+    );
+
+    const manifestRes = await request(app)
+      .post('/api/studio/preview/manifest')
+      .send({
+        componentPath: 'components/ui/card.tsx',
+        variants: Object.fromEntries([
+          [' tone ', ' muted '],
+          ['__proto__', 'polluted'],
+          ['constructor', 'polluted'],
+          ['prototype', 'polluted'],
+          ['bad.key', 'value'],
+          ['size', 'lg<script>'],
+          ['empty', ''],
+        ]),
+      });
+
+    assert.equal(manifestRes.status, 200);
+    assert.match(manifestRes.body.manifest.frameUrl, /variant\.tone=muted/);
+    assert.doesNotMatch(manifestRes.body.manifest.frameUrl, /__proto__/);
+    assert.doesNotMatch(manifestRes.body.manifest.frameUrl, /constructor/);
+    assert.doesNotMatch(manifestRes.body.manifest.frameUrl, /prototype/);
+    assert.doesNotMatch(manifestRes.body.manifest.frameUrl, /bad\.key/);
+    assert.doesNotMatch(manifestRes.body.manifest.frameUrl, /lg%3Cscript/);
+
+    const runtimeRes = await request(app).get('/studio/preview/runtime').query({
+      componentPath: 'components/ui/card.tsx',
+      exportName: 'Card',
+      'variant.tone': ' muted ',
+      'variant.bad.key': 'value',
+      'variant.__proto__': 'polluted',
+      'variant.size': 'lg<script>',
+    });
+
+    assert.equal(runtimeRes.status, 200);
+    assert.match(runtimeRes.text, /"tone": "muted"/);
+    assert.doesNotMatch(runtimeRes.text, /__proto__/);
+    assert.doesNotMatch(runtimeRes.text, /bad\.key/);
+    assert.doesNotMatch(runtimeRes.text, /lg<script>/);
   });
 
   it('rejects traversal-like preview component paths for runtime modules', async () => {
@@ -177,7 +236,52 @@ export function ButtonIcon() {
 
       assert.equal(res.status, 400);
       assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+      assert.equal(res.body.error.message, 'Unsupported preview option value.');
     }
+  });
+
+  it('returns a validation error when a component has no previewable exports', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(path.join(root, 'components/ui/empty.tsx'), `const label = 'Empty';`);
+
+    const res = await request(app)
+      .post('/api/studio/preview/manifest')
+      .send({ componentPath: 'components/ui/empty.tsx' });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+    assert.equal(res.body.error.message, 'Component has no previewable exports.');
+  });
+
+  it('keeps preview API and browser routes partitioned', async () => {
+    await createTempRoot();
+
+    const apiFrame = await request(app)
+      .get('/api/studio/preview/frame')
+      .query({ componentPath: 'components/ui/card.tsx' });
+    const browserManifest = await request(app)
+      .post('/studio/preview/manifest')
+      .send({ componentPath: 'components/ui/card.tsx' });
+
+    assert.equal(apiFrame.status, 404);
+    assert.equal(browserManifest.status, 404);
+  });
+
+  it('can rate limit preview API routes', async () => {
+    const limitedApp = express();
+    limitedApp.use(express.json());
+    limitedApp.use('/api/studio/preview', createPreviewApiLimiter(1), createPreviewApiRouter());
+    await createTempRoot();
+
+    await request(limitedApp)
+      .post('/api/studio/preview/manifest')
+      .send({ componentPath: 'components/ui/missing.tsx' });
+    const res = await request(limitedApp)
+      .post('/api/studio/preview/manifest')
+      .send({ componentPath: 'components/ui/missing.tsx' });
+
+    assert.equal(res.status, 429);
+    assert.equal(res.body.error.code, 'RATE_LIMIT_EXCEEDED');
   });
 
   it('rejects preview manifest component paths that resolve through symlinks outside the workspace', async () => {
@@ -273,9 +377,9 @@ export function ButtonIcon() {
     assert.match(res.headers['content-type'], /javascript/);
     assert.match(res.text, /from '\/studio\/preview\/component\//);
     assert.match(res.text, /const exportName = "Card"/);
-    assert.match(res.text, /window\.location\.origin/);
+    assert.match(res.text, /const parentOrigin = "http:\/\/127\.0\.0\.1:\d+"/);
     assert.equal(res.text.match(/postMessage\(/g)?.length, 2);
-    assert.equal(res.text.match(/postMessage\([\s\S]*?window\.location\.origin\)/g)?.length, 2);
+    assert.equal(res.text.match(/postMessage\([\s\S]*?parentOrigin\)/g)?.length, 2);
     assert.doesNotMatch(res.text, /postMessage\([^;]+,\s*'\*'\)/s);
     assert.match(res.text, /data-preview-state/);
     assert.match(res.text, /data-preview-label/);

@@ -80,8 +80,7 @@ function shouldHandleWithVite(requestPath: string): boolean {
   return (
     requestPath.startsWith('/components/') ||
     requestPath.startsWith('/src/') ||
-    // Vite rewrites dependency imports to /node_modules/ URLs in local preview mode.
-    requestPath.startsWith('/node_modules/') ||
+    requestPath.startsWith('/node_modules/.vite/deps/') ||
     requestPath.startsWith('/@') ||
     requestPath === '/@vite/client'
   );

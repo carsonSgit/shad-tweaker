@@ -69,10 +69,12 @@ export function variantGridSelections(axes: VariantAxis[]): Array<Record<string,
   );
 }
 
-export function previewFrameUrl(selection: PreviewSelection): string {
-  const params = new URLSearchParams();
+export function previewFrameUrl(selection: PreviewSelection, baseFrameUrl: string): string {
+  const url = new URL(baseFrameUrl, window.location.href);
+  const params = url.searchParams;
   params.set('componentPath', selection.componentPath);
   params.set('exportName', selection.exportName);
+  params.set('parentOrigin', window.location.origin);
   params.set('viewport', selection.viewport);
   params.set('theme', selection.theme);
   params.set('density', selection.density);
@@ -80,7 +82,8 @@ export function previewFrameUrl(selection: PreviewSelection): string {
   for (const [axis, value] of Object.entries(selection.variants)) {
     params.set(`variant.${axis}`, value);
   }
-  return `/studio/preview/frame?${params.toString()}`;
+  url.search = params.toString();
+  return url.toString();
 }
 
 export function describeVariants(variants: Record<string, string>): string {

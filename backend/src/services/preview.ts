@@ -41,6 +41,10 @@ export const PREVIEW_DENSITIES: PreviewDensity[] = ['comfortable', 'default', 'c
 
 const JS_IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const JS_IDENTIFIER_PATH = /^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$/;
+const SAFE_COMPONENT_IMPORT_PATH = /^[A-Za-z0-9._/-]+$/;
+const PREVIEW_VARIANT_TOKEN = /^[A-Za-z0-9_-]+$/;
+const SAFE_LOCAL_ORIGIN = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d{1,5})?$/;
+const RESERVED_VARIANT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 export function normalizePreviewRequest(input: unknown): ComponentPreviewRequest {
   if (!input || typeof input !== 'object') {
@@ -57,6 +61,7 @@ export function normalizePreviewRequest(input: unknown): ComponentPreviewRequest
     componentPath.includes('\0') ||
     path.isAbsolute(componentPath) ||
     !isSafeProjectRelativePath(componentPath) ||
+    !SAFE_COMPONENT_IMPORT_PATH.test(componentPath) ||
     !['.tsx', '.jsx'].includes(path.extname(componentPath))
   ) {
     throw new ComponentPreviewValidationError(
@@ -71,14 +76,10 @@ export function normalizePreviewRequest(input: unknown): ComponentPreviewRequest
     theme: readAllowed(record.theme, PREVIEW_THEMES),
     density: readAllowed(record.density, PREVIEW_DENSITIES),
     state: readAllowed(record.state, PREVIEW_STATES),
+    parentOrigin: readPreviewOrigin(record.parentOrigin),
     variants:
       record.variants && typeof record.variants === 'object' && !Array.isArray(record.variants)
-        ? Object.fromEntries(
-            Object.entries(record.variants).filter(
-              (entry): entry is [string, string] =>
-                typeof entry[0] === 'string' && typeof entry[1] === 'string'
-            )
-          )
+        ? readVariantsRecord(record.variants as Record<string, unknown>)
         : readVariantQueryEntries(record),
   };
 }
@@ -103,11 +104,27 @@ function readExportName(value: unknown): string | undefined {
 function readVariantQueryEntries(
   record: Record<string, unknown>
 ): Record<string, string> | undefined {
-  const variants = Object.fromEntries(
+  const variantEntries = Object.fromEntries(
     Object.entries(record)
       .filter(([key, value]) => key.startsWith('variant.') && typeof value === 'string')
-      .map(([key, value]) => [key.slice('variant.'.length), value as string])
-      .filter(([key]) => key.length > 0)
+      .map(([key, value]) => [key.slice('variant.'.length), value])
+  );
+  return readVariantsRecord(variantEntries);
+}
+
+function readVariantsRecord(input: Record<string, unknown>): Record<string, string> | undefined {
+  const variants = Object.fromEntries(
+    Object.entries(input)
+      .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+      .map(([key, value]) => [key.trim(), value.trim()])
+      .filter(
+        ([key, value]) =>
+          key.length > 0 &&
+          value.length > 0 &&
+          !RESERVED_VARIANT_KEYS.has(key) &&
+          PREVIEW_VARIANT_TOKEN.test(key) &&
+          PREVIEW_VARIANT_TOKEN.test(value)
+      )
   );
   return Object.keys(variants).length > 0 ? variants : undefined;
 }
@@ -115,9 +132,21 @@ function readVariantQueryEntries(
 function readAllowed<T extends string>(value: unknown, allowed: T[]): T | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== 'string' || !allowed.includes(value as T)) {
-    throw new ComponentPreviewValidationError(`Unsupported preview option: ${String(value)}.`);
+    throw new ComponentPreviewValidationError('Unsupported preview option value.');
   }
   return value as T;
+}
+
+function readPreviewOrigin(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') {
+    throw new ComponentPreviewValidationError('parentOrigin must be a local HTTP origin.');
+  }
+  const trimmed = value.trim();
+  if (!SAFE_LOCAL_ORIGIN.test(trimmed)) {
+    throw new ComponentPreviewValidationError('parentOrigin must be a local HTTP origin.');
+  }
+  return trimmed;
 }
 
 async function resolvePreviewComponentPath(cwd: string, componentPath: string): Promise<string> {
@@ -192,13 +221,21 @@ function chooseDefaultExport(exports: string[], requested?: string): string {
     }
     return requested;
   }
-  return exports[0] ?? 'default';
+  if (!exports[0]) {
+    throw new ComponentPreviewValidationError('Component has no previewable exports.');
+  }
+  return exports[0];
 }
 
 export function createPreviewFrameUrl(request: ComponentPreviewRequest): string {
+  return `${getPreviewOrigin()}/studio/preview/frame?${buildPreviewParams(request).toString()}`;
+}
+
+function buildPreviewParams(request: ComponentPreviewRequest): URLSearchParams {
   const params = new URLSearchParams();
   params.set('componentPath', request.componentPath);
   if (request.exportName) params.set('exportName', request.exportName);
+  if (request.parentOrigin) params.set('parentOrigin', request.parentOrigin);
   params.set('viewport', request.viewport ?? 'desktop');
   params.set('theme', request.theme ?? 'light');
   params.set('density', request.density ?? 'default');
@@ -206,20 +243,11 @@ export function createPreviewFrameUrl(request: ComponentPreviewRequest): string 
   for (const [key, value] of Object.entries(request.variants ?? {})) {
     params.append(`variant.${key}`, value);
   }
-  return `/studio/preview/frame?${params.toString()}`;
+  return params;
 }
 
 export function createPreviewFrameHtml(request: ComponentPreviewRequest): string {
-  const params = new URLSearchParams();
-  params.set('componentPath', request.componentPath);
-  if (request.exportName) params.set('exportName', request.exportName);
-  params.set('viewport', request.viewport ?? 'desktop');
-  params.set('theme', request.theme ?? 'light');
-  params.set('density', request.density ?? 'default');
-  params.set('state', request.state ?? 'default');
-  for (const [key, value] of Object.entries(request.variants ?? {})) {
-    params.append(`variant.${key}`, value);
-  }
+  const params = buildPreviewParams(request);
 
   const theme = escapeAttribute(request.theme ?? 'light');
   const density = escapeAttribute(request.density ?? 'default');
@@ -283,6 +311,7 @@ export async function createPreviewRuntimeModule(
     request.componentPath
   )}`;
   const exportName = request.exportName ?? 'default';
+  const parentOrigin = request.parentOrigin ?? getStudioOrigin();
   const previewProps = createPreviewProps(request);
 
   return `import React from 'react';
@@ -290,6 +319,7 @@ import { createRoot } from 'react-dom/client';
 import * as ComponentModule from '${componentModulePath}';
 
 const exportName = ${JSON.stringify(exportName)};
+const parentOrigin = ${JSON.stringify(parentOrigin)};
 const previewProps = ${JSON.stringify(previewProps, null, 2)};
 const rootElement = document.getElementById('preview-root');
 
@@ -306,7 +336,7 @@ class PreviewErrorBoundary extends React.Component {
       type: 'shadcn-tweaker-preview-error',
       code: 'PREVIEW_RENDER_ERROR',
       message: error instanceof Error ? error.message : String(error),
-    }, window.location.origin);
+    }, parentOrigin);
   }
   render() {
     if (this.state.error) {
@@ -328,7 +358,7 @@ function renderPreviewError(message, code = 'PREVIEW_RUNTIME_ERROR') {
   wrapper.innerHTML = '<strong>Preview unavailable</strong><pre></pre>';
   wrapper.querySelector('pre').textContent = message;
   rootElement.append(wrapper);
-  window.parent?.postMessage({ type: 'shadcn-tweaker-preview-error', code, message }, window.location.origin);
+  window.parent?.postMessage({ type: 'shadcn-tweaker-preview-error', code, message }, parentOrigin);
 }
 
 if (!rootElement) {
@@ -392,4 +422,28 @@ function escapeAttribute(value: string): string {
     .replace(/"/g, '&quot;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+function readPort(value: string | undefined): number | undefined {
+  if (!value || !/^\d+$/.test(value)) return undefined;
+  const port = Number(value);
+  return port > 0 && port <= 65535 ? port : undefined;
+}
+
+export function getPreviewPort(mainPort = process.env.PORT): number {
+  return readPort(process.env.PREVIEW_PORT) ?? (readPort(mainPort) ?? 3000) + 1;
+}
+
+export function getPreviewOrigin(mainPort = process.env.PORT): string {
+  if (process.env.PREVIEW_ORIGIN && SAFE_LOCAL_ORIGIN.test(process.env.PREVIEW_ORIGIN)) {
+    return process.env.PREVIEW_ORIGIN;
+  }
+  return `http://127.0.0.1:${getPreviewPort(mainPort)}`;
+}
+
+export function getStudioOrigin(mainPort = process.env.PORT): string {
+  if (process.env.STUDIO_ORIGIN && SAFE_LOCAL_ORIGIN.test(process.env.STUDIO_ORIGIN)) {
+    return process.env.STUDIO_ORIGIN;
+  }
+  return `http://127.0.0.1:${readPort(mainPort) ?? 3000}`;
 }

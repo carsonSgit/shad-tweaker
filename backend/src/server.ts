@@ -9,13 +9,19 @@ import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
 import importsRouter from './routes/imports.js';
 import parserRouter from './routes/parser.js';
-import previewRouter from './routes/preview.js';
+import {
+  createPreviewApiLimiter,
+  createPreviewApiRouter,
+  createPreviewBrowserLimiter,
+  createPreviewBrowserRouter,
+} from './routes/preview.js';
 import primitiveStartersRouter from './routes/primitiveStarters.js';
 import studioRouter from './routes/studio.js';
 import templatesRouter from './routes/templates.js';
 import tokensRouter from './routes/tokens.js';
 import variantsRouter from './routes/variants.js';
 import workspaceRouter from './routes/workspace.js';
+import { getPreviewPort } from './services/preview.js';
 import { previewViteMiddleware } from './services/previewVite.js';
 import { initializeDefaultTemplates } from './services/template.js';
 import { initializeWorkspace } from './services/workspace.js';
@@ -46,6 +52,8 @@ export function createStudioAssetLimiter(
 }
 
 const studioAssetLimiter = createStudioAssetLimiter();
+const previewApiLimiter = createPreviewApiLimiter();
+const previewBrowserLimiter = createPreviewBrowserLimiter();
 
 // CORS configuration - restrict to local development
 app.use(
@@ -88,11 +96,7 @@ app.use('/api/tokens', tokensRouter);
 app.use('/api/variants', variantsRouter);
 app.use('/api/studio', studioRouter);
 // Preview exposes JSON APIs under /api and browser-loaded frame/modules under /studio.
-app.use('/api/studio/preview', previewRouter);
-app.use('/studio/preview', previewRouter);
-app.use((req, res, next) => {
-  previewViteMiddleware(req, res, next).catch(next);
-});
+app.use('/api/studio/preview', previewApiLimiter, createPreviewApiRouter());
 
 // Serve built browser studio assets first, then fall back to index.html for SPA routes.
 app.use('/studio', studioAssetLimiter);
@@ -121,6 +125,37 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
     },
   });
 });
+
+export function createPreviewApp() {
+  const previewApp = express();
+  previewApp.use(express.urlencoded({ extended: true, limit: '1mb' }));
+  previewApp.use('/studio/preview', previewBrowserLimiter, createPreviewBrowserRouter());
+  previewApp.use((req, res, next) => {
+    previewViteMiddleware(req, res, next).catch(next);
+  });
+  previewApp.use(
+    (err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      logger.error('Unhandled preview server error', err);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Internal preview server error',
+          code: 'INTERNAL_PREVIEW_ERROR',
+        },
+      });
+    }
+  );
+  previewApp.use((_req, res) => {
+    res.status(404).json({
+      success: false,
+      error: {
+        message: 'Preview endpoint not found',
+        code: 'NOT_FOUND',
+      },
+    });
+  });
+  return previewApp;
+}
 
 app.use((_req, res) => {
   res.status(404).json({
@@ -192,6 +227,11 @@ async function start() {
       logger.info('  GET  /api/workspace/registry-items/:sourceId/:itemName - Fetch registry item');
       logger.info('  GET  /api/studio/summary - Get local studio summary');
       logger.info('  GET  /studio - Open browser studio shell');
+    });
+    createPreviewApp().listen(getPreviewPort(String(port)), () => {
+      logger.info(
+        `Shadcn Tweaker Preview running on http://127.0.0.1:${getPreviewPort(String(port))}`
+      );
     });
   } catch (error) {
     logger.error('Failed to start server', error);

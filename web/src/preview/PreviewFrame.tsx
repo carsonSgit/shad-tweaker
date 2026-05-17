@@ -11,7 +11,7 @@ interface PreviewFrameProps {
 export function PreviewFrame({ label, manifest, selection }: PreviewFrameProps) {
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const viewport = manifest.viewports[selection.viewport];
-  const frameUrl = previewFrameUrl(selection);
+  const frameUrl = previewFrameUrl(selection, manifest.frameUrl);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export function PreviewFrame({ label, manifest, selection }: PreviewFrameProps) 
         className="preview-frame"
         onLoad={() => setRuntimeError(null)}
         ref={iframeRef}
-        sandbox="allow-scripts allow-same-origin"
+        sandbox="allow-scripts"
         src={frameUrl}
         style={{
           height: viewport.height,

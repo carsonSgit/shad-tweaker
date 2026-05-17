@@ -91,6 +91,7 @@ export interface ComponentPreviewRequest {
   theme?: PreviewTheme;
   density?: PreviewDensity;
   state?: PreviewState;
+  parentOrigin?: string;
   variants?: Record<string, string>;
 }
 

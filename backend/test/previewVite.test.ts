@@ -113,6 +113,58 @@ describe('preview Vite middleware', () => {
 
     assert.equal(attempts, 2);
   });
+
+  it('does not serve node_modules paths through the preview Vite middleware', async () => {
+    const root = await createTempRoot();
+    let createServerCalls = 0;
+    let nextCalls = 0;
+    const middleware = createPreviewViteMiddleware({
+      createServer: async () => {
+        createServerCalls += 1;
+        return createFakeViteServer();
+      },
+      getWorkingDirectory: () => root,
+      reactPlugin: createFakeReactPlugin,
+    });
+
+    await middleware(createRequest('/node_modules/react/index.js'), createResponse(), () => {
+      nextCalls += 1;
+    });
+
+    assert.equal(createServerCalls, 0);
+    assert.equal(nextCalls, 1);
+  });
+
+  it('serves preview source and Vite internal paths through Vite', async () => {
+    const root = await createTempRoot();
+    const handledPaths: string[] = [];
+    const middleware = createPreviewViteMiddleware({
+      createServer: async () => ({
+        closeCalls: 0,
+        middlewares: (req, _res, next) => {
+          handledPaths.push(req.path);
+          if (typeof next === 'function') next();
+        },
+        async close() {
+          this.closeCalls += 1;
+        },
+      }),
+      getWorkingDirectory: () => root,
+      reactPlugin: createFakeReactPlugin,
+    });
+
+    await middleware(createRequest('/components/ui/button.tsx'), createResponse(), noop);
+    await middleware(createRequest('/src/lib/utils.ts'), createResponse(), noop);
+    await middleware(createRequest('/node_modules/.vite/deps/react.js'), createResponse(), noop);
+    await middleware(createRequest('/@vite/client'), createResponse(), noop);
+
+    assert.deepEqual(handledPaths, [
+      '/components/ui/button.tsx',
+      '/src/lib/utils.ts',
+      '/node_modules/.vite/deps/react.js',
+      '/@vite/client',
+    ]);
+  });
 });
 
 function createFakeViteServer(): FakeViteServer {
