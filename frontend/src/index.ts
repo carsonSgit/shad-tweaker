@@ -1,8 +1,15 @@
 export {
+  getComponentPreviewManifest,
   getStudioSummary,
   updateWorkspaceConfig,
 } from './api/client.js';
 export type {
+  ComponentPreviewManifest,
+  ComponentPreviewRequest,
+  PreviewDensity,
+  PreviewState,
+  PreviewTheme,
+  PreviewViewport,
   StudioSummary,
   WorkspaceConfig,
 } from './types/index.js';

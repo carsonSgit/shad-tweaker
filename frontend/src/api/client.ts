@@ -7,6 +7,8 @@ import type {
   ComponentLibraryCompareResult,
   ComponentLibraryDetail,
   ComponentLibraryDuplicate,
+  ComponentPreviewManifest,
+  ComponentPreviewRequest,
   ComponentLibraryInventoryItem,
   ComponentTokenOverride,
   DesignTokenMap,
@@ -440,6 +442,15 @@ export async function getVariantComponent(
 // Studio
 export async function getStudioSummary(): Promise<ApiResponse<StudioSummary>> {
   return request('/api/studio/summary');
+}
+
+export async function getComponentPreviewManifest(
+  input: ComponentPreviewRequest
+): Promise<ApiResponse<{ manifest: ComponentPreviewManifest }>> {
+  return request('/api/studio/preview/manifest', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 // Health check
