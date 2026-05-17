@@ -1,0 +1,120 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import { after, afterEach, describe, it } from 'node:test';
+import express from 'express';
+import fs from 'fs-extra';
+import request from 'supertest';
+import previewRouter from '../src/routes/preview.js';
+
+const app = express();
+app.use(express.json());
+app.use('/api/studio/preview', previewRouter);
+
+const tempRoots: string[] = [];
+const testWorkspaceBase = path.join(
+  process.cwd(),
+  '.shadcn-tweaker-test-workspaces',
+  'preview-routes'
+);
+
+async function createTempRoot(): Promise<string> {
+  const root = path.join(testWorkspaceBase, randomUUID());
+  tempRoots.push(root);
+  await fs.ensureDir(path.join(root, 'components/ui'));
+  process.env.SHADCN_TWEAKER_CWD = root;
+  return root;
+}
+
+afterEach(async () => {
+  await Promise.all(tempRoots.splice(0).map((root) => fs.remove(root)));
+  delete process.env.SHADCN_TWEAKER_CWD;
+});
+
+after(async () => {
+  await fs.remove(testWorkspaceBase);
+});
+
+describe('studio preview routes', () => {
+  it('returns a manifest with exports, variants, controls, and frame URL', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/button.tsx'),
+      `import { cva } from 'class-variance-authority';
+
+const buttonVariants = cva('inline-flex', {
+  variants: {
+    variant: {
+      default: 'bg-primary text-primary-foreground',
+      ghost: 'bg-transparent',
+    },
+    size: {
+      sm: 'h-8 px-3',
+      lg: 'h-10 px-4',
+    },
+  },
+  defaultVariants: {
+    variant: 'default',
+    size: 'sm',
+  },
+});
+
+export function Button(props: { children?: string }) {
+  return <button className={buttonVariants()}>{props.children ?? 'Button'}</button>;
+}
+
+export function ButtonIcon() {
+  return <Button>Icon</Button>;
+}`
+    );
+
+    const res = await request(app)
+      .post('/api/studio/preview/manifest')
+      .send({ componentPath: 'components/ui/button.tsx' });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.manifest.component.name, 'button');
+    assert.equal(res.body.manifest.component.path, 'components/ui/button.tsx');
+    assert.deepEqual(res.body.manifest.component.exports, ['Button', 'ButtonIcon']);
+    assert.equal(res.body.manifest.component.defaultExport, 'Button');
+    assert.equal(res.body.manifest.variants.length, 1);
+    assert.deepEqual(res.body.manifest.variants[0].axes.map((axis: { name: string }) => axis.name), [
+      'variant',
+      'size',
+    ]);
+    assert.deepEqual(res.body.manifest.states, [
+      'default',
+      'hover',
+      'focus',
+      'disabled',
+      'loading',
+      'open',
+      'selected',
+    ]);
+    assert.equal(res.body.manifest.viewports.mobile.width, 390);
+    assert.match(res.body.manifest.frameUrl, /^\/studio\/preview\/frame\?/);
+    assert.deepEqual(res.body.manifest.diagnostics, []);
+  });
+
+  it('rejects unsafe preview component paths', async () => {
+    await createTempRoot();
+
+    const res = await request(app)
+      .post('/api/studio/preview/manifest')
+      .send({ componentPath: '../secret.tsx' });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+  });
+
+  it('returns 404 for missing preview components', async () => {
+    await createTempRoot();
+
+    const res = await request(app)
+      .post('/api/studio/preview/manifest')
+      .send({ componentPath: 'components/ui/missing.tsx' });
+
+    assert.equal(res.status, 404);
+    assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_NOT_FOUND');
+  });
+});
