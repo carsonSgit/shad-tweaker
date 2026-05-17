@@ -175,7 +175,7 @@ export function ButtonIcon() {
     assert.equal(res.status, 200);
     assert.match(res.headers['content-type'], /javascript/);
     assert.match(res.text, /export \* from "\/components\/ui\/switch.tsx"/);
-    assert.match(res.text, /export \{ default \} from "\/components\/ui\/switch.tsx"/);
+    assert.match(res.text, /export default PreviewModule.default/);
   });
 
   it('surfaces parser diagnostics in the preview manifest', async () => {

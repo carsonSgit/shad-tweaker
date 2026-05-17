@@ -321,8 +321,10 @@ if (!Component) {
 
 export function createPreviewComponentImportModule(componentPath: string): string {
   const normalized = normalizePreviewRequest({ componentPath });
-  return `export * from ${JSON.stringify(`/${normalized.componentPath}`)};
-export { default } from ${JSON.stringify(`/${normalized.componentPath}`)};
+  const sourcePath = JSON.stringify(`/${normalized.componentPath}`);
+  return `import * as PreviewModule from ${sourcePath};
+export * from ${sourcePath};
+export default PreviewModule.default;
 `;
 }
 
