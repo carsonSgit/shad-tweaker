@@ -149,3 +149,72 @@ export function createPreviewFrameUrl(request: ComponentPreviewRequest): string 
   }
   return `/studio/preview/frame?${params.toString()}`;
 }
+
+export function createPreviewFrameHtml(request: ComponentPreviewRequest): string {
+  const normalized = normalizePreviewRequest(request);
+  const params = new URLSearchParams();
+  params.set('componentPath', normalized.componentPath);
+  if (normalized.exportName) params.set('exportName', normalized.exportName);
+  params.set('viewport', normalized.viewport ?? 'desktop');
+  params.set('theme', normalized.theme ?? 'light');
+  params.set('density', normalized.density ?? 'default');
+  params.set('state', normalized.state ?? 'default');
+  for (const [key, value] of Object.entries(normalized.variants ?? {})) {
+    params.append(`variant.${key}`, value);
+  }
+
+  const theme = escapeAttribute(normalized.theme ?? 'light');
+  const density = escapeAttribute(normalized.density ?? 'default');
+  return `<!doctype html>
+<html lang="en" data-theme="${theme}" data-density="${density}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Component preview</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #ffffff;
+        color: #202124;
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        background: #18191c;
+        color: #f7f7f4;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+      }
+      #preview-root {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: var(--preview-padding, 32px);
+      }
+      :root[data-density="compact"] #preview-root { --preview-padding: 16px; }
+      :root[data-density="comfortable"] #preview-root { --preview-padding: 48px; }
+      .preview-error {
+        border: 1px solid #c7372f;
+        border-radius: 8px;
+        color: #8f1f18;
+        max-width: 680px;
+        padding: 16px;
+      }
+      .preview-error pre {
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="preview-root"></div>
+    <script type="module" src="/studio/preview/runtime?${params.toString()}"></script>
+  </body>
+</html>`;
+}
+
+function escapeAttribute(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}

@@ -10,6 +10,7 @@ import editRouter from './routes/edit.js';
 import importsRouter from './routes/imports.js';
 import parserRouter from './routes/parser.js';
 import primitiveStartersRouter from './routes/primitiveStarters.js';
+import previewRouter from './routes/preview.js';
 import studioRouter from './routes/studio.js';
 import templatesRouter from './routes/templates.js';
 import tokensRouter from './routes/tokens.js';
@@ -85,6 +86,8 @@ app.use('/api/primitive-starters', primitiveStartersRouter);
 app.use('/api/tokens', tokensRouter);
 app.use('/api/variants', variantsRouter);
 app.use('/api/studio', studioRouter);
+app.use('/api/studio/preview', previewRouter);
+app.use('/studio/preview', previewRouter);
 
 // Serve built browser studio assets first, then fall back to index.html for SPA routes.
 app.use('/studio', studioAssetLimiter);

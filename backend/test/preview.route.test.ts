@@ -10,6 +10,7 @@ import previewRouter from '../src/routes/preview.js';
 const app = express();
 app.use(express.json());
 app.use('/api/studio/preview', previewRouter);
+app.use('/studio/preview', previewRouter);
 
 const tempRoots: string[] = [];
 const testWorkspaceBase = path.join(
@@ -116,5 +117,24 @@ export function ButtonIcon() {
 
     assert.equal(res.status, 404);
     assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_NOT_FOUND');
+  });
+
+  it('returns a preview frame shell that loads the runtime entry', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/badge.tsx'),
+      `export function Badge() { return <span>Badge</span>; }`
+    );
+
+    const res = await request(app)
+      .get('/studio/preview/frame')
+      .query({ componentPath: 'components/ui/badge.tsx', exportName: 'Badge' });
+
+    assert.equal(res.status, 200);
+    assert.match(res.headers['content-type'], /html/);
+    assert.match(res.text, /id="preview-root"/);
+    assert.match(res.text, /\/studio\/preview\/runtime/);
+    assert.match(res.text, /data-theme="light"/);
+    assert.match(res.text, /data-density="default"/);
   });
 });
