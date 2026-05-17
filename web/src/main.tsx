@@ -9,6 +9,7 @@ import {
 } from '@studio-shared';
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { PreviewWorkspace } from './preview/PreviewWorkspace';
 import './styles.css';
 
 function backupComponentCount(backup: StudioSummary['backups']['backups'][number]): number {
@@ -256,18 +257,7 @@ function AreaPanel({
   }
 
   if (area === 'preview') {
-    return (
-      <section className="panel">
-        <p>Preview remains attached to edit workflows for this milestone.</p>
-        <p>
-          {selectedComponents.length} selected components are ready for a future browser preview
-          flow.
-        </p>
-        <button onClick={() => setArea('components')} type="button">
-          Go to Components
-        </button>
-      </section>
-    );
+    return <PreviewWorkspace selectedComponents={selectedComponents} summary={summary} />;
   }
 
   if (area === 'diff') {
