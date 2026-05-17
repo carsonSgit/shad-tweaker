@@ -125,7 +125,6 @@ function AreaPanel({
   area,
   selectedComponents,
   selectedPaths,
-  setArea,
   setSelectedPaths,
   setSettingsDirty,
   summary,
@@ -134,7 +133,6 @@ function AreaPanel({
   area: WorkbenchArea;
   selectedComponents: StudioSummary['components']['inventory'];
   selectedPaths: Set<string>;
-  setArea: (area: WorkbenchArea) => void;
   setSelectedPaths: (paths: Set<string>) => void;
   setSettingsDirty: (dirty: boolean) => void;
   summary: StudioSummary;

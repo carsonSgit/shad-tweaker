@@ -1,4 +1,10 @@
-import type { ComponentPreviewManifest, PreviewDensity, PreviewState, PreviewTheme, PreviewViewport } from '@studio-shared';
+import type {
+  ComponentPreviewManifest,
+  PreviewDensity,
+  PreviewState,
+  PreviewTheme,
+  PreviewViewport,
+} from '@studio-shared';
 import type { PreviewSelection } from './previewState';
 
 interface PreviewControlsProps {
@@ -11,7 +17,7 @@ export function PreviewControls({ manifest, selection, onChange }: PreviewContro
   const definition = manifest.variants[0];
 
   return (
-    <div className="preview-controls" aria-label="Preview controls">
+    <div className="preview-controls">
       <label>
         Export
         <select
@@ -45,7 +51,9 @@ export function PreviewControls({ manifest, selection, onChange }: PreviewContro
       <label>
         Theme
         <select
-          onChange={(event) => onChange({ ...selection, theme: event.target.value as PreviewTheme })}
+          onChange={(event) =>
+            onChange({ ...selection, theme: event.target.value as PreviewTheme })
+          }
           value={selection.theme}
         >
           {manifest.themes.map((theme) => (
@@ -75,7 +83,9 @@ export function PreviewControls({ manifest, selection, onChange }: PreviewContro
       <label>
         State
         <select
-          onChange={(event) => onChange({ ...selection, state: event.target.value as PreviewState })}
+          onChange={(event) =>
+            onChange({ ...selection, state: event.target.value as PreviewState })
+          }
           value={selection.state}
         >
           {manifest.states.map((state) => (

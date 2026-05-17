@@ -2,10 +2,10 @@ import { type Request, type Response, Router } from 'express';
 import {
   ComponentPreviewNotFoundError,
   ComponentPreviewValidationError,
+  createComponentPreviewManifest,
   createPreviewComponentImportModule,
   createPreviewFrameHtml,
   createPreviewRuntimeModule,
-  createComponentPreviewManifest,
   normalizePreviewRequest,
 } from '../services/preview.js';
 import { getWorkingDirectory } from '../services/workspace.js';
@@ -45,10 +45,7 @@ router.post('/manifest', async (req: Request, res: Response) => {
 router.get('/frame', async (req: Request, res: Response) => {
   try {
     const request = normalizePreviewRequest(req.query);
-    res
-      .status(200)
-      .type('html')
-      .send(createPreviewFrameHtml(request));
+    res.status(200).type('html').send(createPreviewFrameHtml(request));
   } catch (error) {
     logger.error('Failed to create component preview frame', error);
     const response = previewErrorResponse(error, 'Failed to create component preview frame');
@@ -90,7 +87,10 @@ router.get('/component/:componentPath', async (req: Request, res: Response) => {
       .send(createPreviewComponentImportModule(req.params.componentPath));
   } catch (error) {
     logger.error('Failed to create component preview import module', error);
-    const response = previewErrorResponse(error, 'Failed to create component preview import module');
+    const response = previewErrorResponse(
+      error,
+      'Failed to create component preview import module'
+    );
     res.status(response.status).json({
       success: false,
       error: {

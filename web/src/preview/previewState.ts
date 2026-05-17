@@ -85,5 +85,7 @@ export function previewFrameUrl(selection: PreviewSelection): string {
 
 export function describeVariants(variants: Record<string, string>): string {
   const entries = Object.entries(variants);
-  return entries.length === 0 ? 'Default' : entries.map(([axis, value]) => `${axis}: ${value}`).join(', ');
+  return entries.length === 0
+    ? 'Default'
+    : entries.map(([axis, value]) => `${axis}: ${value}`).join(', ');
 }

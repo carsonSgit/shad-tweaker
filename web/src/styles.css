@@ -284,8 +284,8 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
-.compact-grid .preview-frame {
-  height: 260px !important;
+.compact-grid .preview-frame-shell {
+  max-height: 360px;
 }
 
 .preview-diagnostic,
@@ -323,8 +323,7 @@ h1 {
     grid-template-columns: 1fr;
   }
 
-  .preview-frame {
-    height: 520px !important;
-    width: 100% !important;
+  .preview-frame-shell {
+    max-width: 100%;
   }
 }

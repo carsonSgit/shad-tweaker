@@ -80,7 +80,9 @@ export function normalizePreviewRequest(input: unknown): ComponentPreviewRequest
   };
 }
 
-function readVariantQueryEntries(record: Record<string, unknown>): Record<string, string> | undefined {
+function readVariantQueryEntries(
+  record: Record<string, unknown>
+): Record<string, string> | undefined {
   const variants = Object.fromEntries(
     Object.entries(record)
       .filter(([key, value]) => key.startsWith('variant.') && typeof value === 'string')

@@ -1,12 +1,16 @@
-import { getComponentPreviewManifest, type ComponentPreviewManifest, type StudioSummary } from '@studio-shared';
+import {
+  type ComponentPreviewManifest,
+  getComponentPreviewManifest,
+  type StudioSummary,
+} from '@studio-shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PreviewControls } from './PreviewControls';
 import { PreviewFrame } from './PreviewFrame';
 import {
   createInitialSelection,
   describeVariants,
-  selectionFromManifest,
   type PreviewSelection,
+  selectionFromManifest,
   variantGridSelections,
 } from './previewState';
 
@@ -72,10 +76,7 @@ export function PreviewWorkspace({ selectedComponents, summary }: PreviewWorkspa
       <div className="preview-toolbar">
         <label>
           Component
-          <select
-            onChange={(event) => setComponentPath(event.target.value)}
-            value={componentPath}
-          >
+          <select onChange={(event) => setComponentPath(event.target.value)} value={componentPath}>
             {components.map((component) => (
               <option key={component.path} value={component.path}>
                 {component.name}
@@ -100,7 +101,11 @@ export function PreviewWorkspace({ selectedComponents, summary }: PreviewWorkspa
               ))}
             </div>
           ) : null}
-          <PreviewFrame label={`${manifest.component.name} preview`} manifest={manifest} selection={selection} />
+          <PreviewFrame
+            label={`${manifest.component.name} preview`}
+            manifest={manifest}
+            selection={selection}
+          />
 
           <section className="preview-section">
             <h2>Variant Grid</h2>

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import type { ComponentPreviewManifest } from '@studio-shared';
-import { previewFrameUrl, type PreviewSelection } from './previewState';
+import { useEffect, useState } from 'react';
+import { type PreviewSelection, previewFrameUrl } from './previewState';
 
 interface PreviewFrameProps {
   label: string;
@@ -11,10 +11,7 @@ interface PreviewFrameProps {
 export function PreviewFrame({ label, manifest, selection }: PreviewFrameProps) {
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const viewport = manifest.viewports[selection.viewport];
-
-  useEffect(() => {
-    setRuntimeError(null);
-  }, [selection]);
+  const frameUrl = previewFrameUrl(selection);
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -42,8 +39,9 @@ export function PreviewFrame({ label, manifest, selection }: PreviewFrameProps) 
       {runtimeError ? <div className="preview-diagnostic">{runtimeError}</div> : null}
       <iframe
         className="preview-frame"
+        onLoad={() => setRuntimeError(null)}
         sandbox="allow-scripts allow-same-origin"
-        src={previewFrameUrl(selection)}
+        src={frameUrl}
         style={{
           height: viewport.height,
           maxWidth: '100%',

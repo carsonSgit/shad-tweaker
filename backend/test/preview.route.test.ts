@@ -79,10 +79,10 @@ export function ButtonIcon() {
     assert.deepEqual(res.body.manifest.component.exports, ['Button', 'ButtonIcon']);
     assert.equal(res.body.manifest.component.defaultExport, 'Button');
     assert.equal(res.body.manifest.variants.length, 1);
-    assert.deepEqual(res.body.manifest.variants[0].axes.map((axis: { name: string }) => axis.name), [
-      'variant',
-      'size',
-    ]);
+    assert.deepEqual(
+      res.body.manifest.variants[0].axes.map((axis: { name: string }) => axis.name),
+      ['variant', 'size']
+    );
     assert.deepEqual(res.body.manifest.states, [
       'default',
       'hover',
@@ -145,14 +145,12 @@ export function ButtonIcon() {
       `export function Card() { return <section>Card</section>; }`
     );
 
-    const res = await request(app)
-      .get('/studio/preview/runtime')
-      .query({
-        componentPath: 'components/ui/card.tsx',
-        exportName: 'Card',
-        state: 'selected',
-        'variant.tone': 'muted',
-      });
+    const res = await request(app).get('/studio/preview/runtime').query({
+      componentPath: 'components/ui/card.tsx',
+      exportName: 'Card',
+      state: 'selected',
+      'variant.tone': 'muted',
+    });
 
     assert.equal(res.status, 200);
     assert.match(res.headers['content-type'], /javascript/);
