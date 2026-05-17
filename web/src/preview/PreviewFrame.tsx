@@ -1,5 +1,5 @@
 import type { ComponentPreviewManifest } from '@studio-shared';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type PreviewSelection, previewFrameUrl } from './previewState';
 
 interface PreviewFrameProps {
@@ -12,9 +12,17 @@ export function PreviewFrame({ label, manifest, selection }: PreviewFrameProps) 
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const viewport = manifest.viewports[selection.viewport];
   const frameUrl = previewFrameUrl(selection);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
+    const expectedOrigin = new URL(frameUrl, window.location.href).origin;
     function handleMessage(event: MessageEvent) {
+      if (event.origin !== expectedOrigin) {
+        return;
+      }
+      if (event.source !== iframeRef.current?.contentWindow) {
+        return;
+      }
       if (
         event.data &&
         typeof event.data === 'object' &&
@@ -26,7 +34,7 @@ export function PreviewFrame({ label, manifest, selection }: PreviewFrameProps) 
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [frameUrl]);
 
   return (
     <div className="preview-frame-shell">
@@ -40,6 +48,7 @@ export function PreviewFrame({ label, manifest, selection }: PreviewFrameProps) 
       <iframe
         className="preview-frame"
         onLoad={() => setRuntimeError(null)}
+        ref={iframeRef}
         sandbox="allow-scripts allow-same-origin"
         src={frameUrl}
         style={{

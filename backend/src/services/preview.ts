@@ -39,6 +39,9 @@ export const PREVIEW_VIEWPORTS: Record<PreviewViewport, { width: number; height:
 export const PREVIEW_THEMES: PreviewTheme[] = ['light', 'dark', 'system'];
 export const PREVIEW_DENSITIES: PreviewDensity[] = ['comfortable', 'default', 'compact'];
 
+const JS_IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const JS_IDENTIFIER_PATH = /^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$/;
+
 export function normalizePreviewRequest(input: unknown): ComponentPreviewRequest {
   if (!input || typeof input !== 'object') {
     throw new ComponentPreviewValidationError('Preview request body is required.');
@@ -63,7 +66,7 @@ export function normalizePreviewRequest(input: unknown): ComponentPreviewRequest
 
   return {
     componentPath,
-    exportName: typeof record.exportName === 'string' ? record.exportName.trim() : undefined,
+    exportName: readExportName(record.exportName),
     viewport: readAllowed(record.viewport, Object.keys(PREVIEW_VIEWPORTS) as PreviewViewport[]),
     theme: readAllowed(record.theme, PREVIEW_THEMES),
     density: readAllowed(record.density, PREVIEW_DENSITIES),
@@ -78,6 +81,23 @@ export function normalizePreviewRequest(input: unknown): ComponentPreviewRequest
           )
         : readVariantQueryEntries(record),
   };
+}
+
+function readExportName(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') {
+    throw new ComponentPreviewValidationError('exportName must be a string.');
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return undefined;
+  if (trimmed === 'default') return trimmed;
+  if (!JS_IDENTIFIER.test(trimmed) && !JS_IDENTIFIER_PATH.test(trimmed)) {
+    throw new ComponentPreviewValidationError(
+      'exportName must be "default" or a valid JavaScript export identifier path.'
+    );
+  }
+  return trimmed;
 }
 
 function readVariantQueryEntries(
@@ -100,18 +120,45 @@ function readAllowed<T extends string>(value: unknown, allowed: T[]): T | undefi
   return value as T;
 }
 
+async function resolvePreviewComponentPath(cwd: string, componentPath: string): Promise<string> {
+  const rootPath = path.resolve(cwd);
+  const absolutePath = path.resolve(rootPath, componentPath);
+  const relativeToRoot = path.relative(rootPath, absolutePath);
+  if (
+    relativeToRoot === '..' ||
+    relativeToRoot.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativeToRoot)
+  ) {
+    throw new ComponentPreviewValidationError(
+      'componentPath must resolve within the current workspace.'
+    );
+  }
+
+  if (!(await fs.pathExists(absolutePath))) {
+    throw new ComponentPreviewNotFoundError(`Component not found: ${componentPath}`);
+  }
+
+  const realRootPath = await fs.realpath(rootPath);
+  const realComponentPath = await fs.realpath(absolutePath);
+  const rootPrefix = realRootPath.endsWith(path.sep) ? realRootPath : `${realRootPath}${path.sep}`;
+  if (realComponentPath !== realRootPath && !realComponentPath.startsWith(rootPrefix)) {
+    throw new ComponentPreviewValidationError(
+      'componentPath must resolve within the current workspace.'
+    );
+  }
+
+  return absolutePath;
+}
+
 export async function createComponentPreviewManifest(
   cwd: string,
   input: unknown
 ): Promise<ComponentPreviewManifest> {
   const request = normalizePreviewRequest(input);
-  const absolutePath = path.resolve(cwd, request.componentPath);
-  if (!(await fs.pathExists(absolutePath))) {
-    throw new ComponentPreviewNotFoundError(`Component not found: ${request.componentPath}`);
-  }
+  await resolvePreviewComponentPath(cwd, request.componentPath);
 
   const detail = await getComponentLibraryDetail(cwd, request.componentPath);
-  const variantDetail = await readVariantDetail(cwd, request.componentPath);
+  const variantDetail = await getVariantComponentDetail(cwd, request.componentPath);
   const defaultExport = chooseDefaultExport(detail.exports, request.exportName);
 
   return {
@@ -148,10 +195,6 @@ function chooseDefaultExport(exports: string[], requested?: string): string {
   return exports[0] ?? 'default';
 }
 
-async function readVariantDetail(cwd: string, componentPath: string) {
-  return getVariantComponentDetail(cwd, componentPath);
-}
-
 export function createPreviewFrameUrl(request: ComponentPreviewRequest): string {
   const params = new URLSearchParams();
   params.set('componentPath', request.componentPath);
@@ -167,20 +210,19 @@ export function createPreviewFrameUrl(request: ComponentPreviewRequest): string 
 }
 
 export function createPreviewFrameHtml(request: ComponentPreviewRequest): string {
-  const normalized = normalizePreviewRequest(request);
   const params = new URLSearchParams();
-  params.set('componentPath', normalized.componentPath);
-  if (normalized.exportName) params.set('exportName', normalized.exportName);
-  params.set('viewport', normalized.viewport ?? 'desktop');
-  params.set('theme', normalized.theme ?? 'light');
-  params.set('density', normalized.density ?? 'default');
-  params.set('state', normalized.state ?? 'default');
-  for (const [key, value] of Object.entries(normalized.variants ?? {})) {
+  params.set('componentPath', request.componentPath);
+  if (request.exportName) params.set('exportName', request.exportName);
+  params.set('viewport', request.viewport ?? 'desktop');
+  params.set('theme', request.theme ?? 'light');
+  params.set('density', request.density ?? 'default');
+  params.set('state', request.state ?? 'default');
+  for (const [key, value] of Object.entries(request.variants ?? {})) {
     params.append(`variant.${key}`, value);
   }
 
-  const theme = escapeAttribute(normalized.theme ?? 'light');
-  const density = escapeAttribute(normalized.density ?? 'default');
+  const theme = escapeAttribute(request.theme ?? 'light');
+  const density = escapeAttribute(request.density ?? 'default');
   return `<!doctype html>
 <html lang="en" data-theme="${theme}" data-density="${density}">
   <head>
@@ -235,17 +277,13 @@ export async function createPreviewRuntimeModule(
   cwd: string,
   request: ComponentPreviewRequest
 ): Promise<string> {
-  const normalized = normalizePreviewRequest(request);
-  const absolutePath = path.resolve(cwd, normalized.componentPath);
-  if (!(await fs.pathExists(absolutePath))) {
-    throw new ComponentPreviewNotFoundError(`Component not found: ${normalized.componentPath}`);
-  }
+  await resolvePreviewComponentPath(cwd, request.componentPath);
 
   const componentModulePath = `/studio/preview/component/${encodeURIComponent(
-    normalized.componentPath
+    request.componentPath
   )}`;
-  const exportName = normalized.exportName ?? 'default';
-  const previewProps = createPreviewProps(normalized);
+  const exportName = request.exportName ?? 'default';
+  const previewProps = createPreviewProps(request);
 
   return `import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -268,7 +306,7 @@ class PreviewErrorBoundary extends React.Component {
       type: 'shadcn-tweaker-preview-error',
       code: 'PREVIEW_RENDER_ERROR',
       message: error instanceof Error ? error.message : String(error),
-    }, '*');
+    }, window.location.origin);
   }
   render() {
     if (this.state.error) {
@@ -290,7 +328,7 @@ function renderPreviewError(message, code = 'PREVIEW_RUNTIME_ERROR') {
   wrapper.innerHTML = '<strong>Preview unavailable</strong><pre></pre>';
   wrapper.querySelector('pre').textContent = message;
   rootElement.append(wrapper);
-  window.parent?.postMessage({ type: 'shadcn-tweaker-preview-error', code, message }, '*');
+  window.parent?.postMessage({ type: 'shadcn-tweaker-preview-error', code, message }, window.location.origin);
 }
 
 if (!rootElement) {
@@ -306,6 +344,7 @@ if (!Component) {
     React.createElement(PreviewErrorBoundary, null,
       React.createElement('div', {
         'data-preview-state': previewProps['data-preview-state'],
+        'data-preview-label': previewProps['data-preview-label'],
         'data-preview-variants': JSON.stringify(previewProps.variants ?? {}),
       }, React.createElement(Component, previewProps))
     )
@@ -320,8 +359,7 @@ if (!Component) {
 }
 
 export function createPreviewComponentImportModule(componentPath: string): string {
-  const normalized = normalizePreviewRequest({ componentPath });
-  const sourcePath = JSON.stringify(`/${normalized.componentPath}`);
+  const sourcePath = JSON.stringify(`/${componentPath}`);
   return `import * as PreviewModule from ${sourcePath};
 export * from ${sourcePath};
 export default PreviewModule.default;
@@ -331,13 +369,13 @@ export default PreviewModule.default;
 function createPreviewProps(request: ComponentPreviewRequest): Record<string, unknown> {
   const state = request.state ?? 'default';
   return {
-    children: previewLabel(request),
     disabled: state === 'disabled' || undefined,
     loading: state === 'loading' || undefined,
     open: state === 'open' || undefined,
     'aria-selected': state === 'selected' ? true : undefined,
     'data-state': state === 'open' ? 'open' : state === 'selected' ? 'selected' : undefined,
     'data-preview-state': state,
+    'data-preview-label': previewLabel(request),
     variants: request.variants ?? {},
     ...(request.variants ?? {}),
   };
@@ -349,5 +387,9 @@ function previewLabel(request: ComponentPreviewRequest): string {
 }
 
 function escapeAttribute(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }

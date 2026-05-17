@@ -108,6 +108,123 @@ export function ButtonIcon() {
     assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
   });
 
+  it('rejects unsafe preview export names for manifests', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/button.tsx'),
+      `export function Button() { return <button>Button</button>; }`
+    );
+
+    const res = await request(app).post('/api/studio/preview/manifest').send({
+      componentPath: 'components/ui/button.tsx',
+      exportName: 'Button";alert(1)//',
+    });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+  });
+
+  it('rejects unsafe preview export names for runtime modules', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/button.tsx'),
+      `export function Button() { return <button>Button</button>; }`
+    );
+
+    const res = await request(app).get('/studio/preview/runtime').query({
+      componentPath: 'components/ui/button.tsx',
+      exportName: 'Button";alert(1)//',
+    });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+  });
+
+  it('rejects traversal-like preview component paths for runtime modules', async () => {
+    await createTempRoot();
+
+    const res = await request(app).get('/studio/preview/runtime').query({
+      componentPath: '../secret.tsx',
+    });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+  });
+
+  it('rejects traversal-like preview component paths for component import modules', async () => {
+    await createTempRoot();
+
+    const res = await request(app).get(
+      `/studio/preview/component/${encodeURIComponent('../secret.tsx')}`
+    );
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+  });
+
+  it('rejects unsupported preview enum options', async () => {
+    await createTempRoot();
+
+    for (const [field, value] of [
+      ['viewport', 'watch'],
+      ['theme', 'sepia'],
+      ['density', 'spacious'],
+      ['state', 'dragging'],
+    ]) {
+      const res = await request(app)
+        .get('/studio/preview/frame')
+        .query({ componentPath: 'components/ui/card.tsx', [field]: value });
+
+      assert.equal(res.status, 400);
+      assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+    }
+  });
+
+  it('rejects preview manifest component paths that resolve through symlinks outside the workspace', async () => {
+    const root = await createTempRoot();
+    const outsideRoot = path.join(testWorkspaceBase, randomUUID());
+    tempRoots.push(outsideRoot);
+    await fs.ensureDir(outsideRoot);
+    await fs.writeFile(
+      path.join(outsideRoot, 'escaped.tsx'),
+      `export function Escaped() { return <button>Escaped</button>; }`
+    );
+    await fs.symlink(
+      path.join(outsideRoot, 'escaped.tsx'),
+      path.join(root, 'components/ui/escaped.tsx')
+    );
+
+    const res = await request(app)
+      .post('/api/studio/preview/manifest')
+      .send({ componentPath: 'components/ui/escaped.tsx' });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+  });
+
+  it('rejects preview runtime component paths that resolve through symlinks outside the workspace', async () => {
+    const root = await createTempRoot();
+    const outsideRoot = path.join(testWorkspaceBase, randomUUID());
+    tempRoots.push(outsideRoot);
+    await fs.ensureDir(outsideRoot);
+    await fs.writeFile(
+      path.join(outsideRoot, 'escaped.tsx'),
+      `export function Escaped() { return <button>Escaped</button>; }`
+    );
+    await fs.symlink(
+      path.join(outsideRoot, 'escaped.tsx'),
+      path.join(root, 'components/ui/escaped.tsx')
+    );
+
+    const res = await request(app).get('/studio/preview/runtime').query({
+      componentPath: 'components/ui/escaped.tsx',
+      exportName: 'Escaped',
+    });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+  });
+
   it('returns 404 for missing preview components', async () => {
     await createTempRoot();
 
@@ -156,7 +273,15 @@ export function ButtonIcon() {
     assert.match(res.headers['content-type'], /javascript/);
     assert.match(res.text, /from '\/studio\/preview\/component\//);
     assert.match(res.text, /const exportName = "Card"/);
+    assert.match(res.text, /window\.location\.origin/);
+    assert.equal(res.text.match(/postMessage\(/g)?.length, 2);
+    assert.equal(res.text.match(/postMessage\([\s\S]*?window\.location\.origin\)/g)?.length, 2);
+    assert.doesNotMatch(res.text, /postMessage\([^;]+,\s*'\*'\)/s);
     assert.match(res.text, /data-preview-state/);
+    assert.match(res.text, /data-preview-label/);
+    assert.doesNotMatch(res.text, /"children":/);
+    assert.match(res.text, /React\.createElement\(PreviewErrorBoundary, null,/);
+    assert.match(res.text, /React\.createElement\(Component, previewProps\)/);
     assert.match(res.text, /"aria-selected": true/);
     assert.match(res.text, /"tone": "muted"/);
   });

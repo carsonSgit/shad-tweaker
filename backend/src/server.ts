@@ -87,6 +87,7 @@ app.use('/api/primitive-starters', primitiveStartersRouter);
 app.use('/api/tokens', tokensRouter);
 app.use('/api/variants', variantsRouter);
 app.use('/api/studio', studioRouter);
+// Preview exposes JSON APIs under /api and browser-loaded frame/modules under /studio.
 app.use('/api/studio/preview', previewRouter);
 app.use('/studio/preview', previewRouter);
 app.use((req, res, next) => {

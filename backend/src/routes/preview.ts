@@ -62,10 +62,8 @@ router.get('/frame', async (req: Request, res: Response) => {
 router.get('/runtime', async (req: Request, res: Response) => {
   try {
     const request = normalizePreviewRequest(req.query);
-    res
-      .status(200)
-      .type('application/javascript')
-      .send(await createPreviewRuntimeModule(getWorkingDirectory(), request));
+    const runtimeModule = await createPreviewRuntimeModule(getWorkingDirectory(), request);
+    res.status(200).type('application/javascript').send(runtimeModule);
   } catch (error) {
     logger.error('Failed to create component preview runtime', error);
     const response = previewErrorResponse(error, 'Failed to create component preview runtime');
@@ -81,10 +79,9 @@ router.get('/runtime', async (req: Request, res: Response) => {
 
 router.get('/component/:componentPath', async (req: Request, res: Response) => {
   try {
-    res
-      .status(200)
-      .type('application/javascript')
-      .send(createPreviewComponentImportModule(req.params.componentPath));
+    const request = normalizePreviewRequest({ componentPath: req.params.componentPath });
+    const componentModule = createPreviewComponentImportModule(request.componentPath);
+    res.status(200).type('application/javascript').send(componentModule);
   } catch (error) {
     logger.error('Failed to create component preview import module', error);
     const response = previewErrorResponse(
