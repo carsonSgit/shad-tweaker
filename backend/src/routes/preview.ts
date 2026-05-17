@@ -3,6 +3,7 @@ import {
   ComponentPreviewNotFoundError,
   ComponentPreviewValidationError,
   createPreviewFrameHtml,
+  createPreviewRuntimeModule,
   createComponentPreviewManifest,
   normalizePreviewRequest,
 } from '../services/preview.js';
@@ -50,6 +51,26 @@ router.get('/frame', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Failed to create component preview frame', error);
     const response = previewErrorResponse(error, 'Failed to create component preview frame');
+    res.status(response.status).json({
+      success: false,
+      error: {
+        message: response.message,
+        code: response.code,
+      },
+    });
+  }
+});
+
+router.get('/runtime', async (req: Request, res: Response) => {
+  try {
+    const request = normalizePreviewRequest(req.query);
+    res
+      .status(200)
+      .type('application/javascript')
+      .send(await createPreviewRuntimeModule(getWorkingDirectory(), request));
+  } catch (error) {
+    logger.error('Failed to create component preview runtime', error);
+    const response = previewErrorResponse(error, 'Failed to create component preview runtime');
     res.status(response.status).json({
       success: false,
       error: {

@@ -76,8 +76,18 @@ export function normalizePreviewRequest(input: unknown): ComponentPreviewRequest
                 typeof entry[0] === 'string' && typeof entry[1] === 'string'
             )
           )
-        : undefined,
+        : readVariantQueryEntries(record),
   };
+}
+
+function readVariantQueryEntries(record: Record<string, unknown>): Record<string, string> | undefined {
+  const variants = Object.fromEntries(
+    Object.entries(record)
+      .filter(([key, value]) => key.startsWith('variant.') && typeof value === 'string')
+      .map(([key, value]) => [key.slice('variant.'.length), value as string])
+      .filter(([key]) => key.length > 0)
+  );
+  return Object.keys(variants).length > 0 ? variants : undefined;
 }
 
 function readAllowed<T extends string>(value: unknown, allowed: T[]): T | undefined {
@@ -213,6 +223,121 @@ export function createPreviewFrameHtml(request: ComponentPreviewRequest): string
     <script type="module" src="/studio/preview/runtime?${params.toString()}"></script>
   </body>
 </html>`;
+}
+
+export async function createPreviewRuntimeModule(
+  cwd: string,
+  request: ComponentPreviewRequest
+): Promise<string> {
+  const normalized = normalizePreviewRequest(request);
+  const absolutePath = path.resolve(cwd, normalized.componentPath);
+  if (!(await fs.pathExists(absolutePath))) {
+    throw new ComponentPreviewNotFoundError(`Component not found: ${normalized.componentPath}`);
+  }
+
+  const componentModulePath = `/studio/preview/component/${encodeURIComponent(
+    normalized.componentPath
+  )}`;
+  const exportName = normalized.exportName ?? 'default';
+  const previewProps = createPreviewProps(normalized);
+
+  return `import React from 'react';
+import { createRoot } from 'react-dom/client';
+import * as ComponentModule from '${componentModulePath}';
+
+const exportName = ${JSON.stringify(exportName)};
+const previewProps = ${JSON.stringify(previewProps, null, 2)};
+const rootElement = document.getElementById('preview-root');
+
+class PreviewErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error) {
+    window.parent?.postMessage({
+      type: 'shadcn-tweaker-preview-error',
+      code: 'PREVIEW_RENDER_ERROR',
+      message: error instanceof Error ? error.message : String(error),
+    }, '*');
+  }
+  render() {
+    if (this.state.error) {
+      return React.createElement('div', { className: 'preview-error', role: 'alert' },
+        React.createElement('strong', null, 'Preview render failed'),
+        React.createElement('pre', null, this.state.error instanceof Error ? this.state.error.message : String(this.state.error))
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function renderPreviewError(message, code = 'PREVIEW_RUNTIME_ERROR') {
+  if (!rootElement) return;
+  rootElement.innerHTML = '';
+  const wrapper = document.createElement('div');
+  wrapper.className = 'preview-error';
+  wrapper.setAttribute('role', 'alert');
+  wrapper.innerHTML = '<strong>Preview unavailable</strong><pre></pre>';
+  wrapper.querySelector('pre').textContent = message;
+  rootElement.append(wrapper);
+  window.parent?.postMessage({ type: 'shadcn-tweaker-preview-error', code, message }, '*');
+}
+
+if (!rootElement) {
+  throw new Error('Preview root element is missing.');
+}
+
+const Component = ComponentModule[exportName] ?? (exportName === 'default' ? ComponentModule.default : undefined);
+if (!Component) {
+  renderPreviewError(\`Component export not found: \${exportName}\`, 'PREVIEW_EXPORT_NOT_FOUND');
+} else {
+  const root = createRoot(rootElement);
+  root.render(
+    React.createElement(PreviewErrorBoundary, null,
+      React.createElement('div', {
+        'data-preview-state': previewProps['data-preview-state'],
+        'data-preview-variants': JSON.stringify(previewProps.variants ?? {}),
+      }, React.createElement(Component, previewProps))
+    )
+  );
+  if (previewProps['data-preview-state'] === 'focus') {
+    window.requestAnimationFrame(() => {
+      const focusTarget = rootElement.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      focusTarget?.focus?.();
+    });
+  }
+}`;
+}
+
+export function createPreviewComponentImportModule(componentPath: string): string {
+  const normalized = normalizePreviewRequest({ componentPath });
+  return `export * from ${JSON.stringify(`/${normalized.componentPath}`)};
+export { default } from ${JSON.stringify(`/${normalized.componentPath}`)};
+`;
+}
+
+function createPreviewProps(request: ComponentPreviewRequest): Record<string, unknown> {
+  const state = request.state ?? 'default';
+  return {
+    children: previewLabel(request),
+    disabled: state === 'disabled' || undefined,
+    loading: state === 'loading' || undefined,
+    open: state === 'open' || undefined,
+    'aria-selected': state === 'selected' ? true : undefined,
+    'data-state': state === 'open' ? 'open' : state === 'selected' ? 'selected' : undefined,
+    'data-preview-state': state,
+    variants: request.variants ?? {},
+    ...(request.variants ?? {}),
+  };
+}
+
+function previewLabel(request: ComponentPreviewRequest): string {
+  const state = request.state && request.state !== 'default' ? ` ${request.state}` : '';
+  return `Preview${state}`;
 }
 
 function escapeAttribute(value: string): string {

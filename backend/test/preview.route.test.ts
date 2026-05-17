@@ -137,4 +137,29 @@ export function ButtonIcon() {
     assert.match(res.text, /data-theme="light"/);
     assert.match(res.text, /data-density="default"/);
   });
+
+  it('returns a runtime module that imports the selected local component', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/card.tsx'),
+      `export function Card() { return <section>Card</section>; }`
+    );
+
+    const res = await request(app)
+      .get('/studio/preview/runtime')
+      .query({
+        componentPath: 'components/ui/card.tsx',
+        exportName: 'Card',
+        state: 'selected',
+        'variant.tone': 'muted',
+      });
+
+    assert.equal(res.status, 200);
+    assert.match(res.headers['content-type'], /javascript/);
+    assert.match(res.text, /from '\/studio\/preview\/component\//);
+    assert.match(res.text, /const exportName = "Card"/);
+    assert.match(res.text, /data-preview-state/);
+    assert.match(res.text, /"aria-selected": true/);
+    assert.match(res.text, /"tone": "muted"/);
+  });
 });
