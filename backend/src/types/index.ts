@@ -30,6 +30,50 @@ export interface Preview {
   lineNumbers: number[];
 }
 
+export type PreviewViewport = 'desktop' | 'tablet' | 'mobile';
+export type PreviewTheme = 'light' | 'dark' | 'system';
+export type PreviewDensity = 'comfortable' | 'default' | 'compact';
+export type PreviewState =
+  | 'default'
+  | 'hover'
+  | 'focus'
+  | 'disabled'
+  | 'loading'
+  | 'open'
+  | 'selected';
+
+export interface PreviewDiagnostic {
+  severity: 'info' | 'warning' | 'error';
+  code: string;
+  message: string;
+}
+
+export interface ComponentPreviewRequest {
+  componentPath: string;
+  exportName?: string;
+  viewport?: PreviewViewport;
+  theme?: PreviewTheme;
+  density?: PreviewDensity;
+  state?: PreviewState;
+  variants?: Record<string, string>;
+}
+
+export interface ComponentPreviewManifest {
+  component: {
+    name: string;
+    path: string;
+    exports: string[];
+    defaultExport: string;
+  };
+  variants: VariantDefinitionDetail[];
+  states: PreviewState[];
+  viewports: Record<PreviewViewport, { width: number; height: number }>;
+  themes: PreviewTheme[];
+  densities: PreviewDensity[];
+  frameUrl: string;
+  diagnostics: PreviewDiagnostic[];
+}
+
 export interface EditRequest {
   componentPaths: string[];
   find: string;
