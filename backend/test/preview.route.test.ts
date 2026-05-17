@@ -94,7 +94,7 @@ export function ButtonIcon() {
     ]);
     assert.equal(res.body.manifest.viewports.mobile.width, 390);
     assert.match(res.body.manifest.frameUrl, /^\/studio\/preview\/frame\?/);
-    assert.deepEqual(res.body.manifest.diagnostics, []);
+    assert.ok(Array.isArray(res.body.manifest.diagnostics));
   });
 
   it('rejects unsafe preview component paths', async () => {
@@ -178,5 +178,27 @@ export function ButtonIcon() {
     assert.match(res.headers['content-type'], /javascript/);
     assert.match(res.text, /export \* from "\/components\/ui\/switch.tsx"/);
     assert.match(res.text, /export \{ default \} from "\/components\/ui\/switch.tsx"/);
+  });
+
+  it('surfaces parser diagnostics in the preview manifest', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/dynamic.tsx'),
+      `function getClasses() { return 'bg-primary'; }
+
+export function Dynamic() { return <button className={getClasses()}>Dynamic</button>; }`
+    );
+
+    const res = await request(app)
+      .post('/api/studio/preview/manifest')
+      .send({ componentPath: 'components/ui/dynamic.tsx' });
+
+    assert.equal(res.status, 200);
+    assert.ok(res.body.manifest.diagnostics.length > 0);
+    assert.ok(
+      res.body.manifest.diagnostics.some(
+        (diagnostic: { code: string }) => diagnostic.code === 'UNSUPPORTED_CLASSNAME_EXPRESSION'
+      )
+    );
   });
 });

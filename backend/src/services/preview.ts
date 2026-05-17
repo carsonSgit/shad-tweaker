@@ -109,7 +109,7 @@ export async function createComponentPreviewManifest(
   }
 
   const detail = await getComponentLibraryDetail(cwd, request.componentPath);
-  const variants = await readVariantDefinitions(cwd, request.componentPath);
+  const variantDetail = await readVariantDetail(cwd, request.componentPath);
   const defaultExport = chooseDefaultExport(detail.exports, request.exportName);
 
   return {
@@ -119,7 +119,7 @@ export async function createComponentPreviewManifest(
       exports: detail.exports,
       defaultExport,
     },
-    variants,
+    variants: variantDetail.definitions,
     states: PREVIEW_STATES,
     viewports: PREVIEW_VIEWPORTS,
     themes: PREVIEW_THEMES,
@@ -128,7 +128,11 @@ export async function createComponentPreviewManifest(
       ...request,
       exportName: defaultExport,
     }),
-    diagnostics: [],
+    diagnostics: variantDetail.diagnostics.map((diagnostic) => ({
+      severity: diagnostic.severity,
+      code: diagnostic.code,
+      message: diagnostic.message,
+    })),
   };
 }
 
@@ -142,8 +146,8 @@ function chooseDefaultExport(exports: string[], requested?: string): string {
   return exports[0] ?? 'default';
 }
 
-async function readVariantDefinitions(cwd: string, componentPath: string) {
-  return (await getVariantComponentDetail(cwd, componentPath)).definitions;
+async function readVariantDetail(cwd: string, componentPath: string) {
+  return getVariantComponentDetail(cwd, componentPath);
 }
 
 export function createPreviewFrameUrl(request: ComponentPreviewRequest): string {
