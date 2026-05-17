@@ -10,6 +10,7 @@ import {
   createPreviewApiRouter,
   createPreviewBrowserRouter,
 } from '../src/routes/preview.js';
+import { createPreviewFrameHtml } from '../src/services/preview.js';
 
 const app = express();
 app.use(express.json());
@@ -106,6 +107,24 @@ export function ButtonIcon() {
     assert.ok(Array.isArray(res.body.manifest.diagnostics));
   });
 
+  it('returns a manifest and frame URL for a selected named export', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/button.tsx'),
+      `export function Button() { return <button>Button</button>; }
+export function ButtonIcon() { return <span>Icon</span>; }`
+    );
+
+    const res = await request(app).post('/api/studio/preview/manifest').send({
+      componentPath: 'components/ui/button.tsx',
+      exportName: 'ButtonIcon',
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.manifest.component.defaultExport, 'ButtonIcon');
+    assert.match(res.body.manifest.frameUrl, /exportName=ButtonIcon/);
+  });
+
   it('rejects unsafe preview component paths', async () => {
     await createTempRoot();
 
@@ -153,6 +172,23 @@ export function ButtonIcon() {
 
     assert.equal(res.status, 400);
     assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+  });
+
+  it('rejects safe export names that are not exported by the component', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/button.tsx'),
+      `export function Button() { return <button>Button</button>; }`
+    );
+
+    const res = await request(app).post('/api/studio/preview/manifest').send({
+      componentPath: 'components/ui/button.tsx',
+      exportName: 'ButtonIcon',
+    });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'COMPONENT_PREVIEW_VALIDATION_ERROR');
+    assert.equal(res.body.error.message, 'Component export not found: ButtonIcon');
   });
 
   it('sanitizes preview variants from request bodies and query strings', async () => {
@@ -363,6 +399,19 @@ export function ButtonIcon() {
     assert.match(res.text, /data-density="default"/);
   });
 
+  it('escapes preview frame theme and density attributes', () => {
+    const html = createPreviewFrameHtml({
+      componentPath: 'components/ui/badge.tsx',
+      theme: 'dark"&<>' as never,
+      density: 'compact"&<>' as never,
+    });
+
+    assert.match(html, /data-theme="dark&quot;&amp;&lt;&gt;"/);
+    assert.match(html, /data-density="compact&quot;&amp;&lt;&gt;"/);
+    assert.doesNotMatch(html, /data-theme="dark"&<>"/);
+    assert.doesNotMatch(html, /data-density="compact"&<>"/);
+  });
+
   it('returns a runtime module that imports the selected local component', async () => {
     const root = await createTempRoot();
     await fs.writeFile(
@@ -392,6 +441,23 @@ export function ButtonIcon() {
     assert.match(res.text, /React\.createElement\(Component, previewProps\)/);
     assert.match(res.text, /"aria-selected": true/);
     assert.match(res.text, /"tone": "muted"/);
+  });
+
+  it('returns a runtime module for a selected named export', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/card.tsx'),
+      `export function Card() { return <section>Card</section>; }
+export function CardPreview() { return <section>Preview</section>; }`
+    );
+
+    const res = await request(app).get('/studio/preview/runtime').query({
+      componentPath: 'components/ui/card.tsx',
+      exportName: 'CardPreview',
+    });
+
+    assert.equal(res.status, 200);
+    assert.match(res.text, /const exportName = "CardPreview"/);
   });
 
   it('returns preview frame and runtime markup that can simulate hover state', async () => {

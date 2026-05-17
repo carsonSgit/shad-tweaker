@@ -93,12 +93,13 @@ export function createPreviewViteMiddleware(
 }
 
 function shouldHandleWithVite(requestPath: string): boolean {
-  return (
-    requestPath.startsWith('/components/') ||
-    requestPath.startsWith('/src/') ||
-    requestPath.startsWith('/node_modules/.vite/deps/') ||
-    requestPath.startsWith('/@') ||
-    requestPath === '/@vite/client'
+  if (requestPath.startsWith('/node_modules/')) {
+    return requestPath.startsWith('/node_modules/.vite/deps/');
+  }
+  return !(
+    requestPath === '/studio' ||
+    requestPath.startsWith('/studio/') ||
+    requestPath.startsWith('/api/')
   );
 }
 

@@ -40,6 +40,7 @@ export const PREVIEW_THEMES: PreviewTheme[] = ['light', 'dark', 'system'];
 export const PREVIEW_DENSITIES: PreviewDensity[] = ['comfortable', 'default', 'compact'];
 
 const SAFE_COMPONENT_IMPORT_PATH = /^[A-Za-z0-9._/-]+$/;
+const SAFE_COMPONENT_EXPORT_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const PREVIEW_VARIANT_TOKEN = /^[A-Za-z0-9_-]+$/;
 const SAFE_LOCAL_ORIGIN = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d{1,5})?$/;
 const RESERVED_VARIANT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -95,7 +96,10 @@ function readExportName(value: unknown): string | undefined {
   const trimmed = value.trim();
   if (trimmed.length === 0) return undefined;
   if (trimmed === 'default') return trimmed;
-  throw new ComponentPreviewValidationError('exportName must be "default".');
+  if (SAFE_COMPONENT_EXPORT_NAME.test(trimmed)) return trimmed;
+  throw new ComponentPreviewValidationError(
+    'exportName must be "default" or a safe JavaScript identifier.'
+  );
 }
 
 function readVariantQueryEntries(
@@ -207,7 +211,7 @@ export async function createComponentPreviewManifest(
     densities: PREVIEW_DENSITIES,
     frameUrl: createPreviewFrameUrl({
       ...request,
-      exportName: defaultExport === 'default' ? defaultExport : undefined,
+      exportName: request.exportName,
     }),
     diagnostics: variantDetail.diagnostics.map((diagnostic) => ({
       severity: diagnostic.severity,
@@ -238,6 +242,7 @@ function buildPreviewParams(request: ComponentPreviewRequest): URLSearchParams {
   const params = new URLSearchParams();
   params.set('componentPath', request.componentPath);
   if (request.parentOrigin) params.set('parentOrigin', request.parentOrigin);
+  if (request.exportName) params.set('exportName', request.exportName);
   params.set('viewport', request.viewport ?? 'desktop');
   params.set('theme', request.theme ?? 'light');
   params.set('density', request.density ?? 'default');
@@ -322,7 +327,7 @@ export async function createPreviewRuntimeModule(
     request.componentPath
   )}`;
   const detail = await getComponentLibraryDetail(cwd, request.componentPath);
-  const exportName = chooseDefaultExport(detail.exports);
+  const exportName = chooseDefaultExport(detail.exports, request.exportName);
   const parentOrigin = request.parentOrigin ?? getStudioOrigin();
   const previewProps = createPreviewProps(request);
 

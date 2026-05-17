@@ -69,6 +69,7 @@ app.use(
 );
 
 // Request size limits to prevent DoS attacks
+app.use('/api/studio/preview', express.json({ limit: '100kb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
@@ -118,10 +119,11 @@ app.get(['/studio', '/studio/*'], (_req, res) => {
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', err);
-  res.status(500).json({
+  const status = 'status' in err && typeof err.status === 'number' ? err.status : 500;
+  res.status(status).json({
     success: false,
     error: {
-      message: 'Internal server error',
+      message: status === 413 ? 'Request body too large' : 'Internal server error',
       code: 'INTERNAL_ERROR',
     },
   });
@@ -256,10 +258,8 @@ async function start() {
       logger.info('  GET  /api/studio/summary - Get local studio summary');
       logger.info('  GET  /studio - Open browser studio shell');
     });
-    previewServer = createPreviewApp().listen(getPreviewPort(String(port)), () => {
-      logger.info(
-        `Shadcn Tweaker Preview running on http://127.0.0.1:${getPreviewPort(String(port))}`
-      );
+    previewServer = createPreviewApp().listen(getPreviewPort(), () => {
+      logger.info(`Shadcn Tweaker Preview running on http://127.0.0.1:${getPreviewPort()}`);
     });
   } catch (error) {
     logger.error('Failed to start server', error);

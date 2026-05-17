@@ -114,10 +114,10 @@ describe('preview Vite middleware', () => {
     assert.equal(attempts, 2);
   });
 
-  it('does not serve node_modules paths through the preview Vite middleware', async () => {
+  it('does not serve reserved paths through the preview Vite middleware', async () => {
     const root = await createTempRoot();
     let createServerCalls = 0;
-    let nextCalls = 0;
+    const skippedPaths: string[] = [];
     const middleware = createPreviewViteMiddleware({
       createServer: async () => {
         createServerCalls += 1;
@@ -127,16 +127,24 @@ describe('preview Vite middleware', () => {
       reactPlugin: createFakeReactPlugin,
     });
 
-    await middleware.handler(
-      createRequest('/node_modules/react/index.js'),
-      createResponse(),
-      () => {
-        nextCalls += 1;
-      }
-    );
+    for (const pathname of [
+      '/studio/preview/runtime',
+      '/api/health',
+      '/studio',
+      '/node_modules/react/index.js',
+    ]) {
+      await middleware.handler(createRequest(pathname), createResponse(), () => {
+        skippedPaths.push(pathname);
+      });
+    }
 
     assert.equal(createServerCalls, 0);
-    assert.equal(nextCalls, 1);
+    assert.deepEqual(skippedPaths, [
+      '/studio/preview/runtime',
+      '/api/health',
+      '/studio',
+      '/node_modules/react/index.js',
+    ]);
   });
 
   it('serves preview source and Vite internal paths through Vite', async () => {
@@ -158,6 +166,7 @@ describe('preview Vite middleware', () => {
     });
 
     await middleware.handler(createRequest('/components/ui/button.tsx'), createResponse(), noop);
+    await middleware.handler(createRequest('/app/components/button.tsx'), createResponse(), noop);
     await middleware.handler(createRequest('/src/lib/utils.ts'), createResponse(), noop);
     await middleware.handler(
       createRequest('/node_modules/.vite/deps/react.js'),
@@ -168,6 +177,7 @@ describe('preview Vite middleware', () => {
 
     assert.deepEqual(handledPaths, [
       '/components/ui/button.tsx',
+      '/app/components/button.tsx',
       '/src/lib/utils.ts',
       '/node_modules/.vite/deps/react.js',
       '/@vite/client',

@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 import type { VariantAxis } from '@studio-shared';
-import { variantGridSelections } from './previewState';
+import { previewFrameUrl, variantGridSelections } from './previewState';
+
+const originalWindow = globalThis.window;
+
+after(() => {
+  globalThis.window = originalWindow;
+});
 
 describe('preview variant grid selections', () => {
   it('returns every selection when the cartesian product is within the limit', () => {
@@ -48,5 +54,28 @@ describe('preview variant grid selections', () => {
     assert.equal(result.total, 1024);
     assert.equal(result.truncated, true);
     assert.equal(result.selections.length, 20);
+  });
+});
+
+describe('preview frame URLs', () => {
+  it('preserves the selected export name in iframe URLs', () => {
+    globalThis.window = {
+      location: { href: 'http://localhost:3000/studio', origin: 'http://localhost:3000' },
+    } as Window & typeof globalThis;
+
+    const url = previewFrameUrl(
+      {
+        componentPath: 'components/ui/button.tsx',
+        exportName: 'ButtonIcon',
+        viewport: 'desktop',
+        theme: 'light',
+        density: 'default',
+        state: 'default',
+        variants: {},
+      },
+      'http://127.0.0.1:3001/studio/preview/frame?componentPath=components%2Fui%2Fbutton.tsx'
+    );
+
+    assert.match(url, /exportName=ButtonIcon/);
   });
 });
