@@ -17,6 +17,7 @@ import tokensRouter from './routes/tokens.js';
 import variantsRouter from './routes/variants.js';
 import workspaceRouter from './routes/workspace.js';
 import { initializeDefaultTemplates } from './services/template.js';
+import { previewViteMiddleware } from './services/previewVite.js';
 import { initializeWorkspace } from './services/workspace.js';
 import { logger } from './utils/logger.js';
 import { readPositiveInteger } from './utils/numbers.js';
@@ -88,6 +89,9 @@ app.use('/api/variants', variantsRouter);
 app.use('/api/studio', studioRouter);
 app.use('/api/studio/preview', previewRouter);
 app.use('/studio/preview', previewRouter);
+app.use((req, res, next) => {
+  previewViteMiddleware(req, res, next).catch(next);
+});
 
 // Serve built browser studio assets first, then fall back to index.html for SPA routes.
 app.use('/studio', studioAssetLimiter);
