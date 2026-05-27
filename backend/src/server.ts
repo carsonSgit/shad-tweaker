@@ -1,3 +1,4 @@
+import type { Server } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
@@ -9,12 +10,20 @@ import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
 import importsRouter from './routes/imports.js';
 import parserRouter from './routes/parser.js';
+import {
+  createPreviewApiLimiter,
+  createPreviewApiRouter,
+  createPreviewBrowserLimiter,
+  createPreviewBrowserRouter,
+} from './routes/preview.js';
 import primitiveStartersRouter from './routes/primitiveStarters.js';
 import studioRouter from './routes/studio.js';
 import templatesRouter from './routes/templates.js';
 import tokensRouter from './routes/tokens.js';
 import variantsRouter from './routes/variants.js';
 import workspaceRouter from './routes/workspace.js';
+import { getPreviewPort } from './services/preview.js';
+import { previewViteMiddleware } from './services/previewVite.js';
 import { initializeDefaultTemplates } from './services/template.js';
 import { initializeWorkspace } from './services/workspace.js';
 import { logger } from './utils/logger.js';
@@ -44,6 +53,8 @@ export function createStudioAssetLimiter(
 }
 
 const studioAssetLimiter = createStudioAssetLimiter();
+const previewApiLimiter = createPreviewApiLimiter();
+const previewBrowserLimiter = createPreviewBrowserLimiter();
 
 // CORS configuration - restrict to local development
 app.use(
@@ -58,6 +69,7 @@ app.use(
 );
 
 // Request size limits to prevent DoS attacks
+app.use('/api/studio/preview', express.json({ limit: '100kb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
@@ -85,6 +97,8 @@ app.use('/api/primitive-starters', primitiveStartersRouter);
 app.use('/api/tokens', tokensRouter);
 app.use('/api/variants', variantsRouter);
 app.use('/api/studio', studioRouter);
+// Preview exposes JSON APIs under /api and browser-loaded frame/modules under /studio.
+app.use('/api/studio/preview', previewApiLimiter, createPreviewApiRouter());
 
 // Serve built browser studio assets first, then fall back to index.html for SPA routes.
 app.use('/studio', studioAssetLimiter);
@@ -105,14 +119,49 @@ app.get(['/studio', '/studio/*'], (_req, res) => {
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error', err);
-  res.status(500).json({
+  const status = 'status' in err && typeof err.status === 'number' ? err.status : 500;
+  res.status(status).json({
     success: false,
     error: {
-      message: 'Internal server error',
+      message: status === 413 ? 'Request body too large' : 'Internal server error',
       code: 'INTERNAL_ERROR',
     },
   });
 });
+
+export function createPreviewApp() {
+  const previewApp = express();
+  // The preview server intentionally omits CORS: browser-loaded frame and module
+  // resources are served directly, while JSON preview APIs stay on the main app.
+  previewApp.use(express.json({ limit: '1mb' }));
+  previewApp.use(express.urlencoded({ extended: true, limit: '1mb' }));
+  previewApp.use('/studio/preview', previewBrowserLimiter, createPreviewBrowserRouter());
+  previewApp.use((req, res, next) => {
+    Promise.resolve(previewViteMiddleware.handler(req, res, next)).catch(next);
+  });
+  previewApp.use(
+    (err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      logger.error('Unhandled preview server error', err);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Internal preview server error',
+          code: 'INTERNAL_PREVIEW_ERROR',
+        },
+      });
+    }
+  );
+  previewApp.use((_req, res) => {
+    res.status(404).json({
+      success: false,
+      error: {
+        message: 'Preview endpoint not found',
+        code: 'NOT_FOUND',
+      },
+    });
+  });
+  return previewApp;
+}
 
 app.use((_req, res) => {
   res.status(404).json({
@@ -125,6 +174,32 @@ app.use((_req, res) => {
 });
 
 async function start() {
+  let backendServer: Server | undefined;
+  let previewServer: Server | undefined;
+
+  async function shutdown(signal: NodeJS.Signals): Promise<void> {
+    logger.info(`Received ${signal}; shutting down preview services.`);
+    await Promise.all([
+      closeHttpServer(backendServer),
+      closeHttpServer(previewServer),
+      previewViteMiddleware.close(),
+    ]);
+    process.exit(0);
+  }
+
+  process.once('SIGINT', () => {
+    shutdown('SIGINT').catch((error) => {
+      logger.error('Failed to shut down cleanly', error);
+      process.exit(1);
+    });
+  });
+  process.once('SIGTERM', () => {
+    shutdown('SIGTERM').catch((error) => {
+      logger.error('Failed to shut down cleanly', error);
+      process.exit(1);
+    });
+  });
+
   try {
     await initializeDefaultTemplates();
     const { manifest } = await initializeWorkspace();
@@ -136,7 +211,7 @@ async function start() {
       );
     }
 
-    app.listen(port, () => {
+    backendServer = app.listen(port, () => {
       logger.info(`Shadcn Tweaker Backend running on http://localhost:${port}`);
       logger.info('Available endpoints:');
       logger.info('  GET  /api/components/scan - Scan for components');
@@ -185,10 +260,25 @@ async function start() {
       logger.info('  GET  /api/studio/summary - Get local studio summary');
       logger.info('  GET  /studio - Open browser studio shell');
     });
+    const previewPort = getPreviewPort();
+    previewServer = createPreviewApp().listen(previewPort, () => {
+      logger.info(`Shadcn Tweaker Preview running on http://127.0.0.1:${previewPort}`);
+    });
   } catch (error) {
     logger.error('Failed to start server', error);
     process.exit(1);
   }
+}
+
+function closeHttpServer(server: Server | undefined): Promise<void> {
+  if (!server) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    server.close((error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+    server.closeAllConnections?.();
+  });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {

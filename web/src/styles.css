@@ -14,7 +14,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -208,6 +209,112 @@ h1 {
   gap: 10px;
 }
 
+.preview-workspace {
+  --preview-surface: #fbfbfc;
+  --preview-panel-border: #dfe3e8;
+  --preview-control-background: #ffffff;
+  --preview-control-border: #cfd5dd;
+  --preview-text: #202124;
+  --preview-muted-text: #4f5661;
+  --preview-subtle-text: #6f7680;
+  --preview-danger-background: #fff4f2;
+  --preview-danger-border: #f0b8b1;
+  --preview-danger-text: #8f1f18;
+  gap: 18px;
+}
+
+.preview-toolbar,
+.preview-controls {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.preview-toolbar label,
+.preview-controls label {
+  color: var(--preview-muted-text);
+  display: grid;
+  font-size: 13px;
+  gap: 6px;
+}
+
+.preview-toolbar select,
+.preview-controls select {
+  background: var(--preview-control-background);
+  border: 1px solid var(--preview-control-border);
+  border-radius: 6px;
+  color: var(--preview-text);
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.preview-frame-shell {
+  background: var(--preview-surface);
+  border: 1px solid var(--preview-panel-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  overflow: auto;
+  padding: 10px;
+}
+
+.preview-frame-header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.preview-frame-header span {
+  color: var(--preview-subtle-text);
+  font-size: 13px;
+}
+
+.preview-frame {
+  background: var(--preview-control-background);
+  border: 1px solid var(--preview-panel-border);
+  border-radius: 6px;
+}
+
+.preview-section {
+  display: grid;
+  gap: 10px;
+}
+
+.preview-section h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.preview-note {
+  color: var(--preview-muted-text);
+  font-size: 13px;
+  margin: 0;
+}
+
+.preview-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.compact-grid .preview-frame-shell {
+  max-height: 360px;
+}
+
+.preview-diagnostic,
+.preview-diagnostics {
+  background: var(--preview-danger-background);
+  border: 1px solid var(--preview-danger-border);
+  border-radius: 6px;
+  color: var(--preview-danger-text);
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
 @media (max-width: 760px) {
   .studio {
     grid-template-columns: 1fr;
@@ -230,5 +337,9 @@ h1 {
   .row,
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .preview-frame-shell {
+    max-width: 100%;
   }
 }
