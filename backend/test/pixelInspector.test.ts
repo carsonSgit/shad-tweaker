@@ -3,10 +3,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import fs from 'fs-extra';
-import {
-  analyzePixelInspector,
-  buildPixelInspectorPatch,
-} from '../src/services/pixelInspector.js';
+import { analyzePixelInspector, buildPixelInspectorPatch } from '../src/services/pixelInspector.js';
 import { recordScannedComponents } from '../src/services/workspace.js';
 import type { Component } from '../src/types/index.js';
 
@@ -99,5 +96,21 @@ export function Button() {
     const content = `className="p-2 p-20 hover:p-2"`;
     assert.equal(patch.apply(content).content, `className="p-4 p-20 hover:p-2"`);
     assert.equal(patch.apply(content).changes, 1);
+  });
+
+  it('accepts absolute component paths inside the workspace', async () => {
+    const root = await createTempRoot();
+    await writeComponent(
+      root,
+      'components/ui/badge.tsx',
+      `export function Badge() {
+  return <span className="rounded-full px-3 text-xs shadow-sm">Badge</span>;
+}`
+    );
+
+    const analysis = await analyzePixelInspector(path.join(root, 'components/ui/badge.tsx'));
+
+    assert.equal(analysis.componentPath, 'components/ui/badge.tsx');
+    assert.ok(analysis.candidates.some((candidate) => candidate.group === 'radius'));
   });
 });

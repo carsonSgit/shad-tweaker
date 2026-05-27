@@ -1,22 +1,26 @@
+import path from 'node:path';
 import fs from 'fs-extra';
 import type {
+  PixelInspectorAnalysis,
   PixelInspectorApplyRequest,
   PixelInspectorApplyResult,
-  PixelInspectorPreviewRequest,
-  PixelInspectorAnalysis,
   PixelInspectorClassCandidate,
   PixelInspectorControlGroup,
   PixelInspectorDraft,
+  PixelInspectorPreviewRequest,
   Preset,
   Preview,
 } from '../types/index.js';
 import { isSafeProjectRelativePath } from '../utils/paths.js';
-import { parseComponentSource } from './parser.js';
-import { getWorkingDirectory, loadWorkspaceManifest, mutateWorkspaceManifest } from './workspace.js';
-import path from 'node:path';
-import { createPreview } from './differ.js';
 import { createBackup } from './backup.js';
+import { createPreview } from './differ.js';
+import { parseComponentSource } from './parser.js';
 import { applyTokenPatch, classifyTokenClass } from './tokens.js';
+import {
+  getWorkingDirectory,
+  loadWorkspaceManifest,
+  mutateWorkspaceManifest,
+} from './workspace.js';
 
 const CONTROL_PATTERNS: Array<[PixelInspectorControlGroup, RegExp]> = [
   ['radius', /^(?:[a-z0-9-]+:)*rounded(?:-|$)/],
@@ -43,7 +47,10 @@ export class PixelInspectorValidationError extends Error {
 }
 
 function normalizeComponentPath(componentPath: string): string {
-  const normalized = componentPath.trim().replace(/\\/g, '/').replace(/^\.\//, '');
+  const trimmed = componentPath.trim();
+  const cwd = path.resolve(getWorkingDirectory());
+  const relativePath = path.isAbsolute(trimmed) ? path.relative(cwd, trimmed) : trimmed;
+  const normalized = relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
   if (
     !normalized ||
     path.isAbsolute(normalized) ||
@@ -68,7 +75,9 @@ function uniqueClasses(classes: string[]): string[] {
   return [...new Set(classes.filter(Boolean))];
 }
 
-export async function analyzePixelInspector(componentPath: string): Promise<PixelInspectorAnalysis> {
+export async function analyzePixelInspector(
+  componentPath: string
+): Promise<PixelInspectorAnalysis> {
   const normalized = normalizeComponentPath(componentPath);
   const absolutePath = path.resolve(getWorkingDirectory(), normalized);
   const content = await fs.readFile(absolutePath, 'utf-8');
@@ -76,7 +85,11 @@ export async function analyzePixelInspector(componentPath: string): Promise<Pixe
   const candidates: PixelInspectorClassCandidate[] = [];
   const unsupported: PixelInspectorAnalysis['unsupported'] = [];
 
-  function collect(className: string, source: PixelInspectorClassCandidate['source'], line?: number) {
+  function collect(
+    className: string,
+    source: PixelInspectorClassCandidate['source'],
+    line?: number
+  ) {
     const group = classifyInspectorClass(className);
     if (group) {
       candidates.push({ className, group, source, line });
@@ -263,7 +276,10 @@ export async function createPixelInspectorPreset(input: {
   return mutateWorkspaceManifest(async (manifest) => ({
     manifest: {
       ...manifest,
-      presets: [...(manifest.presets ?? []).filter((candidate) => candidate.id !== preset.id), preset],
+      presets: [
+        ...(manifest.presets ?? []).filter((candidate) => candidate.id !== preset.id),
+        preset,
+      ],
     },
     result: preset,
   }));
