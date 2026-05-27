@@ -10,7 +10,12 @@ import {
   createPreviewApiRouter,
   createPreviewBrowserRouter,
 } from '../src/routes/preview.js';
-import { createPreviewFrameHtml } from '../src/services/preview.js';
+import {
+  createPreviewFrameHtml,
+  getPreviewOrigin,
+  getPreviewPort,
+  getStudioOrigin,
+} from '../src/services/preview.js';
 
 const app = express();
 app.use(express.json());
@@ -35,6 +40,10 @@ async function createTempRoot(): Promise<string> {
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((root) => fs.remove(root)));
   delete process.env.SHADCN_TWEAKER_CWD;
+  delete process.env.PORT;
+  delete process.env.PREVIEW_PORT;
+  delete process.env.PREVIEW_ORIGIN;
+  delete process.env.STUDIO_ORIGIN;
 });
 
 after(async () => {
@@ -399,6 +408,25 @@ export function ButtonIcon() { return <span>Icon</span>; }`
     assert.match(res.text, /data-density="default"/);
   });
 
+  it('sets a local-only frame-ancestors CSP on preview browser responses', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/badge.tsx'),
+      `export function Badge() { return <span>Badge</span>; }`
+    );
+
+    const res = await request(app)
+      .get('/studio/preview/frame')
+      .query({ componentPath: 'components/ui/badge.tsx' });
+
+    assert.equal(res.status, 200);
+    assert.equal(
+      res.headers['content-security-policy'],
+      "frame-ancestors 'self' http://localhost:* http://127.0.0.1:*"
+    );
+    assert.equal(res.headers['x-frame-options'], undefined);
+  });
+
   it('escapes preview frame theme and density attributes', () => {
     const html = createPreviewFrameHtml({
       componentPath: 'components/ui/badge.tsx',
@@ -441,6 +469,28 @@ export function ButtonIcon() { return <span>Icon</span>; }`
     assert.match(res.text, /React\.createElement\(Component, previewProps\)/);
     assert.match(res.text, /"aria-selected": true/);
     assert.match(res.text, /"tone": "muted"/);
+  });
+
+  it('serializes runtime request values as JavaScript data, not executable code', async () => {
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/alert-card.tsx'),
+      `export function AlertCard() { return <section>Alert</section>; }`
+    );
+
+    const res = await request(app).get('/studio/preview/runtime').query({
+      componentPath: 'components/ui/alert-card.tsx',
+      parentOrigin: 'http://localhost:4321',
+      state: 'open',
+      'variant.intent': 'alert',
+    });
+
+    assert.equal(res.status, 200);
+    assert.match(res.text, /const parentOrigin = "http:\/\/localhost:4321"/);
+    assert.match(res.text, /"data-preview-state": "open"/);
+    assert.match(res.text, /"intent": "alert"/);
+    assert.doesNotMatch(res.text, /postMessage\([^;]+,\s*['"]\*['"]\)/s);
+    assert.doesNotMatch(res.text, /;\s*alert\s*\(/);
   });
 
   it('returns a runtime module for a selected named export', async () => {
@@ -519,5 +569,22 @@ export function Dynamic() { return <button className={getClasses()}>Dynamic</but
         (diagnostic: { code: string }) => diagnostic.code === 'UNSUPPORTED_CLASSNAME_EXPRESSION'
       )
     );
+  });
+
+  it('falls back to safe local preview and studio origins for invalid environment values', () => {
+    process.env.PORT = '4100';
+    process.env.PREVIEW_PORT = 'not-a-number';
+    process.env.PREVIEW_ORIGIN = 'https://example.com';
+    process.env.STUDIO_ORIGIN = 'https://example.com';
+
+    assert.equal(getPreviewPort(), 4101);
+    assert.equal(getPreviewOrigin(), 'http://127.0.0.1:4101');
+    assert.equal(getStudioOrigin(), 'http://127.0.0.1:4100');
+
+    process.env.PORT = 'not-a-number';
+
+    assert.equal(getPreviewPort(), 3001);
+    assert.equal(getPreviewOrigin(), 'http://127.0.0.1:3001');
+    assert.equal(getStudioOrigin(), 'http://127.0.0.1:3000');
   });
 });

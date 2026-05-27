@@ -331,6 +331,8 @@ export async function createPreviewRuntimeModule(
   const parentOrigin = request.parentOrigin ?? getStudioOrigin();
   const previewProps = createPreviewProps(request);
 
+  // Request-derived values in this generated module must stay data-only. Use
+  // JSON.stringify for every embedded runtime value instead of code interpolation.
   return `import React from 'react';
 import { createRoot } from 'react-dom/client';
 import * as ComponentModule from '${componentModulePath}';
@@ -436,6 +438,7 @@ function previewLabel(request: ComponentPreviewRequest): string {
 }
 
 function escapeAttribute(value: string): string {
+  // Preview frame attributes are double-quoted; escaping " is the quote boundary guard.
   return value
     .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;')

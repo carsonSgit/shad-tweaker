@@ -131,6 +131,8 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 export function createPreviewApp() {
   const previewApp = express();
+  // The preview server intentionally omits CORS: browser-loaded frame and module
+  // resources are served directly, while JSON preview APIs stay on the main app.
   previewApp.use(express.json({ limit: '1mb' }));
   previewApp.use(express.urlencoded({ extended: true, limit: '1mb' }));
   previewApp.use('/studio/preview', previewBrowserLimiter, createPreviewBrowserRouter());
@@ -258,8 +260,9 @@ async function start() {
       logger.info('  GET  /api/studio/summary - Get local studio summary');
       logger.info('  GET  /studio - Open browser studio shell');
     });
-    previewServer = createPreviewApp().listen(getPreviewPort(), () => {
-      logger.info(`Shadcn Tweaker Preview running on http://127.0.0.1:${getPreviewPort()}`);
+    const previewPort = getPreviewPort();
+    previewServer = createPreviewApp().listen(previewPort, () => {
+      logger.info(`Shadcn Tweaker Preview running on http://127.0.0.1:${previewPort}`);
     });
   } catch (error) {
     logger.error('Failed to start server', error);
@@ -274,6 +277,7 @@ function closeHttpServer(server: Server | undefined): Promise<void> {
       if (error) reject(error);
       else resolve();
     });
+    server.closeAllConnections?.();
   });
 }
 

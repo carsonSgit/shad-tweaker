@@ -62,6 +62,8 @@ export function createPreviewViteMiddleware(
         }
         throw error;
       });
+      // Cache the initialization promise synchronously so concurrent preview
+      // requests share one Vite startup instead of creating duplicate servers.
       previewViteServerCache = { rootPath, server };
     }
 

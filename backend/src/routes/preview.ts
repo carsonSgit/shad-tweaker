@@ -24,6 +24,8 @@ function previewErrorResponse(error: unknown, fallback: string) {
   return { status: 500, message, code: 'COMPONENT_PREVIEW_ERROR' };
 }
 
+const PREVIEW_FRAME_CSP = "frame-ancestors 'self' http://localhost:* http://127.0.0.1:*";
+
 export function createPreviewApiLimiter(
   max = readPositiveInteger(process.env.PREVIEW_API_RATE_LIMIT_PER_MINUTE, 300)
 ) {
@@ -86,6 +88,13 @@ export function createPreviewApiRouter(): Router {
 
 export function createPreviewBrowserRouter(): Router {
   const router = Router();
+
+  router.use((_req, res, next) => {
+    // The preview frame is intentionally embeddable by the local studio. CSP is
+    // the framing control here; X-Frame-Options cannot express cross-port local origins.
+    res.setHeader('Content-Security-Policy', PREVIEW_FRAME_CSP);
+    next();
+  });
 
   router.get('/frame', async (req: Request, res: Response) => {
     try {
