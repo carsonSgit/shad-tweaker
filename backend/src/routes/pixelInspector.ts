@@ -1,6 +1,7 @@
 import { type Request, type Response, Router } from 'express';
 import {
   analyzePixelInspector,
+  applyPixelInspectorPatch,
   PixelInspectorValidationError,
   previewPixelInspectorPatch,
 } from '../services/pixelInspector.js';
@@ -46,6 +47,25 @@ router.post('/preview', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Failed to preview pixel inspector patch', error);
     sendError(res, error, 'Failed to preview pixel inspector patch');
+  }
+});
+
+router.post('/apply', async (req: Request, res: Response) => {
+  try {
+    if (!req.body?.draft || typeof req.body.draft !== 'object') {
+      throw new PixelInspectorValidationError('draft is required.');
+    }
+    res.json({
+      success: true,
+      result: await applyPixelInspectorPatch({
+        draft: req.body.draft,
+        createBackup: req.body.createBackup,
+        recordOverrides: req.body.recordOverrides,
+      }),
+    });
+  } catch (error) {
+    logger.error('Failed to apply pixel inspector patch', error);
+    sendError(res, error, 'Failed to apply pixel inspector patch');
   }
 });
 

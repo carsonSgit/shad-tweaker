@@ -85,4 +85,34 @@ describe('pixel inspector routes', () => {
     assert.match(res.body.previews[0].diff, /rounded-lg p-4/);
     assert.equal(await fs.readFile(componentPath, 'utf-8'), before);
   });
+
+  it('applies component class patches with a backup', async () => {
+    const root = await createTempRoot();
+    const componentPath = path.join(root, 'components/ui/card.tsx');
+    await fs.outputFile(
+      componentPath,
+      `export function Card() {
+  return <div className="rounded-md p-2 shadow-sm">Card</div>;
+}`
+    );
+
+    const res = await request(app)
+      .post('/api/pixel-inspector/apply')
+      .send({
+        draft: {
+          componentPath: 'components/ui/card.tsx',
+          targetClasses: ['rounded-md', 'p-2'],
+          replacementClasses: ['rounded-lg', 'p-4'],
+          rawClassName: 'rounded-lg p-4 shadow-sm',
+          saveMode: 'component-patch',
+        },
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.result.success, true);
+    assert.equal(res.body.result.changes, 2);
+    assert.ok(res.body.result.backupId);
+    assert.match(await fs.readFile(componentPath, 'utf-8'), /rounded-lg p-4 shadow-sm/);
+  });
 });

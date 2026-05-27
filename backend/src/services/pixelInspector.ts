@@ -1,5 +1,7 @@
 import fs from 'fs-extra';
 import type {
+  PixelInspectorApplyRequest,
+  PixelInspectorApplyResult,
   PixelInspectorPreviewRequest,
   PixelInspectorAnalysis,
   PixelInspectorClassCandidate,
@@ -12,6 +14,7 @@ import { parseComponentSource } from './parser.js';
 import { getWorkingDirectory } from './workspace.js';
 import path from 'node:path';
 import { createPreview } from './differ.js';
+import { createBackup } from './backup.js';
 
 const CONTROL_PATTERNS: Array<[PixelInspectorControlGroup, RegExp]> = [
   ['radius', /^(?:[a-z0-9-]+:)*rounded(?:-|$)/],
@@ -165,5 +168,32 @@ export async function previewPixelInspectorPatch(
   return {
     previews: [createPreview(absolutePath, content, patched.content)],
     totalChanges: patched.changes,
+  };
+}
+
+export async function applyPixelInspectorPatch(
+  input: PixelInspectorApplyRequest
+): Promise<PixelInspectorApplyResult> {
+  const normalized = normalizeComponentPath(input.draft.componentPath);
+  const absolutePath = path.resolve(getWorkingDirectory(), normalized);
+  const content = await fs.readFile(absolutePath, 'utf-8');
+  const patch = buildPixelInspectorPatch({ ...input.draft, componentPath: normalized });
+  const patched = patch.apply(content);
+  let backupId: string | undefined;
+
+  if (patched.changes > 0 && (input.createBackup ?? true)) {
+    const backup = await createBackup([absolutePath]);
+    backupId = backup.id;
+  }
+
+  if (patched.changes > 0) {
+    await fs.writeFile(absolutePath, patched.content, 'utf-8');
+  }
+
+  return {
+    success: true,
+    modified: patched.changes > 0 ? [absolutePath] : [],
+    changes: patched.changes,
+    backupId,
   };
 }
