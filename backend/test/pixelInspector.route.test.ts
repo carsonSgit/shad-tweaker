@@ -58,4 +58,31 @@ describe('pixel inspector routes', () => {
     assert.equal(res.body.success, false);
     assert.equal(res.body.error.code, 'PIXEL_INSPECTOR_VALIDATION_ERROR');
   });
+
+  it('previews class patches without writing component files', async () => {
+    const root = await createTempRoot();
+    const componentPath = path.join(root, 'components/ui/card.tsx');
+    const before = `export function Card() {
+  return <div className="rounded-md p-2 shadow-sm">Card</div>;
+}`;
+    await fs.outputFile(componentPath, before);
+
+    const res = await request(app)
+      .post('/api/pixel-inspector/preview')
+      .send({
+        draft: {
+          componentPath: 'components/ui/card.tsx',
+          targetClasses: ['rounded-md', 'p-2'],
+          replacementClasses: ['rounded-lg', 'p-4'],
+          rawClassName: 'rounded-lg p-4 shadow-sm',
+          saveMode: 'component-patch',
+        },
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.totalChanges, 2);
+    assert.match(res.body.previews[0].diff, /rounded-lg p-4/);
+    assert.equal(await fs.readFile(componentPath, 'utf-8'), before);
+  });
 });

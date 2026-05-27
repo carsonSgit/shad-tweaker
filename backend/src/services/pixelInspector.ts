@@ -1,14 +1,17 @@
 import fs from 'fs-extra';
 import type {
+  PixelInspectorPreviewRequest,
   PixelInspectorAnalysis,
   PixelInspectorClassCandidate,
   PixelInspectorControlGroup,
   PixelInspectorDraft,
+  Preview,
 } from '../types/index.js';
 import { isSafeProjectRelativePath } from '../utils/paths.js';
 import { parseComponentSource } from './parser.js';
 import { getWorkingDirectory } from './workspace.js';
 import path from 'node:path';
+import { createPreview } from './differ.js';
 
 const CONTROL_PATTERNS: Array<[PixelInspectorControlGroup, RegExp]> = [
   ['radius', /^(?:[a-z0-9-]+:)*rounded(?:-|$)/],
@@ -145,5 +148,22 @@ export function buildPixelInspectorPatch(draft: PixelInspectorDraft): {
       }
       return { content: nextContent, changes: totalChanges };
     },
+  };
+}
+
+export async function previewPixelInspectorPatch(
+  input: PixelInspectorPreviewRequest
+): Promise<{ previews: Preview[]; totalChanges: number }> {
+  const normalized = normalizeComponentPath(input.draft.componentPath);
+  const absolutePath = path.resolve(getWorkingDirectory(), normalized);
+  const content = await fs.readFile(absolutePath, 'utf-8');
+  const patch = buildPixelInspectorPatch({ ...input.draft, componentPath: normalized });
+  const patched = patch.apply(content);
+  if (patched.changes === 0) {
+    return { previews: [], totalChanges: 0 };
+  }
+  return {
+    previews: [createPreview(absolutePath, content, patched.content)],
+    totalChanges: patched.changes,
   };
 }

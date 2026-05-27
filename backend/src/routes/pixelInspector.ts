@@ -2,6 +2,7 @@ import { type Request, type Response, Router } from 'express';
 import {
   analyzePixelInspector,
   PixelInspectorValidationError,
+  previewPixelInspectorPatch,
 } from '../services/pixelInspector.js';
 import { logger } from '../utils/logger.js';
 
@@ -30,6 +31,21 @@ router.post('/analyze', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Failed to analyze pixel inspector classes', error);
     sendError(res, error, 'Failed to analyze pixel inspector classes');
+  }
+});
+
+router.post('/preview', async (req: Request, res: Response) => {
+  try {
+    if (!req.body?.draft || typeof req.body.draft !== 'object') {
+      throw new PixelInspectorValidationError('draft is required.');
+    }
+    res.json({
+      success: true,
+      ...(await previewPixelInspectorPatch({ draft: req.body.draft })),
+    });
+  } catch (error) {
+    logger.error('Failed to preview pixel inspector patch', error);
+    sendError(res, error, 'Failed to preview pixel inspector patch');
   }
 });
 
