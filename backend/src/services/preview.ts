@@ -136,12 +136,18 @@ function readAllowed<T extends string>(
   fieldName: string
 ): T | undefined {
   if (value === undefined) return undefined;
-  if (typeof value !== 'string' || !allowed.includes(value as T)) {
+  if (typeof value !== 'string') {
     throw new ComponentPreviewValidationError(
       `${fieldName} must be one of: ${allowed.join(', ')}.`
     );
   }
-  return value as T;
+  const match = allowed.find((option) => option === value);
+  if (!match) {
+    throw new ComponentPreviewValidationError(
+      `${fieldName} must be one of: ${allowed.join(', ')}.`
+    );
+  }
+  return match;
 }
 
 function readPreviewOrigin(value: unknown): string | undefined {
@@ -335,7 +341,7 @@ export async function createPreviewRuntimeModule(
   // JSON.stringify for every embedded runtime value instead of code interpolation.
   return `import React from 'react';
 import { createRoot } from 'react-dom/client';
-import * as ComponentModule from '${componentModulePath}';
+import * as ComponentModule from ${JSON.stringify(componentModulePath)};
 
 const exportName = ${JSON.stringify(exportName)};
 const parentOrigin = ${JSON.stringify(parentOrigin)};

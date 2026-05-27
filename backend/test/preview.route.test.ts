@@ -455,7 +455,7 @@ export function ButtonIcon() { return <span>Icon</span>; }`
 
     assert.equal(res.status, 200);
     assert.match(res.headers['content-type'], /javascript/);
-    assert.match(res.text, /from '\/studio\/preview\/component\//);
+    assert.match(res.text, /from ["']\/studio\/preview\/component\//);
     assert.match(res.text, /const exportName = "Card"/);
     assert.match(res.text, /const parentOrigin = "http:\/\/127\.0\.0\.1:\d+"/);
     assert.equal(res.text.match(/postMessage\(/g)?.length, 2);
