@@ -20,6 +20,7 @@ import type {
   PixelInspectorApplyResult,
   PixelInspectorPreviewRequest,
   Preview,
+  Preset,
   RegistryItemSummary,
   RegistrySource,
   RegistrySourceHealth,
@@ -31,6 +32,8 @@ import type {
   TokenPatchChange,
   VariantComponentDetail,
   VariantComponentSummary,
+  VariantGenerationPreview,
+  VariantPreviewOperation,
   WorkspaceConfig,
   WorkspaceManifest,
 } from '../types/index.js';
@@ -479,6 +482,36 @@ export async function applyPixelInspector(
   input: PixelInspectorApplyRequest
 ): Promise<ApiResponse<{ result: PixelInspectorApplyResult }>> {
   return request('/api/pixel-inspector/apply', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getPixelInspectorPresets(): Promise<ApiResponse<{ presets: Preset[] }>> {
+  return request('/api/pixel-inspector/presets');
+}
+
+export async function createPixelInspectorPreset(input: {
+  name: string;
+  description?: string;
+  draft: PixelInspectorPreviewRequest['draft'];
+}): Promise<ApiResponse<{ preset: Preset }>> {
+  return request('/api/pixel-inspector/presets', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function applyVariantGeneration(input: {
+  componentPath: string;
+  targetDefinition: string;
+  operation: VariantPreviewOperation;
+}): Promise<
+  ApiResponse<{
+    result: { preview: VariantGenerationPreview; modified: string[]; backupId?: string };
+  }>
+> {
+  return request('/api/variants/apply', {
     method: 'POST',
     body: JSON.stringify(input),
   });

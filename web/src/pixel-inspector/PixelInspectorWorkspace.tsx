@@ -1,7 +1,12 @@
 import {
   analyzePixelInspector,
+  applyPixelInspector,
+  applyVariantGeneration,
+  createPixelInspectorPreset,
   type PixelInspectorAnalysis,
   type PixelInspectorClassCandidate,
+  type PixelInspectorSaveMode,
+  previewPixelInspector,
   type StudioSummary,
 } from '@studio-shared';
 import { useEffect, useMemo, useState } from 'react';
@@ -25,6 +30,11 @@ export function PixelInspectorWorkspace({
   const [selectedClass, setSelectedClass] = useState('');
   const [replacementClass, setReplacementClass] = useState('');
   const [rawClassName, setRawClassName] = useState('');
+  const [saveMode, setSaveMode] = useState<PixelInspectorSaveMode>('component-patch');
+  const [tokenSetId, setTokenSetId] = useState(summary.tokens.tokenSets[0]?.id ?? '');
+  const [presetName, setPresetName] = useState('Pixel Inspector Preset');
+  const [variantValue, setVariantValue] = useState('inspected');
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!componentPath && components[0]) {
@@ -77,6 +87,80 @@ export function PixelInspectorWorkspace({
     }),
     [componentPath, rawClassName]
   );
+
+  const draft = useMemo(
+    () => ({
+      componentPath,
+      targetClasses: selectedClass ? [selectedClass] : [],
+      replacementClasses: replacementClass ? [replacementClass] : [],
+      rawClassName,
+      saveMode,
+      tokenSetId: tokenSetId || undefined,
+      tokenName: selectedClass ? `${selectedClass}-override` : undefined,
+      presetName,
+      variantDefinition: analysis?.candidates[0] ? 'buttonVariants' : undefined,
+      variantAxis: 'variant',
+      variantValue,
+    }),
+    [
+      analysis,
+      componentPath,
+      presetName,
+      rawClassName,
+      replacementClass,
+      saveMode,
+      selectedClass,
+      tokenSetId,
+      variantValue,
+    ]
+  );
+
+  async function previewDraft() {
+    const result = await previewPixelInspector({ draft });
+    if (result.success && result.data) {
+      setResultMessage(`${result.data.totalChanges} class changes previewed.`);
+    } else {
+      setResultMessage(result.error?.message || 'Preview failed.');
+    }
+  }
+
+  async function saveDraft() {
+    if (saveMode === 'preset') {
+      const result = await createPixelInspectorPreset({ name: presetName, draft });
+      setResultMessage(
+        result.success && result.data
+          ? `Preset saved: ${result.data.preset.name}`
+          : result.error?.message || 'Preset save failed.'
+      );
+      return;
+    }
+    if (saveMode === 'variant-value') {
+      const result = await applyVariantGeneration({
+        componentPath,
+        targetDefinition: draft.variantDefinition || '',
+        operation: {
+          type: 'add-value',
+          axisName: draft.variantAxis || 'variant',
+          value: { name: variantValue, classes: rawClassName.split(/\s+/).filter(Boolean) },
+        },
+      });
+      setResultMessage(
+        result.success && result.data
+          ? `Variant saved with backup ${result.data.result.backupId ?? 'none'}.`
+          : result.error?.message || 'Variant save failed.'
+      );
+      return;
+    }
+    const result = await applyPixelInspector({
+      draft,
+      recordOverrides: saveMode === 'token-patch',
+    });
+    setResultMessage(
+      result.success && result.data
+        ? `${result.data.result.changes} changes saved.`
+        : result.error?.message || 'Save failed.'
+    );
+  }
 
   if (components.length === 0) {
     return <section className="panel">No components found.</section>;
@@ -155,6 +239,54 @@ export function PixelInspectorWorkspace({
                 value={rawClassName}
               />
             </label>
+            <label>
+              Save as
+              <select
+                onChange={(event) => setSaveMode(event.target.value as PixelInspectorSaveMode)}
+                value={saveMode}
+              >
+                <option value="component-patch">Component patch</option>
+                <option value="token-patch">Token patch</option>
+                <option value="variant-value">Variant value</option>
+                <option value="preset">Reusable preset</option>
+              </select>
+            </label>
+            {saveMode === 'token-patch' ? (
+              <label>
+                Token set
+                <select onChange={(event) => setTokenSetId(event.target.value)} value={tokenSetId}>
+                  {summary.tokens.tokenSets.map((tokenSet) => (
+                    <option key={tokenSet.id} value={tokenSet.id}>
+                      {tokenSet.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {saveMode === 'preset' ? (
+              <label>
+                Preset name
+                <input onChange={(event) => setPresetName(event.target.value)} value={presetName} />
+              </label>
+            ) : null}
+            {saveMode === 'variant-value' ? (
+              <label>
+                Variant value
+                <input
+                  onChange={(event) => setVariantValue(event.target.value)}
+                  value={variantValue}
+                />
+              </label>
+            ) : null}
+            <div className="actions">
+              <button onClick={previewDraft} type="button">
+                Preview patch
+              </button>
+              <button onClick={saveDraft} type="button">
+                Save
+              </button>
+            </div>
+            {resultMessage ? <p>{resultMessage}</p> : null}
           </div>
           <PreviewFrame
             label="Inspector preview"

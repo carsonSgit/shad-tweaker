@@ -1,7 +1,10 @@
 export {
   analyzePixelInspector,
   applyPixelInspector,
+  applyVariantGeneration,
+  createPixelInspectorPreset,
   getComponentPreviewManifest,
+  getPixelInspectorPresets,
   getStudioSummary,
   previewPixelInspector,
   updateWorkspaceConfig,
