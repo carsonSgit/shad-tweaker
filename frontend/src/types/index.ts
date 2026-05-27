@@ -605,6 +605,7 @@ export type Screen =
   | 'tokens'
   | 'variants'
   | 'motion'
+  | 'pixel-inspector'
   | 'diff'
   | 'settings'
   | 'dashboard'
