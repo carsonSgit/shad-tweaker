@@ -1,6 +1,7 @@
 import {
   analyzePixelInspector,
   type PixelInspectorAnalysis,
+  type PixelInspectorClassCandidate,
   type StudioSummary,
 } from '@studio-shared';
 import { useEffect, useMemo, useState } from 'react';
@@ -21,6 +22,9 @@ export function PixelInspectorWorkspace({
   const [componentPath, setComponentPath] = useState(components[0]?.path ?? '');
   const [analysis, setAnalysis] = useState<PixelInspectorAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [replacementClass, setReplacementClass] = useState('');
+  const [rawClassName, setRawClassName] = useState('');
 
   useEffect(() => {
     if (!componentPath && components[0]) {
@@ -36,6 +40,10 @@ export function PixelInspectorWorkspace({
       if (!active) return;
       if (result.success && result.data) {
         setAnalysis(result.data.analysis);
+        const firstClass = result.data.analysis.candidates[0]?.className ?? '';
+        setSelectedClass(firstClass);
+        setReplacementClass(firstClass);
+        setRawClassName(result.data.analysis.rawClasses.join(' '));
       } else {
         setAnalysis(null);
         setError(result.error?.message || 'Could not analyze component classes.');
@@ -53,6 +61,22 @@ export function PixelInspectorWorkspace({
     }
     return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [analysis]);
+
+  const candidatesByGroup = useMemo(() => {
+    const groups = new Map<string, PixelInspectorClassCandidate[]>();
+    for (const candidate of analysis?.candidates ?? []) {
+      groups.set(candidate.group, [...(groups.get(candidate.group) ?? []), candidate]);
+    }
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [analysis]);
+
+  const selection = useMemo(
+    () => ({
+      ...createInitialSelection(componentPath),
+      inspectorClassName: rawClassName.trim() || undefined,
+    }),
+    [componentPath, rawClassName]
+  );
 
   if (components.length === 0) {
     return <section className="panel">No components found.</section>;
@@ -84,6 +108,53 @@ export function PixelInspectorWorkspace({
                 </span>
               ))}
             </div>
+            <label>
+              Target class
+              <select
+                onChange={(event) => {
+                  setSelectedClass(event.target.value);
+                  setReplacementClass(event.target.value);
+                }}
+                value={selectedClass}
+              >
+                {candidatesByGroup.map(([group, candidates]) => (
+                  <optgroup key={group} label={group}>
+                    {candidates.map((candidate) => (
+                      <option
+                        key={`${candidate.source}:${candidate.line}:${candidate.className}`}
+                        value={candidate.className}
+                      >
+                        {candidate.className}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <label>
+              Replacement
+              <input
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setReplacementClass(next);
+                  setRawClassName((current) =>
+                    current
+                      .split(/\s+/)
+                      .map((className) => (className === selectedClass ? next : className))
+                      .join(' ')
+                  );
+                }}
+                value={replacementClass}
+              />
+            </label>
+            <label>
+              Raw classes
+              <textarea
+                onChange={(event) => setRawClassName(event.target.value)}
+                rows={6}
+                value={rawClassName}
+              />
+            </label>
           </div>
           <PreviewFrame
             label="Inspector preview"
@@ -97,7 +168,7 @@ export function PixelInspectorWorkspace({
               frameUrl: `/studio/preview/frame?componentPath=${encodeURIComponent(componentPath)}`,
               diagnostics: [],
             }}
-            selection={createInitialSelection(componentPath)}
+            selection={selection}
           />
         </div>
       ) : null}

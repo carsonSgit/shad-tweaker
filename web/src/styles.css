@@ -312,6 +312,17 @@ h1 {
   gap: 14px;
 }
 
+.pixel-inspector-panel label {
+  display: grid;
+  gap: 6px;
+}
+
+.pixel-inspector-panel textarea {
+  font: inherit;
+  min-height: 132px;
+  resize: vertical;
+}
+
 .pixel-class-groups {
   display: grid;
   gap: 8px;
