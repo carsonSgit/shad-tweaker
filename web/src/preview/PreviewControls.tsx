@@ -14,6 +14,7 @@ interface PreviewControlsProps {
 }
 
 export function PreviewControls({ manifest, selection, onChange }: PreviewControlsProps) {
+  // Milestone 41 previews the primary variant definition; multi-definition controls are future work.
   const definition = manifest.variants[0];
 
   return (

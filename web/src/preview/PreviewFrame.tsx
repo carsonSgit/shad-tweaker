@@ -49,6 +49,7 @@ export function PreviewFrame({ label, manifest, selection }: PreviewFrameProps) 
         className="preview-frame"
         onLoad={() => setRuntimeError(null)}
         ref={iframeRef}
+        // Keep the preview at a unique origin; all parent communication must use postMessage.
         sandbox="allow-scripts"
         src={frameUrl}
         style={{

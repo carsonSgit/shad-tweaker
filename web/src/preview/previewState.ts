@@ -39,6 +39,7 @@ export function selectionFromManifest(
   manifest: ComponentPreviewManifest,
   previous: PreviewSelection
 ): PreviewSelection {
+  // Milestone 41 previews the primary variant definition; multi-definition controls are future work.
   const definition = manifest.variants[0];
   return {
     ...previous,
@@ -67,6 +68,7 @@ export function variantGridSelections(
   limit = VARIANT_GRID_LIMIT
 ): VariantGridSelections {
   const total = axes.reduce((count, axis) => count * Math.max(axis.values.length, 1), 1);
+  // No axes still represents one preview: the unmodified/default component state.
   if (axes.length === 0) return { selections: [{}], total, truncated: false };
 
   const selections: Array<Record<string, string>> = [{}];

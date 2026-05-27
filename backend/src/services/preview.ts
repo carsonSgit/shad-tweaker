@@ -264,6 +264,7 @@ export function createPreviewFrameHtml(request: ComponentPreviewRequest): string
 
   const theme = escapeAttribute(request.theme ?? 'light');
   const density = escapeAttribute(request.density ?? 'default');
+  const runtimeSrc = escapeAttribute(`/studio/preview/runtime?${params.toString()}`);
   return `<!doctype html>
 <html lang="en" data-theme="${theme}" data-density="${density}">
   <head>
@@ -318,7 +319,7 @@ export function createPreviewFrameHtml(request: ComponentPreviewRequest): string
   </head>
   <body>
     <div id="preview-root"></div>
-    <script type="module" src="/studio/preview/runtime?${params.toString()}"></script>
+    <script type="module" src="${runtimeSrc}"></script>
   </body>
 </html>`;
 }
