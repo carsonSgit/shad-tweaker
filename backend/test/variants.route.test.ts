@@ -94,6 +94,29 @@ describe('variant builder routes', () => {
     assert.equal(after, before);
   });
 
+  it('applies variant generation with a backup', async () => {
+    const root = await createTempRoot();
+    await writeButton(root);
+    const filePath = path.join(root, 'components/ui/button.tsx');
+
+    const res = await request(app)
+      .post('/api/variants/apply')
+      .send({
+        componentPath: 'components/ui/button.tsx',
+        targetDefinition: 'buttonVariants',
+        operation: {
+          type: 'add-value',
+          axisName: 'variant',
+          value: { name: 'ghost', classes: ['bg-transparent'] },
+        },
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(res.body.result.backupId);
+    assert.match(await fs.readFile(filePath, 'utf-8'), /ghost: 'bg-transparent'/);
+  });
+
   it('returns validation errors for malformed preview payloads', async () => {
     await createTempRoot();
 

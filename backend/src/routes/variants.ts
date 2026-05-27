@@ -4,6 +4,7 @@ import {
   ComponentLibraryValidationError,
 } from '../services/componentLibrary.js';
 import {
+  applyVariantGeneration,
   getVariantComponentDetail,
   listVariantComponents,
   previewVariantGeneration,
@@ -128,6 +129,30 @@ router.post('/preview', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Failed to preview variant generation', error);
     sendError(res, variantErrorResponse(error, 'Failed to preview variant generation'));
+  }
+});
+
+router.post('/apply', async (req: Request, res: Response) => {
+  try {
+    const body = req.body as PreviewRequestBody;
+    const componentPath = readString(body.componentPath, 'componentPath', MAX_PREVIEW_PATH_LENGTH);
+    const targetDefinition = readString(
+      body.targetDefinition,
+      'targetDefinition',
+      MAX_PREVIEW_IDENTIFIER_LENGTH
+    );
+    const operation = readPreviewOperation(body.operation);
+    res.json({
+      success: true,
+      result: await applyVariantGeneration(getWorkingDirectory(), {
+        componentPath,
+        targetDefinition,
+        operation,
+      }),
+    });
+  } catch (error) {
+    logger.error('Failed to apply variant generation', error);
+    sendError(res, variantErrorResponse(error, 'Failed to apply variant generation'));
   }
 });
 
