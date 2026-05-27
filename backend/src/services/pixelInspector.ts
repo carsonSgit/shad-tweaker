@@ -16,6 +16,7 @@ import { getWorkingDirectory, loadWorkspaceManifest, mutateWorkspaceManifest } f
 import path from 'node:path';
 import { createPreview } from './differ.js';
 import { createBackup } from './backup.js';
+import { applyTokenPatch, classifyTokenClass } from './tokens.js';
 
 const CONTROL_PATTERNS: Array<[PixelInspectorControlGroup, RegExp]> = [
   ['radius', /^(?:[a-z0-9-]+:)*rounded(?:-|$)/],
@@ -176,6 +177,25 @@ export async function applyPixelInspectorPatch(
   input: PixelInspectorApplyRequest
 ): Promise<PixelInspectorApplyResult> {
   const normalized = normalizeComponentPath(input.draft.componentPath);
+  if (input.draft.saveMode === 'token-patch') {
+    if (!input.draft.tokenSetId) {
+      throw new PixelInspectorValidationError('tokenSetId is required for token patches.');
+    }
+    const changes = buildPixelInspectorPatch(input.draft).changes.map((change) => ({
+      category: classifyTokenClass(change.to) ?? classifyTokenClass(change.from) ?? 'colors',
+      from: change.from,
+      to: change.to,
+      tokenName: input.draft.tokenName,
+    }));
+    return applyTokenPatch({
+      tokenSetId: input.draft.tokenSetId,
+      componentPaths: [normalized],
+      changes,
+      createBackup: input.createBackup,
+      recordOverrides: input.recordOverrides,
+    });
+  }
+
   const absolutePath = path.resolve(getWorkingDirectory(), normalized);
   const content = await fs.readFile(absolutePath, 'utf-8');
   const patch = buildPixelInspectorPatch({ ...input.draft, componentPath: normalized });

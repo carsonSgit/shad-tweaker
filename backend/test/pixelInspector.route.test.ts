@@ -5,6 +5,8 @@ import { afterEach, describe, it } from 'node:test';
 import fs from 'fs-extra';
 import request from 'supertest';
 import { app } from '../src/server.js';
+import { createTokenSet, getComponentOverrides } from '../src/services/tokens.js';
+import { createEmptyTokenMap } from '../src/utils/validation.js';
 
 const tempRoots: string[] = [];
 const testWorkspaceBase = path.join(
@@ -143,5 +145,39 @@ describe('pixel inspector routes', () => {
     assert.equal(listRes.status, 200);
     assert.equal(listRes.body.presets.length, 1);
     assert.equal(listRes.body.presets[0].id, createRes.body.preset.id);
+  });
+
+  it('applies token patch save mode through existing token patch behavior', async () => {
+    const root = await createTempRoot();
+    await createTokenSet({ name: 'Inspector Tokens', tokens: createEmptyTokenMap() });
+    const componentPath = path.join(root, 'components/ui/card.tsx');
+    await fs.outputFile(
+      componentPath,
+      `export function Card() {
+  return <div className="rounded-md p-2 shadow-sm">Card</div>;
+}`
+    );
+
+    const res = await request(app)
+      .post('/api/pixel-inspector/apply')
+      .send({
+        recordOverrides: true,
+        draft: {
+          componentPath: 'components/ui/card.tsx',
+          targetClasses: ['rounded-md'],
+          replacementClasses: ['rounded-xl'],
+          rawClassName: 'rounded-xl p-2 shadow-sm',
+          saveMode: 'token-patch',
+          tokenSetId: 'token_set_inspector-tokens',
+          tokenName: 'card-radius',
+        },
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.result.success, true);
+    assert.equal(res.body.result.changes, 1);
+    assert.match(await fs.readFile(componentPath, 'utf-8'), /rounded-xl/);
+    const overrides = await getComponentOverrides('components/ui/card.tsx');
+    assert.equal(overrides[0].overrides.radius?.['card-radius'], 'rounded-xl');
   });
 });
