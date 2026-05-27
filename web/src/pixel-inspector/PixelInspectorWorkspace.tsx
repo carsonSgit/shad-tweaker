@@ -33,6 +33,7 @@ export function PixelInspectorWorkspace({
   const [saveMode, setSaveMode] = useState<PixelInspectorSaveMode>('component-patch');
   const [tokenSetId, setTokenSetId] = useState(summary.tokens.tokenSets[0]?.id ?? '');
   const [presetName, setPresetName] = useState('Pixel Inspector Preset');
+  const [variantDefinition, setVariantDefinition] = useState('');
   const [variantValue, setVariantValue] = useState('inspected');
   const [resultMessage, setResultMessage] = useState<string | null>(null);
 
@@ -98,7 +99,7 @@ export function PixelInspectorWorkspace({
       tokenSetId: tokenSetId || undefined,
       tokenName: selectedClass ? `${selectedClass}-override` : undefined,
       presetName,
-      variantDefinition: analysis?.candidates[0] ? 'buttonVariants' : undefined,
+      variantDefinition: variantDefinition || undefined,
       variantAxis: 'variant',
       variantValue,
     }),
@@ -111,6 +112,7 @@ export function PixelInspectorWorkspace({
       saveMode,
       selectedClass,
       tokenSetId,
+      variantDefinition,
       variantValue,
     ]
   );
@@ -270,13 +272,23 @@ export function PixelInspectorWorkspace({
               </label>
             ) : null}
             {saveMode === 'variant-value' ? (
-              <label>
-                Variant value
-                <input
-                  onChange={(event) => setVariantValue(event.target.value)}
-                  value={variantValue}
-                />
-              </label>
+              <>
+                <label>
+                  Variant definition
+                  <input
+                    onChange={(event) => setVariantDefinition(event.target.value)}
+                    placeholder="buttonVariants"
+                    value={variantDefinition}
+                  />
+                </label>
+                <label>
+                  Variant value
+                  <input
+                    onChange={(event) => setVariantValue(event.target.value)}
+                    value={variantValue}
+                  />
+                </label>
+              </>
             ) : null}
             <div className="actions">
               <button onClick={previewDraft} type="button">
