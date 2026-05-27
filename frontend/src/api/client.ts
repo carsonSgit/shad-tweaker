@@ -15,6 +15,10 @@ import type {
   DesignTokenSet,
   ImportConflictResolution,
   ImportPlan,
+  PixelInspectorAnalysis,
+  PixelInspectorApplyRequest,
+  PixelInspectorApplyResult,
+  PixelInspectorPreviewRequest,
   Preview,
   RegistryItemSummary,
   RegistrySource,
@@ -448,6 +452,33 @@ export async function getComponentPreviewManifest(
   input: ComponentPreviewRequest
 ): Promise<ApiResponse<{ manifest: ComponentPreviewManifest }>> {
   return request('/api/studio/preview/manifest', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function analyzePixelInspector(
+  componentPath: string
+): Promise<ApiResponse<{ analysis: PixelInspectorAnalysis }>> {
+  return request('/api/pixel-inspector/analyze', {
+    method: 'POST',
+    body: JSON.stringify({ componentPath }),
+  });
+}
+
+export async function previewPixelInspector(
+  input: PixelInspectorPreviewRequest
+): Promise<ApiResponse<{ previews: Preview[]; totalChanges: number }>> {
+  return request('/api/pixel-inspector/preview', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function applyPixelInspector(
+  input: PixelInspectorApplyRequest
+): Promise<ApiResponse<{ result: PixelInspectorApplyResult }>> {
+  return request('/api/pixel-inspector/apply', {
     method: 'POST',
     body: JSON.stringify(input),
   });

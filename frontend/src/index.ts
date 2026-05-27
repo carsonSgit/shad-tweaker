@@ -1,11 +1,22 @@
 export {
+  analyzePixelInspector,
+  applyPixelInspector,
   getComponentPreviewManifest,
   getStudioSummary,
+  previewPixelInspector,
   updateWorkspaceConfig,
 } from './api/client.js';
 export type {
   ComponentPreviewManifest,
   ComponentPreviewRequest,
+  PixelInspectorAnalysis,
+  PixelInspectorApplyRequest,
+  PixelInspectorApplyResult,
+  PixelInspectorClassCandidate,
+  PixelInspectorControlGroup,
+  PixelInspectorDraft,
+  PixelInspectorPreviewRequest,
+  PixelInspectorSaveMode,
   PreviewDensity,
   PreviewState,
   PreviewTheme,
