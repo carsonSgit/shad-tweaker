@@ -300,6 +300,32 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
+.pixel-inspector-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+}
+
+.pixel-inspector-panel {
+  align-content: start;
+  display: grid;
+  gap: 14px;
+}
+
+.pixel-class-groups {
+  display: grid;
+  gap: 8px;
+}
+
+.pixel-class-groups span {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+}
+
 .compact-grid .preview-frame-shell {
   max-height: 360px;
 }
@@ -326,6 +352,10 @@ h1 {
 
   .sidebar nav {
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+
+  .pixel-inspector-grid {
+    grid-template-columns: 1fr;
   }
 
   .topbar,

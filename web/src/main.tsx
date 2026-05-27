@@ -9,6 +9,7 @@ import {
 } from '@studio-shared';
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { PixelInspectorWorkspace } from './pixel-inspector/PixelInspectorWorkspace';
 import { PreviewWorkspace } from './preview/PreviewWorkspace';
 import './styles.css';
 
@@ -256,6 +257,10 @@ function AreaPanel({
 
   if (area === 'preview') {
     return <PreviewWorkspace selectedComponents={selectedComponents} summary={summary} />;
+  }
+
+  if (area === 'pixel-inspector') {
+    return <PixelInspectorWorkspace selectedComponents={selectedComponents} summary={summary} />;
   }
 
   if (area === 'diff') {
