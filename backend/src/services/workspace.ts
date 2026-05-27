@@ -292,6 +292,24 @@ async function readLegacyConfig(cwd: string): Promise<Partial<WorkspaceConfig>> 
   }
 }
 
+function readComponentDirectoryOverride(cwd: string): Partial<WorkspaceConfig> {
+  const configuredPath = process.env.SHADCN_COMPONENTS_PATH;
+  if (!configuredPath) {
+    return {};
+  }
+
+  const relativePath = path.isAbsolute(configuredPath)
+    ? path.relative(cwd, configuredPath)
+    : configuredPath;
+  const normalized = relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
+  if (!isSafeProjectRelativePath(normalized)) {
+    logger.warn(`Ignoring unsafe component directory override: ${configuredPath}`);
+    return {};
+  }
+
+  return { componentDirectory: normalized };
+}
+
 async function readMigratedPresets(cwd: string, existingPresets: Preset[]): Promise<Preset[]> {
   const templatePath = path.join(getWorkspaceDir(cwd), TEMPLATE_FILE);
 
@@ -528,6 +546,14 @@ async function loadWorkspaceManifestUnsafe(cwd: string): Promise<WorkspaceManife
     await writeManifest(manifest, cwd);
   }
 
+  const override = readComponentDirectoryOverride(cwd);
+  const overrideChanged =
+    override.componentDirectory !== undefined &&
+    override.componentDirectory !== manifest.config.componentDirectory;
+  if (overrideChanged) {
+    manifest.config = { ...manifest.config, ...override };
+  }
+
   const presets = await readMigratedPresets(cwd, manifest.presets);
   const backups =
     manifest.backups.length > 0
@@ -540,7 +566,11 @@ async function loadWorkspaceManifestUnsafe(cwd: string): Promise<WorkspaceManife
     backups,
   };
 
-  if (presetsChanged(presets, manifest.presets) || backupsChanged(backups, manifest.backups)) {
+  if (
+    overrideChanged ||
+    presetsChanged(presets, manifest.presets) ||
+    backupsChanged(backups, manifest.backups)
+  ) {
     await writeManifest(
       {
         ...hydrated,

@@ -29,6 +29,7 @@ async function createTempRoot(): Promise<string> {
 
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((root) => fs.remove(root)));
+  delete process.env.SHADCN_COMPONENTS_PATH;
 });
 
 describe('workspace manifest service', () => {
@@ -206,6 +207,27 @@ describe('workspace manifest service', () => {
     assert.equal(manifest.config.maxBackups, 5);
     assert.equal(manifest.config.autoBackup, false);
     assert.equal(manifest.config.componentDirectory, './src/components/ui');
+  });
+
+  it('uses the CLI component path environment override during initialization', async () => {
+    const root = await createTempRoot();
+    process.env.SHADCN_COMPONENTS_PATH = path.join(root, 'samples/components/ui');
+
+    const { manifest } = await initializeWorkspace(root);
+
+    assert.equal(manifest.config.componentDirectory, 'samples/components/ui');
+  });
+
+  it('applies the CLI component path environment override to existing manifests', async () => {
+    const root = await createTempRoot();
+    await initializeWorkspace(root);
+    process.env.SHADCN_COMPONENTS_PATH = path.join(root, 'samples/components/ui');
+
+    const { manifest } = await initializeWorkspace(root);
+    const reloaded = await loadWorkspaceManifest(root);
+
+    assert.equal(manifest.config.componentDirectory, 'samples/components/ui');
+    assert.equal(reloaded.config.componentDirectory, 'samples/components/ui');
   });
 
   it('preserves manifest config updates after legacy config seeding', async () => {
