@@ -2,6 +2,9 @@ import { type Request, type Response, Router } from 'express';
 import {
   analyzePixelInspector,
   applyPixelInspectorPatch,
+  createPixelInspectorPreset,
+  deletePixelInspectorPreset,
+  listPixelInspectorPresets,
   PixelInspectorValidationError,
   previewPixelInspectorPatch,
 } from '../services/pixelInspector.js';
@@ -66,6 +69,51 @@ router.post('/apply', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Failed to apply pixel inspector patch', error);
     sendError(res, error, 'Failed to apply pixel inspector patch');
+  }
+});
+
+router.get('/presets', async (_req: Request, res: Response) => {
+  try {
+    res.json({ success: true, presets: await listPixelInspectorPresets() });
+  } catch (error) {
+    logger.error('Failed to list pixel inspector presets', error);
+    sendError(res, error, 'Failed to list pixel inspector presets');
+  }
+});
+
+router.post('/presets', async (req: Request, res: Response) => {
+  try {
+    if (typeof req.body?.name !== 'string' || !req.body?.draft) {
+      throw new PixelInspectorValidationError('name and draft are required.');
+    }
+    res.status(201).json({
+      success: true,
+      preset: await createPixelInspectorPreset({
+        name: req.body.name,
+        description: typeof req.body.description === 'string' ? req.body.description : undefined,
+        draft: req.body.draft,
+      }),
+    });
+  } catch (error) {
+    logger.error('Failed to create pixel inspector preset', error);
+    sendError(res, error, 'Failed to create pixel inspector preset');
+  }
+});
+
+router.delete('/presets/:id', async (req: Request, res: Response) => {
+  try {
+    const deleted = await deletePixelInspectorPreset(req.params.id);
+    if (!deleted) {
+      res.status(404).json({
+        success: false,
+        error: { message: 'Preset not found', code: 'PIXEL_INSPECTOR_PRESET_NOT_FOUND' },
+      });
+      return;
+    }
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Failed to delete pixel inspector preset', error);
+    sendError(res, error, 'Failed to delete pixel inspector preset');
   }
 });
 

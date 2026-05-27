@@ -7,11 +7,12 @@ import type {
   PixelInspectorClassCandidate,
   PixelInspectorControlGroup,
   PixelInspectorDraft,
+  Preset,
   Preview,
 } from '../types/index.js';
 import { isSafeProjectRelativePath } from '../utils/paths.js';
 import { parseComponentSource } from './parser.js';
-import { getWorkingDirectory } from './workspace.js';
+import { getWorkingDirectory, loadWorkspaceManifest, mutateWorkspaceManifest } from './workspace.js';
 import path from 'node:path';
 import { createPreview } from './differ.js';
 import { createBackup } from './backup.js';
@@ -196,4 +197,68 @@ export async function applyPixelInspectorPatch(
     changes: patched.changes,
     backupId,
   };
+}
+
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 48);
+}
+
+export async function listPixelInspectorPresets(): Promise<Preset[]> {
+  const manifest = await loadWorkspaceManifest();
+  return manifest.presets ?? [];
+}
+
+export async function createPixelInspectorPreset(input: {
+  name: string;
+  description?: string;
+  draft: PixelInspectorDraft;
+}): Promise<Preset> {
+  const name = input.name.trim();
+  if (!name) {
+    throw new PixelInspectorValidationError('Preset name is required.');
+  }
+  const patch = buildPixelInspectorPatch(input.draft);
+  const now = new Date().toISOString();
+  const preset: Preset = {
+    id: `preset_${slugify(name) || cryptoRandomSuffix()}`,
+    name,
+    description: input.description?.trim() || undefined,
+    created: now,
+    tokenOverrides: [],
+    classTransforms: patch.changes.map((change) => ({
+      find: change.from,
+      replace: change.to,
+      isRegex: false,
+    })),
+    astTransforms: [],
+    motionOverrides: [],
+    variantRecipes: [],
+  };
+
+  return mutateWorkspaceManifest(async (manifest) => ({
+    manifest: {
+      ...manifest,
+      presets: [...(manifest.presets ?? []).filter((candidate) => candidate.id !== preset.id), preset],
+    },
+    result: preset,
+  }));
+}
+
+export async function deletePixelInspectorPreset(id: string): Promise<boolean> {
+  return mutateWorkspaceManifest(async (manifest) => {
+    const presets = (manifest.presets ?? []).filter((preset) => preset.id !== id);
+    return {
+      manifest: { ...manifest, presets },
+      result: presets.length !== (manifest.presets ?? []).length,
+    };
+  });
+}
+
+function cryptoRandomSuffix(): string {
+  return Math.random().toString(36).slice(2, 10);
 }

@@ -115,4 +115,33 @@ describe('pixel inspector routes', () => {
     assert.ok(res.body.result.backupId);
     assert.match(await fs.readFile(componentPath, 'utf-8'), /rounded-lg p-4 shadow-sm/);
   });
+
+  it('saves and lists reusable pixel inspector presets', async () => {
+    await createTempRoot();
+
+    const createRes = await request(app)
+      .post('/api/pixel-inspector/presets')
+      .send({
+        name: 'Soft Card',
+        description: 'Softer radius and padding',
+        draft: {
+          componentPath: 'components/ui/card.tsx',
+          targetClasses: ['rounded-md'],
+          replacementClasses: ['rounded-xl'],
+          rawClassName: 'rounded-xl p-4',
+          saveMode: 'preset',
+        },
+      });
+
+    assert.equal(createRes.status, 201);
+    assert.equal(createRes.body.success, true);
+    assert.equal(createRes.body.preset.name, 'Soft Card');
+    assert.equal(createRes.body.preset.classTransforms[0].find, 'rounded-md');
+
+    const listRes = await request(app).get('/api/pixel-inspector/presets');
+
+    assert.equal(listRes.status, 200);
+    assert.equal(listRes.body.presets.length, 1);
+    assert.equal(listRes.body.presets[0].id, createRes.body.preset.id);
+  });
 });
