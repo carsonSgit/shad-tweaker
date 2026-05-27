@@ -57,6 +57,7 @@ export interface ComponentPreviewRequest {
   state?: PreviewState;
   parentOrigin?: string;
   variants?: Record<string, string>;
+  inspectorClassName?: string;
 }
 
 export interface ComponentPreviewManifest {

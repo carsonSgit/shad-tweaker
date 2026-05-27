@@ -21,6 +21,7 @@ export interface PreviewSelection {
   density: PreviewDensity;
   state: PreviewState;
   variants: Record<string, string>;
+  inspectorClassName?: string;
 }
 
 export function createInitialSelection(componentPath: string): PreviewSelection {
@@ -97,6 +98,7 @@ export function previewFrameUrl(selection: PreviewSelection, baseFrameUrl: strin
   params.set('theme', selection.theme);
   params.set('density', selection.density);
   params.set('state', selection.state);
+  if (selection.inspectorClassName) params.set('inspectorClassName', selection.inspectorClassName);
   for (const [axis, value] of Object.entries(selection.variants)) {
     params.set(`variant.${axis}`, value);
   }
