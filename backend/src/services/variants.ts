@@ -17,6 +17,7 @@ import type {
 import { createBackup } from './backup.js';
 import { getComponentLibraryDetail, listComponentLibrary } from './componentLibrary.js';
 import { parseComponentSourceFile } from './parser.js';
+import { resolveWithinWorkspace } from '../utils/paths.js';
 
 export class VariantBuilderValidationError extends Error {
   readonly code = 'VARIANT_BUILDER_VALIDATION_ERROR';
@@ -99,7 +100,9 @@ export async function applyVariantGeneration(
   request: VariantPreviewRequest
 ): Promise<{ preview: VariantGenerationPreview; modified: string[]; backupId?: string }> {
   const preview = await previewVariantGeneration(cwd, request);
-  const absolutePath = path.resolve(cwd, preview.componentPath);
+  const absolutePath = resolveWithinWorkspace(cwd, preview.componentPath, {
+    extensions: ['.tsx', '.jsx'],
+  });
   const backup = await createBackup([absolutePath]);
   await fs.writeFile(absolutePath, preview.after, 'utf-8');
   return {
