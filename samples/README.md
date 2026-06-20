@@ -2,6 +2,10 @@
 
 This folder gives the local studio a tiny component set for trying Pixel Inspector without wiring a separate app.
 
+When no component directory is configured or auto-detected, the studio falls back to this
+`samples/components/ui` set automatically, so the sandbox always opens with editable content.
+You can still point it at your own components explicitly with `--path`.
+
 Run the browser studio against these samples:
 
 ```powershell
