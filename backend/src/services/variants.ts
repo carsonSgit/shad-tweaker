@@ -103,6 +103,9 @@ export async function applyVariantGeneration(
   const absolutePath = resolveWithinWorkspace(cwd, preview.componentPath, {
     extensions: ['.tsx', '.jsx'],
   });
+  if (preview.before === preview.after) {
+    return { preview, modified: [] };
+  }
   const backup = await createBackup([absolutePath]);
   await fs.writeFile(absolutePath, preview.after, 'utf-8');
   return {
