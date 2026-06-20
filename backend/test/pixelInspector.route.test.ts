@@ -147,6 +147,37 @@ describe('pixel inspector routes', () => {
     assert.equal(listRes.body.presets[0].id, createRes.body.preset.id);
   });
 
+  it('auto-suffixes preset ids on name collision instead of overwriting', async () => {
+    await createTempRoot();
+
+    const send = (replacement: string) =>
+      request(app)
+        .post('/api/pixel-inspector/presets')
+        .send({
+          name: 'Soft Card',
+          draft: {
+            componentPath: 'components/ui/card.tsx',
+            targetClasses: ['rounded-md'],
+            replacementClasses: [replacement],
+            rawClassName: replacement,
+            saveMode: 'preset',
+          },
+        });
+
+    const first = await send('rounded-xl');
+    const second = await send('rounded-2xl');
+
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
+    assert.notEqual(second.body.preset.id, first.body.preset.id);
+
+    const listRes = await request(app).get('/api/pixel-inspector/presets');
+    assert.equal(listRes.body.presets.length, 2);
+    const ids = listRes.body.presets.map((preset: { id: string }) => preset.id);
+    assert.ok(ids.includes(first.body.preset.id));
+    assert.ok(ids.includes(second.body.preset.id));
+  });
+
   it('applies token patch save mode through existing token patch behavior', async () => {
     const root = await createTempRoot();
     await createTokenSet({ name: 'Inspector Tokens', tokens: createEmptyTokenMap() });
