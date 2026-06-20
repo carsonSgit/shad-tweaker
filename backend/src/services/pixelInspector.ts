@@ -1,4 +1,3 @@
-import path from 'node:path';
 import fs from 'fs-extra';
 import type {
   PixelInspectorAnalysis,
@@ -11,7 +10,7 @@ import type {
   Preset,
   Preview,
 } from '../types/index.js';
-import { isSafeProjectRelativePath } from '../utils/paths.js';
+import { WorkspacePathError, resolveWithinWorkspace, toWorkspaceRelative } from '../utils/paths.js';
 import { createBackup } from './backup.js';
 import { createPreview } from './differ.js';
 import { parseComponentSource } from './parser.js';
@@ -46,22 +45,21 @@ export class PixelInspectorValidationError extends Error {
   readonly code = 'PIXEL_INSPECTOR_VALIDATION_ERROR';
 }
 
-function normalizeComponentPath(componentPath: string): string {
-  const trimmed = componentPath.trim();
-  const cwd = path.resolve(getWorkingDirectory());
-  const relativePath = path.isAbsolute(trimmed) ? path.relative(cwd, trimmed) : trimmed;
-  const normalized = relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
-  if (
-    !normalized ||
-    path.isAbsolute(normalized) ||
-    !isSafeProjectRelativePath(normalized) ||
-    !['.tsx', '.jsx'].includes(path.extname(normalized))
-  ) {
-    throw new PixelInspectorValidationError(
-      'componentPath must be a safe project-relative TSX or JSX file.'
-    );
+function resolveComponentPath(componentPath: string): { relative: string; absolute: string } {
+  const root = getWorkingDirectory();
+  try {
+    const absolute = resolveWithinWorkspace(root, componentPath, {
+      extensions: ['.tsx', '.jsx'],
+    });
+    return { relative: toWorkspaceRelative(root, absolute), absolute };
+  } catch (error) {
+    if (error instanceof WorkspacePathError) {
+      throw new PixelInspectorValidationError(
+        'componentPath must be a safe project-relative TSX or JSX file.'
+      );
+    }
+    throw error;
   }
-  return normalized;
 }
 
 function classifyInspectorClass(className: string): PixelInspectorControlGroup | null {
@@ -78,8 +76,7 @@ function uniqueClasses(classes: string[]): string[] {
 export async function analyzePixelInspector(
   componentPath: string
 ): Promise<PixelInspectorAnalysis> {
-  const normalized = normalizeComponentPath(componentPath);
-  const absolutePath = path.resolve(getWorkingDirectory(), normalized);
+  const { relative: normalized, absolute: absolutePath } = resolveComponentPath(componentPath);
   const content = await fs.readFile(absolutePath, 'utf-8');
   const parsed = parseComponentSource(normalized, content);
   const candidates: PixelInspectorClassCandidate[] = [];
@@ -172,8 +169,9 @@ export function buildPixelInspectorPatch(draft: PixelInspectorDraft): {
 export async function previewPixelInspectorPatch(
   input: PixelInspectorPreviewRequest
 ): Promise<{ previews: Preview[]; totalChanges: number }> {
-  const normalized = normalizeComponentPath(input.draft.componentPath);
-  const absolutePath = path.resolve(getWorkingDirectory(), normalized);
+  const { relative: normalized, absolute: absolutePath } = resolveComponentPath(
+    input.draft.componentPath
+  );
   const content = await fs.readFile(absolutePath, 'utf-8');
   const patch = buildPixelInspectorPatch({ ...input.draft, componentPath: normalized });
   const patched = patch.apply(content);
@@ -189,7 +187,9 @@ export async function previewPixelInspectorPatch(
 export async function applyPixelInspectorPatch(
   input: PixelInspectorApplyRequest
 ): Promise<PixelInspectorApplyResult> {
-  const normalized = normalizeComponentPath(input.draft.componentPath);
+  const { relative: normalized, absolute: absolutePath } = resolveComponentPath(
+    input.draft.componentPath
+  );
   if (input.draft.saveMode === 'token-patch') {
     if (!input.draft.tokenSetId) {
       throw new PixelInspectorValidationError('tokenSetId is required for token patches.');
@@ -209,7 +209,6 @@ export async function applyPixelInspectorPatch(
     });
   }
 
-  const absolutePath = path.resolve(getWorkingDirectory(), normalized);
   const content = await fs.readFile(absolutePath, 'utf-8');
   const patch = buildPixelInspectorPatch({ ...input.draft, componentPath: normalized });
   const patched = patch.apply(content);
