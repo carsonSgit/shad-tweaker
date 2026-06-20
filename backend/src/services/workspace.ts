@@ -546,41 +546,46 @@ async function loadWorkspaceManifestUnsafe(cwd: string): Promise<WorkspaceManife
     await writeManifest(manifest, cwd);
   }
 
-  const override = readComponentDirectoryOverride(cwd);
-  const overrideChanged =
-    override.componentDirectory !== undefined &&
-    override.componentDirectory !== manifest.config.componentDirectory;
-  if (overrideChanged) {
-    manifest.config = { ...manifest.config, ...override };
-  }
-
   const presets = await readMigratedPresets(cwd, manifest.presets);
   const backups =
     manifest.backups.length > 0
       ? manifest.backups
       : mergeBackups(manifest.backups, await deriveBackups(cwd));
 
-  const hydrated: WorkspaceManifest = {
+  const persisted: WorkspaceManifest = {
     ...manifest,
     presets,
     backups,
   };
 
-  if (
-    overrideChanged ||
-    presetsChanged(presets, manifest.presets) ||
-    backupsChanged(backups, manifest.backups)
-  ) {
+  if (presetsChanged(presets, manifest.presets) || backupsChanged(backups, manifest.backups)) {
     await writeManifest(
       {
-        ...hydrated,
+        ...persisted,
         updatedAt: new Date().toISOString(),
       },
       cwd
     );
   }
 
-  return hydrated;
+  return persisted;
+}
+
+/**
+ * Applies the SHADCN_COMPONENTS_PATH override to a freshly loaded manifest
+ * ephemerally: it shapes the in-memory config for this process but is never
+ * written to disk. Only the read-only entry points use it, so the override
+ * never leaks into persisted state through a read-modify-write path.
+ */
+function withComponentDirectoryOverride(
+  manifest: WorkspaceManifest,
+  cwd: string
+): WorkspaceManifest {
+  const override = readComponentDirectoryOverride(cwd);
+  if (override.componentDirectory === undefined) {
+    return manifest;
+  }
+  return { ...manifest, config: { ...manifest.config, ...override } };
 }
 
 export async function saveWorkspaceManifest(
@@ -593,7 +598,9 @@ export async function saveWorkspaceManifest(
 export async function loadWorkspaceManifest(
   cwd: string = getWorkingDirectory()
 ): Promise<WorkspaceManifest> {
-  return withManifestWriteLock(cwd, () => loadWorkspaceManifestUnsafe(cwd));
+  return withManifestWriteLock(cwd, async () =>
+    withComponentDirectoryOverride(await loadWorkspaceManifestUnsafe(cwd), cwd)
+  );
 }
 
 export async function initializeWorkspace(
@@ -603,7 +610,7 @@ export async function initializeWorkspace(
     // This created flag is serialized within this process; another process could still
     // create the manifest between the existence check and write.
     const created = !(await fs.pathExists(getManifestPath(cwd)));
-    const manifest = await loadWorkspaceManifestUnsafe(cwd);
+    const manifest = withComponentDirectoryOverride(await loadWorkspaceManifestUnsafe(cwd), cwd);
 
     return { manifest, created };
   });
