@@ -255,33 +255,41 @@ export async function createPixelInspectorPreset(input: {
     throw new PixelInspectorValidationError('Preset name is required.');
   }
   const patch = buildPixelInspectorPatch(input.draft);
+  const baseId = `preset_${slugify(name) || randomSuffix()}`;
   const now = new Date().toISOString();
-  const preset: Preset = {
-    id: `preset_${slugify(name) || cryptoRandomSuffix()}`,
-    name,
-    description: input.description?.trim() || undefined,
-    created: now,
-    tokenOverrides: [],
-    classTransforms: patch.changes.map((change) => ({
-      find: change.from,
-      replace: change.to,
-      isRegex: false,
-    })),
-    astTransforms: [],
-    motionOverrides: [],
-    variantRecipes: [],
-  };
 
-  return mutateWorkspaceManifest(async (manifest) => ({
-    manifest: {
-      ...manifest,
-      presets: [
-        ...(manifest.presets ?? []).filter((candidate) => candidate.id !== preset.id),
-        preset,
-      ],
-    },
-    result: preset,
-  }));
+  return mutateWorkspaceManifest(async (manifest) => {
+    const existing = manifest.presets ?? [];
+    const preset: Preset = {
+      id: uniquePresetId(baseId, existing),
+      name,
+      description: input.description?.trim() || undefined,
+      created: now,
+      tokenOverrides: [],
+      classTransforms: patch.changes.map((change) => ({
+        find: change.from,
+        replace: change.to,
+        isRegex: false,
+      })),
+      astTransforms: [],
+      motionOverrides: [],
+      variantRecipes: [],
+    };
+    return {
+      manifest: { ...manifest, presets: [...existing, preset] },
+      result: preset,
+    };
+  });
+}
+
+/** Returns `baseId`, or `baseId-2`, `baseId-3`, ... so a name collision never overwrites a preset. */
+function uniquePresetId(baseId: string, existing: Preset[]): string {
+  const taken = new Set(existing.map((preset) => preset.id));
+  if (!taken.has(baseId)) return baseId;
+  for (let suffix = 2; ; suffix += 1) {
+    const candidate = `${baseId}-${suffix}`;
+    if (!taken.has(candidate)) return candidate;
+  }
 }
 
 export async function deletePixelInspectorPreset(id: string): Promise<boolean> {
@@ -294,6 +302,6 @@ export async function deletePixelInspectorPreset(id: string): Promise<boolean> {
   });
 }
 
-function cryptoRandomSuffix(): string {
+function randomSuffix(): string {
   return Math.random().toString(36).slice(2, 10);
 }
