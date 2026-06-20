@@ -104,7 +104,6 @@ export function PixelInspectorWorkspace({
       variantValue,
     }),
     [
-      analysis,
       componentPath,
       presetName,
       rawClassName,
