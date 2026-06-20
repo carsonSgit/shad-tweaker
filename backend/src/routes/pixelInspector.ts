@@ -12,6 +12,44 @@ import { logger } from '../utils/logger.js';
 
 const router = Router();
 
+const MAX_COMPONENT_PATH_LENGTH = 1024;
+const MAX_DRAFT_CLASSES = 50;
+const MAX_CLASS_LENGTH = 200;
+
+function validateClassList(value: unknown, field: string): void {
+  if (!Array.isArray(value)) {
+    throw new PixelInspectorValidationError(`${field} must be an array.`);
+  }
+  if (value.length > MAX_DRAFT_CLASSES) {
+    throw new PixelInspectorValidationError(
+      `${field} must contain at most ${MAX_DRAFT_CLASSES} entries.`
+    );
+  }
+  for (const entry of value) {
+    if (typeof entry !== 'string' || entry.length > MAX_CLASS_LENGTH) {
+      throw new PixelInspectorValidationError(
+        `${field} entries must be strings up to ${MAX_CLASS_LENGTH} characters.`
+      );
+    }
+  }
+}
+
+/** Bounds-checks the untrusted draft payload before it reaches the service layer. */
+function validatePixelInspectorDraft(draft: unknown): void {
+  if (!draft || typeof draft !== 'object') {
+    throw new PixelInspectorValidationError('draft is required.');
+  }
+  const record = draft as Record<string, unknown>;
+  if (typeof record.componentPath !== 'string' || record.componentPath.trim().length === 0) {
+    throw new PixelInspectorValidationError('draft.componentPath must be a non-empty string.');
+  }
+  if (record.componentPath.length > MAX_COMPONENT_PATH_LENGTH) {
+    throw new PixelInspectorValidationError('draft.componentPath is too long.');
+  }
+  validateClassList(record.targetClasses, 'draft.targetClasses');
+  validateClassList(record.replacementClasses, 'draft.replacementClasses');
+}
+
 function sendError(res: Response, error: unknown, fallback: string): void {
   const validation = error instanceof PixelInspectorValidationError;
   res.status(validation ? 400 : 500).json({
@@ -40,9 +78,7 @@ router.post('/analyze', async (req: Request, res: Response) => {
 
 router.post('/preview', async (req: Request, res: Response) => {
   try {
-    if (!req.body?.draft || typeof req.body.draft !== 'object') {
-      throw new PixelInspectorValidationError('draft is required.');
-    }
+    validatePixelInspectorDraft(req.body?.draft);
     res.json({
       success: true,
       ...(await previewPixelInspectorPatch({ draft: req.body.draft })),
@@ -55,9 +91,7 @@ router.post('/preview', async (req: Request, res: Response) => {
 
 router.post('/apply', async (req: Request, res: Response) => {
   try {
-    if (!req.body?.draft || typeof req.body.draft !== 'object') {
-      throw new PixelInspectorValidationError('draft is required.');
-    }
+    validatePixelInspectorDraft(req.body?.draft);
     res.json({
       success: true,
       result: await applyPixelInspectorPatch({
@@ -83,9 +117,10 @@ router.get('/presets', async (_req: Request, res: Response) => {
 
 router.post('/presets', async (req: Request, res: Response) => {
   try {
-    if (typeof req.body?.name !== 'string' || !req.body?.draft) {
-      throw new PixelInspectorValidationError('name and draft are required.');
+    if (typeof req.body?.name !== 'string') {
+      throw new PixelInspectorValidationError('name is required.');
     }
+    validatePixelInspectorDraft(req.body?.draft);
     res.status(201).json({
       success: true,
       preset: await createPixelInspectorPreset({
