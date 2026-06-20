@@ -502,6 +502,14 @@ export async function createPixelInspectorPreset(input: {
   });
 }
 
+export async function deletePixelInspectorPreset(
+  id: string
+): Promise<ApiResponse<{ success: boolean }>> {
+  return request(`/api/pixel-inspector/presets/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function applyVariantGeneration(input: {
   componentPath: string;
   targetDefinition: string;
