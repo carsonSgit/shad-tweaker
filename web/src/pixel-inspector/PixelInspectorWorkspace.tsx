@@ -3,15 +3,19 @@ import {
   applyPixelInspector,
   applyVariantGeneration,
   createPixelInspectorPreset,
+  deletePixelInspectorPreset,
+  getPixelInspectorPresets,
   type PixelInspectorAnalysis,
   type PixelInspectorClassCandidate,
   type PixelInspectorSaveMode,
+  type Preset,
   previewPixelInspector,
   type StudioSummary,
 } from '@studio-shared';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PreviewFrame } from '../preview/PreviewFrame';
 import { createInitialSelection } from '../preview/previewState';
+import { PresetBrowser } from './PresetBrowser';
 
 interface PixelInspectorWorkspaceProps {
   selectedComponents: StudioSummary['components']['inventory'];
@@ -36,6 +40,18 @@ export function PixelInspectorWorkspace({
   const [variantDefinition, setVariantDefinition] = useState('');
   const [variantValue, setVariantValue] = useState('inspected');
   const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [presets, setPresets] = useState<Preset[]>([]);
+
+  const reloadPresets = useCallback(async () => {
+    const result = await getPixelInspectorPresets();
+    if (result.success && result.data) {
+      setPresets(result.data.presets);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reloadPresets();
+  }, [reloadPresets]);
 
   useEffect(() => {
     if (!componentPath && components[0]) {
@@ -128,11 +144,12 @@ export function PixelInspectorWorkspace({
   async function saveDraft() {
     if (saveMode === 'preset') {
       const result = await createPixelInspectorPreset({ name: presetName, draft });
-      setResultMessage(
-        result.success && result.data
-          ? `Preset saved: ${result.data.preset.name}`
-          : result.error?.message || 'Preset save failed.'
-      );
+      if (result.success && result.data) {
+        setResultMessage(`Preset saved: ${result.data.preset.name}`);
+        await reloadPresets();
+      } else {
+        setResultMessage(result.error?.message || 'Preset save failed.');
+      }
       return;
     }
     if (saveMode === 'variant-value') {
@@ -161,6 +178,34 @@ export function PixelInspectorWorkspace({
         ? `${result.data.result.changes} changes saved.`
         : result.error?.message || 'Save failed.'
     );
+  }
+
+  function applyPreset(preset: Preset) {
+    const [first] = preset.classTransforms;
+    if (!first) {
+      setResultMessage(`Preset ${preset.name} has no class changes to apply.`);
+      return;
+    }
+    setSaveMode('component-patch');
+    setSelectedClass(first.find);
+    setReplacementClass(first.replace);
+    setRawClassName((current) =>
+      current
+        .split(/\s+/)
+        .map((className) => (className === first.find ? first.replace : className))
+        .join(' ')
+    );
+    setResultMessage(`Loaded preset ${preset.name} into the draft.`);
+  }
+
+  async function removePreset(id: string) {
+    const result = await deletePixelInspectorPreset(id);
+    if (result.success) {
+      await reloadPresets();
+      setResultMessage('Preset deleted.');
+    } else {
+      setResultMessage(result.error?.message || 'Could not delete preset.');
+    }
   }
 
   if (components.length === 0) {
@@ -315,6 +360,7 @@ export function PixelInspectorWorkspace({
           />
         </div>
       ) : null}
+      <PresetBrowser presets={presets} onApply={applyPreset} onDelete={removePreset} />
     </section>
   );
 }
