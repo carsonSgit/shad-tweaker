@@ -118,6 +118,38 @@ describe('pixel inspector routes', () => {
     assert.match(await fs.readFile(componentPath, 'utf-8'), /rounded-lg p-4 shadow-sm/);
   });
 
+  it('rejects drafts whose class arrays exceed the bounds', async () => {
+    await createTempRoot();
+
+    const tooMany = await request(app)
+      .post('/api/pixel-inspector/preview')
+      .send({
+        draft: {
+          componentPath: 'components/ui/card.tsx',
+          targetClasses: Array.from({ length: 51 }, (_, i) => `p-${i}`),
+          replacementClasses: ['p-4'],
+          rawClassName: 'p-4',
+          saveMode: 'component-patch',
+        },
+      });
+    assert.equal(tooMany.status, 400);
+    assert.equal(tooMany.body.error.code, 'PIXEL_INSPECTOR_VALIDATION_ERROR');
+
+    const tooLong = await request(app)
+      .post('/api/pixel-inspector/preview')
+      .send({
+        draft: {
+          componentPath: 'components/ui/card.tsx',
+          targetClasses: ['p-2'],
+          replacementClasses: ['x'.repeat(201)],
+          rawClassName: 'p-4',
+          saveMode: 'component-patch',
+        },
+      });
+    assert.equal(tooLong.status, 400);
+    assert.equal(tooLong.body.error.code, 'PIXEL_INSPECTOR_VALIDATION_ERROR');
+  });
+
   it('saves and lists reusable pixel inspector presets', async () => {
     await createTempRoot();
 
