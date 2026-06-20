@@ -84,6 +84,25 @@ export function Button() {
     assert.ok(analysis.rawClasses.includes('hover:scale-105'));
   });
 
+  it('distinguishes border style, width, and color utilities', async () => {
+    const root = await createTempRoot();
+    await writeComponent(
+      root,
+      'components/ui/divider.tsx',
+      `export function Divider() {
+  return <hr className="border-dashed border-2 border-red-500" />;
+}`
+    );
+
+    const analysis = await analyzePixelInspector('components/ui/divider.tsx');
+    const groupOf = (className: string) =>
+      analysis.candidates.find((candidate) => candidate.className === className)?.group;
+
+    assert.equal(groupOf('border-dashed'), 'borderStyle');
+    assert.equal(groupOf('border-2'), 'borderWidth');
+    assert.equal(groupOf('border-red-500'), 'borderColor');
+  });
+
   it('builds exact class replacement patches without matching substrings', () => {
     const patch = buildPixelInspectorPatch({
       componentPath: 'components/ui/button.tsx',

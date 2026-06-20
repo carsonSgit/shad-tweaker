@@ -282,6 +282,7 @@ export type PixelInspectorControlGroup =
   | 'height'
   | 'width'
   | 'borderWidth'
+  | 'borderStyle'
   | 'borderColor'
   | 'background'
   | 'foreground'
