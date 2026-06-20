@@ -27,6 +27,10 @@ const CONTROL_PATTERNS: Array<[PixelInspectorControlGroup, RegExp]> = [
   ['gap', /^(?:[a-z0-9-]+:)*gap(?:-[xy])?-/],
   ['height', /^(?:[a-z0-9-]+:)*(?:h|min-h|max-h)-/],
   ['width', /^(?:[a-z0-9-]+:)*(?:w|min-w|max-w)-/],
+  [
+    'borderStyle',
+    /^(?:[a-z0-9-]+:)*(?:border|divide|outline)-(?:solid|dashed|dotted|double|hidden|none)$/,
+  ],
   ['borderColor', /^(?:[a-z0-9-]+:)*(?:border|divide|outline)-(?!0$|2$|4$|8$|\[?\d)/],
   ['borderWidth', /^(?:[a-z0-9-]+:)*(?:border|border-[trblxy]|divide-[xy])(?:-|$)/],
   ['background', /^(?:[a-z0-9-]+:)*bg-/],
@@ -172,8 +176,11 @@ export async function previewPixelInspectorPatch(
   const { relative: normalized, absolute: absolutePath } = resolveComponentPath(
     input.draft.componentPath
   );
-  const content = await fs.readFile(absolutePath, 'utf-8');
   const patch = buildPixelInspectorPatch({ ...input.draft, componentPath: normalized });
+  if (patch.changes.length === 0) {
+    return { previews: [], totalChanges: 0 };
+  }
+  const content = await fs.readFile(absolutePath, 'utf-8');
   const patched = patch.apply(content);
   if (patched.changes === 0) {
     return { previews: [], totalChanges: 0 };
