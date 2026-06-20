@@ -1,6 +1,5 @@
 import { createPatch, diffLines } from 'diff';
 import fs from 'fs-extra';
-import path from 'node:path';
 import ts from 'typescript';
 import type {
   ComponentLibraryDetail,
