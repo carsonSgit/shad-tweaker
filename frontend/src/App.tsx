@@ -213,6 +213,7 @@ export function App() {
       case 'tokens':
       case 'variants':
       case 'motion':
+      case 'pixel-inspector':
       case 'diff':
       case 'settings':
         return (

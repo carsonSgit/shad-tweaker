@@ -10,6 +10,7 @@ import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
 import importsRouter from './routes/imports.js';
 import parserRouter from './routes/parser.js';
+import pixelInspectorRouter from './routes/pixelInspector.js';
 import {
   createPreviewApiLimiter,
   createPreviewApiRouter,
@@ -94,6 +95,7 @@ app.use('/api/workspace', workspaceRouter);
 app.use('/api/parser', parserRouter);
 app.use('/api/imports', importsRouter);
 app.use('/api/primitive-starters', primitiveStartersRouter);
+app.use('/api/pixel-inspector', pixelInspectorRouter);
 app.use('/api/tokens', tokensRouter);
 app.use('/api/variants', variantsRouter);
 app.use('/api/studio', studioRouter);

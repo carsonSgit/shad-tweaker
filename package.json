@@ -54,12 +54,12 @@
     "ink-select-input": "^6.0.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
     "cli-highlight": "^2.1.11"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.11",
+    "@biomejs/biome": "^2.5.0",
     "@types/bun": "^1.1.14",
     "@types/cors": "^2.8.17",
     "@types/diff": "^8.0.0",

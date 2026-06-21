@@ -93,6 +93,7 @@ export interface ComponentPreviewRequest {
   state?: PreviewState;
   parentOrigin?: string;
   variants?: Record<string, string>;
+  inspectorClassName?: string;
 }
 
 export interface ComponentPreviewManifest {
@@ -272,6 +273,79 @@ export interface TokenPatchChange {
   from: string;
   to: string;
   tokenName?: string;
+}
+
+export type PixelInspectorControlGroup =
+  | 'radius'
+  | 'padding'
+  | 'gap'
+  | 'height'
+  | 'width'
+  | 'borderWidth'
+  | 'borderStyle'
+  | 'borderColor'
+  | 'background'
+  | 'foreground'
+  | 'shadow'
+  | 'ring'
+  | 'fontSize'
+  | 'fontWeight'
+  | 'letterSpacing'
+  | 'duration'
+  | 'easing'
+  | 'transform';
+
+export type PixelInspectorSaveMode = 'component-patch' | 'token-patch' | 'variant-value' | 'preset';
+
+export interface PixelInspectorClassCandidate {
+  className: string;
+  group: PixelInspectorControlGroup;
+  source: TokenCandidate['source'];
+  line?: number;
+}
+
+export interface PixelInspectorAnalysis {
+  componentPath: string;
+  candidates: PixelInspectorClassCandidate[];
+  rawClasses: string[];
+  unsupported: Array<{ raw: string; line?: number; reason: string }>;
+}
+
+export interface PixelInspectorDraft {
+  componentPath: string;
+  targetClasses: string[];
+  replacementClasses: string[];
+  /**
+   * Frontend-only editing buffer (the raw class string the UI is editing).
+   * Optional because the backend service intentionally ignores it; patches are
+   * derived from targetClasses/replacementClasses.
+   */
+  rawClassName?: string;
+  saveMode: PixelInspectorSaveMode;
+  tokenSetId?: string;
+  tokenName?: string;
+  presetName?: string;
+  variantDefinition?: string;
+  variantAxis?: string;
+  variantValue?: string;
+}
+
+export interface PixelInspectorPreviewRequest {
+  draft: PixelInspectorDraft;
+}
+
+export interface PixelInspectorApplyRequest extends PixelInspectorPreviewRequest {
+  createBackup?: boolean;
+  recordOverrides?: boolean;
+}
+
+export interface PixelInspectorApplyResult {
+  success: boolean;
+  modified: string[];
+  changes: number;
+  backupId?: string;
+  presetId?: string;
+  errors?: Array<{ path: string; error: string }>;
 }
 
 // Keep variant builder types in sync with backend/src/types/index.ts.
@@ -533,6 +607,7 @@ export type Screen =
   | 'tokens'
   | 'variants'
   | 'motion'
+  | 'pixel-inspector'
   | 'diff'
   | 'settings'
   | 'dashboard'

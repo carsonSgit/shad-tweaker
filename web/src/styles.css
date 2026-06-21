@@ -13,6 +13,14 @@ body {
   margin: 0;
 }
 
+/* Base reset declared before higher-specificity selectors (e.g. `.topbar p`,
+   which wins on specificity regardless of order) to satisfy Biome's
+   noDescendingSpecificity lint. */
+h1,
+p {
+  margin: 0;
+}
+
 button,
 input,
 select {
@@ -91,11 +99,6 @@ select {
   display: flex;
   justify-content: space-between;
   padding: 18px 20px;
-}
-
-h1,
-p {
-  margin: 0;
 }
 
 h1 {
@@ -300,6 +303,73 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
+.pixel-inspector-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+}
+
+.pixel-inspector-panel {
+  align-content: start;
+  display: grid;
+  gap: 14px;
+}
+
+.pixel-inspector-panel label {
+  display: grid;
+  gap: 6px;
+}
+
+.pixel-inspector-panel textarea {
+  font: inherit;
+  min-height: 132px;
+  resize: vertical;
+}
+
+.pixel-class-groups {
+  display: grid;
+  gap: 8px;
+}
+
+.pixel-class-groups span {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+}
+
+.preset-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.preset-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.preset-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.preset-meta small {
+  opacity: 0.7;
+}
+
+.preset-empty,
+.preset-status {
+  opacity: 0.8;
+}
+
 .compact-grid .preview-frame-shell {
   max-height: 360px;
 }
@@ -326,6 +396,10 @@ h1 {
 
   .sidebar nav {
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+
+  .pixel-inspector-grid {
+    grid-template-columns: 1fr;
   }
 
   .topbar,

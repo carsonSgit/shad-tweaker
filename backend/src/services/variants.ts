@@ -1,4 +1,5 @@
 import { createPatch, diffLines } from 'diff';
+import fs from 'fs-extra';
 import ts from 'typescript';
 import type {
   ComponentLibraryDetail,
@@ -12,6 +13,8 @@ import type {
   VariantPreviewOperation,
   VariantValue,
 } from '../types/index.js';
+import { resolveWithinWorkspace } from '../utils/paths.js';
+import { createBackup } from './backup.js';
 import { getComponentLibraryDetail, listComponentLibrary } from './componentLibrary.js';
 import { parseComponentSourceFile } from './parser.js';
 
@@ -88,6 +91,26 @@ export async function previewVariantGeneration(
     after,
     diff: createPatch(component.path, component.content, after, 'before', 'after'),
     changes: countChangedLines(component.content, after),
+  };
+}
+
+export async function applyVariantGeneration(
+  cwd: string,
+  request: VariantPreviewRequest
+): Promise<{ preview: VariantGenerationPreview; modified: string[]; backupId?: string }> {
+  const preview = await previewVariantGeneration(cwd, request);
+  const absolutePath = resolveWithinWorkspace(cwd, preview.componentPath, {
+    extensions: ['.tsx', '.jsx'],
+  });
+  if (preview.before === preview.after) {
+    return { preview, modified: [] };
+  }
+  const backup = await createBackup([absolutePath]);
+  await fs.writeFile(absolutePath, preview.after, 'utf-8');
+  return {
+    preview,
+    modified: [absolutePath],
+    backupId: backup.id,
   };
 }
 

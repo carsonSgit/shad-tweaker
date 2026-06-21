@@ -42,6 +42,7 @@ export const PREVIEW_DENSITIES: PreviewDensity[] = ['comfortable', 'default', 'c
 const SAFE_COMPONENT_IMPORT_PATH = /^[A-Za-z0-9._/-]+$/;
 const SAFE_COMPONENT_EXPORT_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const PREVIEW_VARIANT_TOKEN = /^[A-Za-z0-9_-]+$/;
+const PREVIEW_CLASS_TOKEN = /^(?:[A-Za-z0-9_!:[\]/().%-]+|\[[^\]\0]{1,120}\])$/;
 const SAFE_LOCAL_ORIGIN = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d{1,5})?$/;
 const RESERVED_VARIANT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -80,11 +81,25 @@ export function normalizePreviewRequest(input: unknown): ComponentPreviewRequest
     density: readAllowed(record.density, PREVIEW_DENSITIES, 'density'),
     state: readAllowed(record.state, PREVIEW_STATES, 'state'),
     parentOrigin: readPreviewOrigin(record.parentOrigin),
+    inspectorClassName: readInspectorClassName(record.inspectorClassName),
     variants:
       record.variants && typeof record.variants === 'object' && !Array.isArray(record.variants)
         ? readVariantsRecord(record.variants as Record<string, unknown>)
         : readVariantQueryEntries(record),
   };
+}
+
+function readInspectorClassName(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') {
+    throw new ComponentPreviewValidationError('inspectorClassName must be a string.');
+  }
+  const classes = value.trim().split(/\s+/).filter(Boolean);
+  if (classes.length === 0) return undefined;
+  if (classes.length > 80 || classes.some((className) => !PREVIEW_CLASS_TOKEN.test(className))) {
+    throw new ComponentPreviewValidationError('inspectorClassName contains invalid class tokens.');
+  }
+  return classes.join(' ');
 }
 
 function readExportName(value: unknown): string | undefined {
@@ -249,6 +264,7 @@ function buildPreviewParams(request: ComponentPreviewRequest): URLSearchParams {
   params.set('componentPath', request.componentPath);
   if (request.parentOrigin) params.set('parentOrigin', request.parentOrigin);
   if (request.exportName) params.set('exportName', request.exportName);
+  if (request.inspectorClassName) params.set('inspectorClassName', request.inspectorClassName);
   params.set('viewport', request.viewport ?? 'desktop');
   params.set('theme', request.theme ?? 'light');
   params.set('density', request.density ?? 'default');
@@ -436,6 +452,10 @@ function createPreviewProps(request: ComponentPreviewRequest): Record<string, un
     'data-preview-label': previewLabel(request),
     variants: request.variants ?? {},
     ...(request.variants ?? {}),
+    // Inspector preview intentionally wins: when the pixel inspector supplies a
+    // className it replaces any variant-recipe className so the previewed classes
+    // exactly match what the inspector is editing. Spread last to enforce this.
+    ...(request.inspectorClassName ? { className: request.inspectorClassName } : {}),
   };
 }
 

@@ -24,6 +24,7 @@ const screenLabels: Record<Screen, { label: string; icon: string }> = {
   tokens: { label: 'Tokens', icon: 't' },
   variants: { label: 'Variants', icon: 'v' },
   motion: { label: 'Motion', icon: 'm' },
+  'pixel-inspector': { label: 'Inspector', icon: 'i' },
   diff: { label: 'Diff', icon: 'd' },
   settings: { label: 'Settings', icon: 's' },
 };

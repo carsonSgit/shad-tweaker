@@ -21,6 +21,11 @@ const COMMON_COMPONENT_DIRS = [
   '../components/ui',
   '../frontend/src/components/ui',
   '../frontend/src/components',
+  // Last resort: the bundled sample UI set, so the studio sandbox has
+  // editable content out of the box when no project directory is configured.
+  // Kept cwd-relative so component paths stay inside the workspace and remain
+  // editable through the pixel inspector's path-containment guard.
+  'samples/components/ui',
 ];
 
 let cachedComponents: Component[] = [];

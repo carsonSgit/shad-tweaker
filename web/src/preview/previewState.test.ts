@@ -78,4 +78,26 @@ describe('preview frame URLs', () => {
 
     assert.match(url, /exportName=ButtonIcon/);
   });
+
+  it('includes pixel inspector draft classes in iframe URLs', () => {
+    globalThis.window = {
+      location: { href: 'http://localhost:3000/studio', origin: 'http://localhost:3000' },
+    } as Window & typeof globalThis;
+
+    const url = previewFrameUrl(
+      {
+        componentPath: 'components/ui/button.tsx',
+        exportName: 'Button',
+        viewport: 'desktop',
+        theme: 'light',
+        density: 'default',
+        state: 'default',
+        variants: {},
+        inspectorClassName: 'rounded-xl px-4',
+      },
+      'http://127.0.0.1:3001/studio/preview/frame?componentPath=components%2Fui%2Fbutton.tsx'
+    );
+
+    assert.match(url, /inspectorClassName=rounded-xl\+px-4/);
+  });
 });

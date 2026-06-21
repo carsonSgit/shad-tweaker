@@ -4,6 +4,7 @@ export type WorkbenchArea =
   | 'tokens'
   | 'variants'
   | 'motion'
+  | 'pixel-inspector'
   | 'preview'
   | 'diff'
   | 'backups'
@@ -46,6 +47,12 @@ export const WORKBENCH_AREAS: WorkbenchAreaMeta[] = [
     label: 'Motion',
     shortLabel: 'Motion',
     description: 'Inspect motion, easing, and duration token readiness.',
+  },
+  {
+    id: 'pixel-inspector',
+    label: 'Pixel Inspector',
+    shortLabel: 'Inspector',
+    description: 'Tune component classes, tokens, variants, and reusable presets.',
   },
   {
     id: 'preview',

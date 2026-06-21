@@ -83,6 +83,7 @@ export function WorkbenchPanel({
       {area === 'tokens' && <Tokens summary={summary} />}
       {area === 'variants' && <Variants summary={summary} />}
       {area === 'motion' && <Motion summary={summary} />}
+      {area === 'pixel-inspector' && <PixelInspector summary={summary} />}
       {area === 'preview' && <PreviewHub onNavigate={onNavigate} />}
       {area === 'diff' && <DiffHub summary={summary} onNavigate={onNavigate} />}
       {area === 'settings' && <Settings summary={summary} />}
@@ -186,6 +187,22 @@ function Motion({ summary }: { summary: StudioSummary | null }) {
       <Text color={THEME.muted}>
         Motion authoring belongs to the Motion Editor epic; this shell exposes readiness now.
       </Text>
+    </Box>
+  );
+}
+
+function PixelInspector({ summary }: { summary: StudioSummary | null }) {
+  const componentCount = summary?.components.inventory.length ?? 0;
+  const tokenSetCount = summary?.tokens.tokenSets.length ?? 0;
+
+  return (
+    <Box flexDirection="column" borderStyle="single" borderColor={THEME.muted} paddingX={1}>
+      <Text>
+        Pixel Inspector is available in the browser studio. Components:{' '}
+        <Text color={THEME.secondary}>{componentCount}</Text>, token sets:{' '}
+        <Text color={THEME.secondary}>{tokenSetCount}</Text>
+      </Text>
+      <Text color={THEME.muted}>Launch with studio --web to tune classes in the preview iframe.</Text>
     </Box>
   );
 }
