@@ -10,7 +10,7 @@ import type {
   Preset,
   Preview,
 } from '../types/index.js';
-import { WorkspacePathError, resolveWithinWorkspace, toWorkspaceRelative } from '../utils/paths.js';
+import { resolveWithinWorkspace, toWorkspaceRelative, WorkspacePathError } from '../utils/paths.js';
 import { createBackup } from './backup.js';
 import { createPreview } from './differ.js';
 import { parseComponentSource } from './parser.js';
@@ -31,7 +31,13 @@ const CONTROL_PATTERNS: Array<[PixelInspectorControlGroup, RegExp]> = [
     'borderStyle',
     /^(?:[a-z0-9-]+:)*(?:border|divide|outline)-(?:solid|dashed|dotted|double|hidden|none)$/,
   ],
-  ['borderColor', /^(?:[a-z0-9-]+:)*(?:border|divide|outline)-(?!0$|2$|4$|8$|\[?\d)/],
+  // Mutually exclusive with `borderStyle` and `borderWidth` via negative lookahead
+  // (style keywords + numeric widths) so classification does not silently depend on
+  // this entry preceding/following them in CONTROL_PATTERNS.
+  [
+    'borderColor',
+    /^(?:[a-z0-9-]+:)*(?:border|divide|outline)-(?!0$|2$|4$|8$|\[?\d|solid$|dashed$|dotted$|double$|hidden$|none$)/,
+  ],
   ['borderWidth', /^(?:[a-z0-9-]+:)*(?:border|border-[trblxy]|divide-[xy])(?:-|$)/],
   ['background', /^(?:[a-z0-9-]+:)*bg-/],
   ['fontSize', /^(?:[a-z0-9-]+:)*text-(?:xs|sm|base|lg|xl|[2-9]xl|\[)/],
@@ -66,6 +72,22 @@ function resolveComponentPath(componentPath: string): { relative: string; absolu
   }
 }
 
+/**
+ * Reads a component file that has already passed workspace path validation.
+ * A missing file is a routine caller error (e.g. stale path), so it surfaces as
+ * a validation error (HTTP 400) instead of bubbling a native ENOENT up to a 500.
+ */
+async function readComponentFile(absolutePath: string, componentPath: string): Promise<string> {
+  try {
+    return await fs.readFile(absolutePath, 'utf-8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      throw new PixelInspectorValidationError(`Component file not found: ${componentPath}`);
+    }
+    throw error;
+  }
+}
+
 function classifyInspectorClass(className: string): PixelInspectorControlGroup | null {
   for (const [group, pattern] of CONTROL_PATTERNS) {
     if (pattern.test(className)) return group;
@@ -81,7 +103,7 @@ export async function analyzePixelInspector(
   componentPath: string
 ): Promise<PixelInspectorAnalysis> {
   const { relative: normalized, absolute: absolutePath } = resolveComponentPath(componentPath);
-  const content = await fs.readFile(absolutePath, 'utf-8');
+  const content = await readComponentFile(absolutePath, normalized);
   const parsed = parseComponentSource(normalized, content);
   const candidates: PixelInspectorClassCandidate[] = [];
   const unsupported: PixelInspectorAnalysis['unsupported'] = [];
@@ -180,7 +202,7 @@ export async function previewPixelInspectorPatch(
   if (patch.changes.length === 0) {
     return { previews: [], totalChanges: 0 };
   }
-  const content = await fs.readFile(absolutePath, 'utf-8');
+  const content = await readComponentFile(absolutePath, normalized);
   const patched = patch.apply(content);
   if (patched.changes === 0) {
     return { previews: [], totalChanges: 0 };
@@ -216,7 +238,17 @@ export async function applyPixelInspectorPatch(
     });
   }
 
-  const content = await fs.readFile(absolutePath, 'utf-8');
+  // The apply endpoint only writes component/token patches. `preset` and
+  // `variant-value` drafts are persisted through dedicated paths
+  // (createPixelInspectorPreset / applyVariantGeneration) and must not silently
+  // fall through to a component-file write, so reject them explicitly.
+  if (input.draft.saveMode === 'preset' || input.draft.saveMode === 'variant-value') {
+    throw new PixelInspectorValidationError(
+      `saveMode '${input.draft.saveMode}' is not handled by the apply endpoint.`
+    );
+  }
+
+  const content = await readComponentFile(absolutePath, normalized);
   const patch = buildPixelInspectorPatch({ ...input.draft, componentPath: normalized });
   const patched = patch.apply(content);
   let backupId: string | undefined;

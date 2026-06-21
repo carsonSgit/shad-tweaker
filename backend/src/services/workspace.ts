@@ -303,7 +303,11 @@ function readComponentDirectoryOverride(cwd: string): Partial<WorkspaceConfig> {
     : configuredPath;
   const normalized = relativePath.replace(/\\/g, '/').replace(/^\.\//, '');
   if (!isSafeProjectRelativePath(normalized)) {
-    logger.warn(`Ignoring unsafe component directory override: ${configuredPath}`);
+    logger.warn(
+      `SHADCN_COMPONENTS_PATH "${configuredPath}" resolves outside the workspace and is being ` +
+        'ignored. Set it to a path inside the project (relative, or absolute within the workspace) ' +
+        'to override the component directory.'
+    );
     return {};
   }
 

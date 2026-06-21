@@ -452,6 +452,9 @@ function createPreviewProps(request: ComponentPreviewRequest): Record<string, un
     'data-preview-label': previewLabel(request),
     variants: request.variants ?? {},
     ...(request.variants ?? {}),
+    // Inspector preview intentionally wins: when the pixel inspector supplies a
+    // className it replaces any variant-recipe className so the previewed classes
+    // exactly match what the inspector is editing. Spread last to enforce this.
     ...(request.inspectorClassName ? { className: request.inspectorClassName } : {}),
   };
 }

@@ -295,11 +295,7 @@ export type PixelInspectorControlGroup =
   | 'easing'
   | 'transform';
 
-export type PixelInspectorSaveMode =
-  | 'component-patch'
-  | 'token-patch'
-  | 'variant-value'
-  | 'preset';
+export type PixelInspectorSaveMode = 'component-patch' | 'token-patch' | 'variant-value' | 'preset';
 
 export interface PixelInspectorClassCandidate {
   className: string;
@@ -319,6 +315,11 @@ export interface PixelInspectorDraft {
   componentPath: string;
   targetClasses: string[];
   replacementClasses: string[];
+  /**
+   * Frontend-only editing buffer (the raw class string the UI is editing).
+   * The backend service intentionally ignores it; patches are derived from
+   * targetClasses/replacementClasses.
+   */
   rawClassName: string;
   saveMode: PixelInspectorSaveMode;
   tokenSetId?: string;

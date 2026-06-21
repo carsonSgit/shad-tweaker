@@ -246,10 +246,7 @@ describe('workspace manifest service', () => {
     assert.equal(onDisk.config.maxBackups, 9);
 
     delete process.env.SHADCN_COMPONENTS_PATH;
-    assert.equal(
-      (await loadWorkspaceManifest(root)).config.componentDirectory,
-      defaultDir
-    );
+    assert.equal((await loadWorkspaceManifest(root)).config.componentDirectory, defaultDir);
   });
 
   it('preserves manifest config updates after legacy config seeding', async () => {

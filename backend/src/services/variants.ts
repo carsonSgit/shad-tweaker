@@ -13,10 +13,10 @@ import type {
   VariantPreviewOperation,
   VariantValue,
 } from '../types/index.js';
+import { resolveWithinWorkspace } from '../utils/paths.js';
 import { createBackup } from './backup.js';
 import { getComponentLibraryDetail, listComponentLibrary } from './componentLibrary.js';
 import { parseComponentSourceFile } from './parser.js';
-import { resolveWithinWorkspace } from '../utils/paths.js';
 
 export class VariantBuilderValidationError extends Error {
   readonly code = 'VARIANT_BUILDER_VALIDATION_ERROR';

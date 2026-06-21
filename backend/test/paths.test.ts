@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import {
-  WorkspacePathError,
   isSafeProjectRelativePath,
   resolveWithinWorkspace,
   toWorkspaceRelative,
+  WorkspacePathError,
 } from '../src/utils/paths.js';
 
 const root = path.resolve('/workspace/project');
@@ -51,7 +51,8 @@ describe('resolveWithinWorkspace', () => {
       resolveWithinWorkspace(root, 'components/ui/button.tsx', { extensions: ['.tsx', '.jsx'] })
     );
     assert.throws(
-      () => resolveWithinWorkspace(root, 'components/ui/button.ts', { extensions: ['.tsx', '.jsx'] }),
+      () =>
+        resolveWithinWorkspace(root, 'components/ui/button.ts', { extensions: ['.tsx', '.jsx'] }),
       WorkspacePathError
     );
   });

@@ -13,6 +13,13 @@ body {
   margin: 0;
 }
 
+/* Base reset kept above higher-specificity selectors (e.g. `.topbar p`) so
+   element selectors stay in ascending specificity order. */
+h1,
+p {
+  margin: 0;
+}
+
 button,
 input,
 select {
@@ -91,11 +98,6 @@ select {
   display: flex;
   justify-content: space-between;
   padding: 18px 20px;
-}
-
-h1,
-p {
-  margin: 0;
 }
 
 h1 {

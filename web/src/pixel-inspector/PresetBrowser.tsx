@@ -38,7 +38,9 @@ export function PresetBrowser({ presets, onApply, onDelete }: PresetBrowserProps
     <div className="pixel-inspector-panel preset-browser">
       <h2>Saved presets</h2>
       {presets.length === 0 ? (
-        <p className="preset-empty">No presets yet. Save a draft as a reusable preset to see it here.</p>
+        <p className="preset-empty">
+          No presets yet. Save a draft as a reusable preset to see it here.
+        </p>
       ) : (
         <ul className="preset-list">
           {presets.map((preset) => (

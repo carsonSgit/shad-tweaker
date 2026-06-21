@@ -1,4 +1,5 @@
 import { type Request, type Response, Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   analyzePixelInspector,
   applyPixelInspectorPatch,
@@ -9,8 +10,33 @@ import {
   previewPixelInspectorPatch,
 } from '../services/pixelInspector.js';
 import { logger } from '../utils/logger.js';
+import { readPositiveInteger } from '../utils/numbers.js';
 
 const router = Router();
+
+/**
+ * Guards the write endpoints (file patches + backup creation, preset mutations)
+ * against abusive request volumes. Read endpoints are intentionally unthrottled.
+ */
+export function createPixelInspectorMutationLimiter(
+  max = readPositiveInteger(process.env.PIXEL_INSPECTOR_MUTATION_RATE_LIMIT_PER_MINUTE, 60)
+) {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: {
+        message: 'Too many pixel inspector write requests. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+      },
+    },
+  });
+}
+
+const mutationLimiter = createPixelInspectorMutationLimiter();
 
 const MAX_COMPONENT_PATH_LENGTH = 1024;
 const MAX_DRAFT_CLASSES = 50;
@@ -89,7 +115,7 @@ router.post('/preview', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/apply', async (req: Request, res: Response) => {
+router.post('/apply', mutationLimiter, async (req: Request, res: Response) => {
   try {
     validatePixelInspectorDraft(req.body?.draft);
     res.json({
@@ -115,7 +141,7 @@ router.get('/presets', async (_req: Request, res: Response) => {
   }
 });
 
-router.post('/presets', async (req: Request, res: Response) => {
+router.post('/presets', mutationLimiter, async (req: Request, res: Response) => {
   try {
     if (typeof req.body?.name !== 'string') {
       throw new PixelInspectorValidationError('name is required.');
@@ -135,7 +161,7 @@ router.post('/presets', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/presets/:id', async (req: Request, res: Response) => {
+router.delete('/presets/:id', mutationLimiter, async (req: Request, res: Response) => {
   try {
     const deleted = await deletePixelInspectorPreset(req.params.id);
     if (!deleted) {

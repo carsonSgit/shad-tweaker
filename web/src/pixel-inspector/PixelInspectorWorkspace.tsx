@@ -347,10 +347,19 @@ export function PixelInspectorWorkspace({
           <PreviewFrame
             label="Inspector preview"
             manifest={{
-              component: { name: componentPath, path: componentPath, exports: [], defaultExport: '' },
+              component: {
+                name: componentPath,
+                path: componentPath,
+                exports: [],
+                defaultExport: '',
+              },
               variants: [],
               states: ['default'],
-              viewports: { desktop: { width: 1200, height: 720 }, tablet: { width: 768, height: 720 }, mobile: { width: 390, height: 720 } },
+              viewports: {
+                desktop: { width: 1200, height: 720 },
+                tablet: { width: 768, height: 720 },
+                mobile: { width: 390, height: 720 },
+              },
               themes: ['light', 'dark', 'system'],
               densities: ['comfortable', 'default', 'compact'],
               frameUrl: `/studio/preview/frame?componentPath=${encodeURIComponent(componentPath)}`,

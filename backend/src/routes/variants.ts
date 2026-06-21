@@ -1,4 +1,5 @@
 import { type NextFunction, type Request, type Response, Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   ComponentLibraryNotFoundError,
   ComponentLibraryValidationError,
@@ -15,11 +16,36 @@ import { getWorkingDirectory } from '../services/workspace.js';
 import type { VariantPreviewOperation } from '../types/index.js';
 import { createInvalidComponentIdentifierError } from '../utils/componentIdentifier.js';
 import { logger } from '../utils/logger.js';
+import { readPositiveInteger } from '../utils/numbers.js';
 import { hasUnsafeComponentIdentifierUrl, readComponentIdentifier } from '../utils/validation.js';
 
 const router = Router();
 const MAX_PREVIEW_PATH_LENGTH = 1024;
 const MAX_PREVIEW_IDENTIFIER_LENGTH = 260;
+
+/**
+ * Guards variant generation's write endpoint (file rewrite + backup creation)
+ * against abusive request volumes. Read/preview endpoints stay unthrottled.
+ */
+export function createVariantMutationLimiter(
+  max = readPositiveInteger(process.env.VARIANT_MUTATION_RATE_LIMIT_PER_MINUTE, 60)
+) {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: {
+        message: 'Too many variant write requests. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+      },
+    },
+  });
+}
+
+const mutationLimiter = createVariantMutationLimiter();
 
 interface PreviewRequestBody {
   componentPath?: unknown;
@@ -132,7 +158,7 @@ router.post('/preview', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/apply', async (req: Request, res: Response) => {
+router.post('/apply', mutationLimiter, async (req: Request, res: Response) => {
   try {
     const body = req.body as PreviewRequestBody;
     const componentPath = readString(body.componentPath, 'componentPath', MAX_PREVIEW_PATH_LENGTH);
