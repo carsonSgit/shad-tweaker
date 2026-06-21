@@ -41,6 +41,7 @@ const mutationLimiter = createPixelInspectorMutationLimiter();
 const MAX_COMPONENT_PATH_LENGTH = 1024;
 const MAX_DRAFT_CLASSES = 50;
 const MAX_CLASS_LENGTH = 200;
+const MAX_PRESET_ID_LENGTH = 128;
 
 function validateClassList(value: unknown, field: string): void {
   if (!Array.isArray(value)) {
@@ -74,6 +75,13 @@ function validatePixelInspectorDraft(draft: unknown): void {
   }
   validateClassList(record.targetClasses, 'draft.targetClasses');
   validateClassList(record.replacementClasses, 'draft.replacementClasses');
+  if (
+    (record.targetClasses as unknown[]).length !== (record.replacementClasses as unknown[]).length
+  ) {
+    throw new PixelInspectorValidationError(
+      'draft.targetClasses and draft.replacementClasses must have the same length.'
+    );
+  }
 }
 
 function sendError(res: Response, error: unknown, fallback: string): void {
@@ -91,6 +99,9 @@ router.post('/analyze', async (req: Request, res: Response) => {
   try {
     if (typeof req.body?.componentPath !== 'string') {
       throw new PixelInspectorValidationError('componentPath is required.');
+    }
+    if (req.body.componentPath.length > MAX_COMPONENT_PATH_LENGTH) {
+      throw new PixelInspectorValidationError('componentPath is too long.');
     }
     res.json({
       success: true,
@@ -163,6 +174,9 @@ router.post('/presets', mutationLimiter, async (req: Request, res: Response) => 
 
 router.delete('/presets/:id', mutationLimiter, async (req: Request, res: Response) => {
   try {
+    if (!req.params.id || req.params.id.length > MAX_PRESET_ID_LENGTH) {
+      throw new PixelInspectorValidationError('preset id is missing or too long.');
+    }
     const deleted = await deletePixelInspectorPreset(req.params.id);
     if (!deleted) {
       res.status(404).json({

@@ -317,10 +317,10 @@ export interface PixelInspectorDraft {
   replacementClasses: string[];
   /**
    * Frontend-only editing buffer (the raw class string the UI is editing).
-   * The backend service intentionally ignores it; patches are derived from
-   * targetClasses/replacementClasses.
+   * Optional because the backend service intentionally ignores it; patches are
+   * derived from targetClasses/replacementClasses.
    */
-  rawClassName: string;
+  rawClassName?: string;
   saveMode: PixelInspectorSaveMode;
   tokenSetId?: string;
   tokenName?: string;

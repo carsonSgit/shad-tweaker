@@ -565,6 +565,10 @@ export interface PixelInspectorClassCandidate {
 export interface PixelInspectorAnalysis {
   componentPath: string;
   candidates: PixelInspectorClassCandidate[];
+  /**
+   * Deduplicated class names that matched a control group (i.e. the classified
+   * candidates), not every class found in the source file.
+   */
   rawClasses: string[];
   unsupported: Array<{ raw: string; line?: number; reason: string }>;
 }
@@ -575,10 +579,10 @@ export interface PixelInspectorDraft {
   replacementClasses: string[];
   /**
    * Frontend-only editing buffer (the raw class string the UI is editing).
-   * The backend service intentionally ignores it; patches are derived from
-   * targetClasses/replacementClasses.
+   * Optional because the backend service intentionally ignores it; patches are
+   * derived from targetClasses/replacementClasses.
    */
-  rawClassName: string;
+  rawClassName?: string;
   saveMode: PixelInspectorSaveMode;
   tokenSetId?: string;
   tokenName?: string;
@@ -603,6 +607,10 @@ export interface PixelInspectorApplyResult {
   changes: number;
   backupId?: string;
   presetId?: string;
+  /**
+   * Per-path failures. Populated only by the `token-patch` save mode, which
+   * delegates to applyTokenPatch; the plain component-patch path never sets it.
+   */
   errors?: Array<{ path: string; error: string }>;
 }
 

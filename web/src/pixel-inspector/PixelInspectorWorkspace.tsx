@@ -133,51 +133,59 @@ export function PixelInspectorWorkspace({
   );
 
   async function previewDraft() {
-    const result = await previewPixelInspector({ draft });
-    if (result.success && result.data) {
-      setResultMessage(`${result.data.totalChanges} class changes previewed.`);
-    } else {
-      setResultMessage(result.error?.message || 'Preview failed.');
+    try {
+      const result = await previewPixelInspector({ draft });
+      if (result.success && result.data) {
+        setResultMessage(`${result.data.totalChanges} class changes previewed.`);
+      } else {
+        setResultMessage(result.error?.message || 'Preview failed.');
+      }
+    } catch {
+      setResultMessage('Preview failed: network error.');
     }
   }
 
   async function saveDraft() {
-    if (saveMode === 'preset') {
-      const result = await createPixelInspectorPreset({ name: presetName, draft });
-      if (result.success && result.data) {
-        setResultMessage(`Preset saved: ${result.data.preset.name}`);
-        await reloadPresets();
-      } else {
-        setResultMessage(result.error?.message || 'Preset save failed.');
+    try {
+      if (saveMode === 'preset') {
+        const result = await createPixelInspectorPreset({ name: presetName, draft });
+        if (result.success && result.data) {
+          setResultMessage(`Preset saved: ${result.data.preset.name}`);
+          await reloadPresets();
+        } else {
+          setResultMessage(result.error?.message || 'Preset save failed.');
+        }
+        return;
       }
-      return;
-    }
-    if (saveMode === 'variant-value') {
-      const result = await applyVariantGeneration({
-        componentPath,
-        targetDefinition: draft.variantDefinition || '',
-        operation: {
-          type: 'add-value',
-          axisName: draft.variantAxis || 'variant',
-          value: { name: variantValue, classes: rawClassName.split(/\s+/).filter(Boolean) },
-        },
+      if (saveMode === 'variant-value') {
+        const result = await applyVariantGeneration({
+          componentPath,
+          targetDefinition: draft.variantDefinition || '',
+          operation: {
+            type: 'add-value',
+            axisName: draft.variantAxis || 'variant',
+            value: { name: variantValue, classes: rawClassName.split(/\s+/).filter(Boolean) },
+          },
+        });
+        setResultMessage(
+          result.success && result.data
+            ? `Variant saved with backup ${result.data.result.backupId ?? 'none'}.`
+            : result.error?.message || 'Variant save failed.'
+        );
+        return;
+      }
+      const result = await applyPixelInspector({
+        draft,
+        recordOverrides: saveMode === 'token-patch',
       });
       setResultMessage(
         result.success && result.data
-          ? `Variant saved with backup ${result.data.result.backupId ?? 'none'}.`
-          : result.error?.message || 'Variant save failed.'
+          ? `${result.data.result.changes} changes saved.`
+          : result.error?.message || 'Save failed.'
       );
-      return;
+    } catch {
+      setResultMessage('Save failed: network error.');
     }
-    const result = await applyPixelInspector({
-      draft,
-      recordOverrides: saveMode === 'token-patch',
-    });
-    setResultMessage(
-      result.success && result.data
-        ? `${result.data.result.changes} changes saved.`
-        : result.error?.message || 'Save failed.'
-    );
   }
 
   function applyPreset(preset: Preset) {

@@ -13,8 +13,9 @@ body {
   margin: 0;
 }
 
-/* Base reset kept above higher-specificity selectors (e.g. `.topbar p`) so
-   element selectors stay in ascending specificity order. */
+/* Base reset declared before higher-specificity selectors (e.g. `.topbar p`,
+   which wins on specificity regardless of order) to satisfy Biome's
+   noDescendingSpecificity lint. */
 h1,
 p {
   margin: 0;

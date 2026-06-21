@@ -150,6 +150,52 @@ describe('pixel inspector routes', () => {
     assert.equal(tooLong.body.error.code, 'PIXEL_INSPECTOR_VALIDATION_ERROR');
   });
 
+  it('rejects drafts whose class arrays differ in length instead of truncating', async () => {
+    await createTempRoot();
+
+    const res = await request(app)
+      .post('/api/pixel-inspector/preview')
+      .send({
+        draft: {
+          componentPath: 'components/ui/card.tsx',
+          targetClasses: ['rounded-md', 'p-2'],
+          replacementClasses: ['rounded-lg'],
+          rawClassName: 'rounded-lg',
+          saveMode: 'component-patch',
+        },
+      });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'PIXEL_INSPECTOR_VALIDATION_ERROR');
+    assert.match(res.body.error.message, /same length/);
+  });
+
+  it('rejects apply requests with an unsupported saveMode', async () => {
+    const root = await createTempRoot();
+    await fs.outputFile(
+      path.join(root, 'components/ui/card.tsx'),
+      `export function Card() {
+  return <div className="rounded-md p-2 shadow-sm">Card</div>;
+}`
+    );
+
+    const res = await request(app)
+      .post('/api/pixel-inspector/apply')
+      .send({
+        draft: {
+          componentPath: 'components/ui/card.tsx',
+          targetClasses: ['rounded-md'],
+          replacementClasses: ['rounded-lg'],
+          rawClassName: 'rounded-lg',
+          saveMode: 'preset',
+        },
+      });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.code, 'PIXEL_INSPECTOR_VALIDATION_ERROR');
+    assert.match(res.body.error.message, /not handled by the apply endpoint/);
+  });
+
   it('saves and lists reusable pixel inspector presets', async () => {
     await createTempRoot();
 

@@ -231,6 +231,17 @@ describe('workspace manifest service', () => {
     assert.equal(reloaded.config.componentDirectory, 'samples/components/ui');
   });
 
+  it('ignores a component path environment override that points outside the workspace', async () => {
+    const root = await createTempRoot();
+    await initializeWorkspace(root);
+    const defaultDir = (await loadWorkspaceManifest(root)).config.componentDirectory;
+
+    process.env.SHADCN_COMPONENTS_PATH = path.join(root, '..', 'outside/components/ui');
+
+    const reloaded = await loadWorkspaceManifest(root);
+    assert.equal(reloaded.config.componentDirectory, defaultDir);
+  });
+
   it('keeps the component path environment override out of the persisted manifest', async () => {
     const root = await createTempRoot();
     await initializeWorkspace(root);

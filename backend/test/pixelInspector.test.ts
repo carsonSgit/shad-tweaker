@@ -117,6 +117,26 @@ export function Button() {
     assert.equal(patch.apply(content).changes, 1);
   });
 
+  it('treats regex special characters in class names literally', () => {
+    const patch = buildPixelInspectorPatch({
+      componentPath: 'components/ui/box.tsx',
+      targetClasses: ['bg-[rgba(0,0,0,0.5)]'],
+      replacementClasses: ['bg-[rgba(0,0,0,0.8)]'],
+      rawClassName: 'bg-[rgba(0,0,0,0.8)]',
+      saveMode: 'component-patch',
+    });
+
+    // The brackets/parens/dots must match literally, not as regex metacharacters.
+    const content = `className="bg-[rgba(0,0,0,0.5)] bg-blue-500"`;
+    const result = patch.apply(content);
+    assert.equal(result.content, `className="bg-[rgba(0,0,0,0.8)] bg-blue-500"`);
+    assert.equal(result.changes, 1);
+
+    // The `.` must not act as a regex wildcard: `0X5` must not match `0.5`.
+    const unrelated = `className="bg-[rgba(0,0,0,0X5)]"`;
+    assert.equal(patch.apply(unrelated).changes, 0);
+  });
+
   it('accepts absolute component paths inside the workspace', async () => {
     const root = await createTempRoot();
     await writeComponent(

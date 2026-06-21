@@ -33,7 +33,9 @@ const CONTROL_PATTERNS: Array<[PixelInspectorControlGroup, RegExp]> = [
   ],
   // Mutually exclusive with `borderStyle` and `borderWidth` via negative lookahead
   // (style keywords + numeric widths) so classification does not silently depend on
-  // this entry preceding/following them in CONTROL_PATTERNS.
+  // this entry preceding/following them in CONTROL_PATTERNS. `\[?\d` rejects any
+  // numeric width by its first digit, so multi-digit widths (e.g. `border-12`) are
+  // excluded too — the explicit 0/2/4/8 alternatives just mirror Tailwind's named scale.
   [
     'borderColor',
     /^(?:[a-z0-9-]+:)*(?:border|divide|outline)-(?!0$|2$|4$|8$|\[?\d|solid$|dashed$|dotted$|double$|hidden$|none$)/,
@@ -238,11 +240,11 @@ export async function applyPixelInspectorPatch(
     });
   }
 
-  // The apply endpoint only writes component/token patches. `preset` and
-  // `variant-value` drafts are persisted through dedicated paths
-  // (createPixelInspectorPreset / applyVariantGeneration) and must not silently
-  // fall through to a component-file write, so reject them explicitly.
-  if (input.draft.saveMode === 'preset' || input.draft.saveMode === 'variant-value') {
+  // The apply endpoint only writes component patches here (token patches are
+  // handled above). Every other mode — `preset`, `variant-value`, or any future
+  // mode — is persisted through a dedicated path and must not silently fall
+  // through to a component-file write, so require `component-patch` explicitly.
+  if (input.draft.saveMode !== 'component-patch') {
     throw new PixelInspectorValidationError(
       `saveMode '${input.draft.saveMode}' is not handled by the apply endpoint.`
     );
@@ -325,10 +327,14 @@ export async function createPixelInspectorPreset(input: {
 function uniquePresetId(baseId: string, existing: Preset[]): string {
   const taken = new Set(existing.map((preset) => preset.id));
   if (!taken.has(baseId)) return baseId;
-  for (let suffix = 2; ; suffix += 1) {
+  // Cap the search so a pathological set of colliding ids cannot stall the loop;
+  // the bound is well above MAX_DRAFT_CLASSES-scale preset counts in practice.
+  const maxSuffix = taken.size + 2;
+  for (let suffix = 2; suffix <= maxSuffix; suffix += 1) {
     const candidate = `${baseId}-${suffix}`;
     if (!taken.has(candidate)) return candidate;
   }
+  throw new PixelInspectorValidationError(`Unable to allocate a unique id for preset "${baseId}".`);
 }
 
 export async function deletePixelInspectorPreset(id: string): Promise<boolean> {
