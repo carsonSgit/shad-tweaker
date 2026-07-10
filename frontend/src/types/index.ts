@@ -808,10 +808,12 @@ export interface ApiResponse<T> {
 // Screen navigation types
 export type Screen =
   | 'components'
+  | 'gallery'
   | 'registries'
   | 'tokens'
   | 'variants'
   | 'motion'
+  | 'loaders'
   | 'pixel-inspector'
   | 'diff'
   | 'settings'

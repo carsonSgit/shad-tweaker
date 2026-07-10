@@ -72,7 +72,7 @@ function MotionPreviewPlayer({
 
       const reduced = reducedMotionPreview && settings.reducedMotion !== 'full';
       if (reduced && settings.reducedMotion === 'disable') {
-        target.getAnimations().forEach((animation) => animation.cancel());
+        for (const animation of target.getAnimations()) animation.cancel();
         setVisible(direction === 'enter');
         return;
       }
@@ -83,7 +83,7 @@ function MotionPreviewPlayer({
         transform: reduced ? 'none' : phaseTransform(phase),
       };
       const onscreen: Keyframe = { opacity: 1, transform: 'none' };
-      target.getAnimations().forEach((animation) => animation.cancel());
+      for (const animation of target.getAnimations()) animation.cancel();
       target.style.transformOrigin = settings.transformOrigin.replace('-', ' ');
       const animation = target.animate(
         direction === 'enter' ? [offscreen, onscreen] : [onscreen, offscreen],

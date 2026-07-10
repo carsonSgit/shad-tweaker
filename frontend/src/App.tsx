@@ -209,10 +209,12 @@ export function App() {
           />
         );
 
+      case 'gallery':
       case 'registries':
       case 'tokens':
       case 'variants':
       case 'motion':
+      case 'loaders':
       case 'pixel-inspector':
       case 'diff':
       case 'settings':
