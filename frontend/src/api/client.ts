@@ -7,6 +7,8 @@ import type {
   BrailleLoaderPreset,
   Component,
   ComponentDetail,
+  ComponentExportRequest,
+  ComponentExportResult,
   ComponentLibraryCompareResult,
   ComponentLibraryDetail,
   ComponentLibraryDuplicate,
@@ -530,6 +532,16 @@ export async function applyVariantGeneration(input: {
   }>
 > {
   return request('/api/variants/apply', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+// Component Export
+export async function exportComponentPackage(
+  input: ComponentExportRequest
+): Promise<ApiResponse<{ result: ComponentExportResult }>> {
+  return request('/api/export', {
     method: 'POST',
     body: JSON.stringify(input),
   });

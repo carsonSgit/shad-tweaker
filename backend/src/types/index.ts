@@ -744,6 +744,30 @@ export interface BackupManifest {
   }>;
 }
 
+export type ComponentExportTarget = 'folder' | 'npm-package' | 'registry';
+
+export interface ComponentExportRequest {
+  componentPaths: string[];
+  target: ComponentExportTarget;
+  /** Workspace-relative output directory; defaults to exports/<target>. */
+  outputDir?: string;
+  /** npm package name; only used by the npm-package target. */
+  packageName?: string;
+}
+
+export interface ComponentExportResult {
+  outputDir: string;
+  target: ComponentExportTarget;
+  /** Output-relative paths of every file written. */
+  files: string[];
+  /** npm dependencies detected across the exported components. */
+  dependencies: string[];
+  validation: {
+    valid: boolean;
+    errors: string[];
+  };
+}
+
 export interface RegistryItemFileJson {
   path: string;
   type: string;

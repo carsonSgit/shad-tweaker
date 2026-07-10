@@ -9,6 +9,7 @@ import {
 } from '@studio-shared';
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ExportPanel } from './export/ExportPanel';
 import { LoadersWorkspace } from './loaders/LoadersWorkspace';
 import { MotionWorkspace } from './motion/MotionWorkspace';
 import { PixelInspectorWorkspace } from './pixel-inspector/PixelInspectorWorkspace';
@@ -173,6 +174,7 @@ function AreaPanel({
             ))
           )}
         </div>
+        <ExportPanel selectedComponents={selectedComponents} />
       </section>
     );
   }
