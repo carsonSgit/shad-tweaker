@@ -4,6 +4,7 @@ export type WorkbenchArea =
   | 'tokens'
   | 'variants'
   | 'motion'
+  | 'loaders'
   | 'pixel-inspector'
   | 'preview'
   | 'diff'
@@ -47,6 +48,12 @@ export const WORKBENCH_AREAS: WorkbenchAreaMeta[] = [
     label: 'Motion',
     shortLabel: 'Motion',
     description: 'Inspect motion, easing, and duration token readiness.',
+  },
+  {
+    id: 'loaders',
+    label: 'Loaders',
+    shortLabel: 'Loaders',
+    description: 'Browse braille loader presets and customize an exportable React loader.',
   },
   {
     id: 'pixel-inspector',

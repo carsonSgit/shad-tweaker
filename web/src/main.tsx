@@ -9,6 +9,7 @@ import {
 } from '@studio-shared';
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { LoadersWorkspace } from './loaders/LoadersWorkspace';
 import { PixelInspectorWorkspace } from './pixel-inspector/PixelInspectorWorkspace';
 import { PreviewWorkspace } from './preview/PreviewWorkspace';
 import './styles.css';
@@ -253,6 +254,10 @@ function AreaPanel({
         </p>
       </section>
     );
+  }
+
+  if (area === 'loaders') {
+    return <LoadersWorkspace />;
   }
 
   if (area === 'preview') {
