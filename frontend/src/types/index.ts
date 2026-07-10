@@ -589,6 +589,49 @@ export interface ApplyImportPlanResult {
   rolledBack?: boolean;
 }
 
+export type BrailleLoaderUsage = 'terminal' | 'web';
+
+export type BrailleLoaderReducedMotionMode = 'static-frame' | 'label-only';
+
+export interface BrailleLoaderPreset {
+  id: string;
+  name: string;
+  description: string;
+  /** Animation frames; every glyph stays within the Unicode braille block. */
+  frames: string[];
+  /** Default frame interval in milliseconds. */
+  intervalMs: number;
+  /** Accessible label announced to screen readers while loading. */
+  defaultLabel: string;
+  /** Static glyph rendered when the user prefers reduced motion. */
+  reducedMotionFrame: string;
+  usage: BrailleLoaderUsage[];
+  tags: string[];
+}
+
+export interface BrailleLoaderCustomization {
+  presetId: string;
+  /** PascalCase identifier for the generated component. */
+  componentName?: string;
+  intervalMs?: number;
+  label?: string;
+  /** Glyph font size in rem. */
+  sizeRem?: number;
+  /** CSS color value or design-token reference, e.g. `var(--primary)`. */
+  color?: string;
+  reducedMotionMode?: BrailleLoaderReducedMotionMode;
+}
+
+export interface BrailleLoaderGenerated {
+  presetId: string;
+  componentName: string;
+  fileName: string;
+  code: string;
+  intervalMs: number;
+  label: string;
+  reducedMotionMode: BrailleLoaderReducedMotionMode;
+}
+
 export interface ApiError {
   message: string;
   code: string;

@@ -2,6 +2,9 @@ import type {
   ApiResponse,
   ApplyImportPlanResult,
   BackupListItem,
+  BrailleLoaderCustomization,
+  BrailleLoaderGenerated,
+  BrailleLoaderPreset,
   Component,
   ComponentDetail,
   ComponentLibraryCompareResult,
@@ -520,6 +523,22 @@ export async function applyVariantGeneration(input: {
   }>
 > {
   return request('/api/variants/apply', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+// Braille Loaders
+export async function getBrailleLoaderPresets(): Promise<
+  ApiResponse<{ presets: BrailleLoaderPreset[] }>
+> {
+  return request('/api/loaders/presets');
+}
+
+export async function generateBrailleLoader(
+  input: BrailleLoaderCustomization
+): Promise<ApiResponse<{ generated: BrailleLoaderGenerated }>> {
+  return request('/api/loaders/generate', {
     method: 'POST',
     body: JSON.stringify(input),
   });

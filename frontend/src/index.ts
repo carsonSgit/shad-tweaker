@@ -4,6 +4,8 @@ export {
   applyVariantGeneration,
   createPixelInspectorPreset,
   deletePixelInspectorPreset,
+  generateBrailleLoader,
+  getBrailleLoaderPresets,
   getComponentPreviewManifest,
   getPixelInspectorPresets,
   getStudioSummary,
@@ -11,6 +13,10 @@ export {
   updateWorkspaceConfig,
 } from './api/client.js';
 export type {
+  BrailleLoaderCustomization,
+  BrailleLoaderGenerated,
+  BrailleLoaderPreset,
+  BrailleLoaderReducedMotionMode,
   ComponentPreviewManifest,
   ComponentPreviewRequest,
   PixelInspectorAnalysis,

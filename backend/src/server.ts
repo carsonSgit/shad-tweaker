@@ -9,6 +9,7 @@ import backupRouter from './routes/backup.js';
 import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
 import importsRouter from './routes/imports.js';
+import loadersRouter from './routes/loaders.js';
 import parserRouter from './routes/parser.js';
 import pixelInspectorRouter from './routes/pixelInspector.js';
 import {
@@ -94,6 +95,7 @@ app.use('/api/templates', templatesRouter);
 app.use('/api/workspace', workspaceRouter);
 app.use('/api/parser', parserRouter);
 app.use('/api/imports', importsRouter);
+app.use('/api/loaders', loadersRouter);
 app.use('/api/primitive-starters', primitiveStartersRouter);
 app.use('/api/pixel-inspector', pixelInspectorRouter);
 app.use('/api/tokens', tokensRouter);
