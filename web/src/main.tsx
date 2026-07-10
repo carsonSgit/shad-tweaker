@@ -13,6 +13,7 @@ import { LoadersWorkspace } from './loaders/LoadersWorkspace';
 import { MotionWorkspace } from './motion/MotionWorkspace';
 import { PixelInspectorWorkspace } from './pixel-inspector/PixelInspectorWorkspace';
 import { PreviewWorkspace } from './preview/PreviewWorkspace';
+import { RegistryPublishPanel } from './registry/RegistryPublishPanel';
 import './styles.css';
 
 function backupComponentCount(backup: StudioSummary['backups']['backups'][number]): number {
@@ -194,6 +195,7 @@ function AreaPanel({
             <span>{source.registryJsonUrl || source.baseUrl || 'local source'}</span>
           </article>
         ))}
+        <RegistryPublishPanel />
       </section>
     );
   }

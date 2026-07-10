@@ -29,9 +29,11 @@ import type {
   PixelInspectorPreviewRequest,
   Preset,
   Preview,
+  RegistryGenerateResult,
   RegistryItemSummary,
   RegistrySource,
   RegistrySourceHealth,
+  RegistryValidationResult,
   StudioSummary,
   Template,
   TokenCandidate,
@@ -531,6 +533,29 @@ export async function applyVariantGeneration(input: {
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+// Registry Publishing
+export async function generateLocalRegistry(input: {
+  name?: string;
+  homepage?: string;
+}): Promise<ApiResponse<RegistryGenerateResult>> {
+  return request('/api/registry-publish/generate', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function validateLocalRegistry(): Promise<
+  ApiResponse<{ validation: RegistryValidationResult }>
+> {
+  return request('/api/registry-publish/validate');
+}
+
+export async function getRegistryPublishInstructions(): Promise<
+  ApiResponse<{ instructions: string }>
+> {
+  return request('/api/registry-publish/instructions');
 }
 
 // Motion Editor

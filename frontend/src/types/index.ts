@@ -589,6 +589,47 @@ export interface ApplyImportPlanResult {
   rolledBack?: boolean;
 }
 
+export interface RegistryItemFileJson {
+  path: string;
+  type: string;
+  content?: string;
+  target?: string;
+}
+
+/** shadcn-compatible registry item (https://ui.shadcn.com/docs/registry/registry-item-json). */
+export interface RegistryItemJson {
+  $schema: string;
+  name: string;
+  type: string;
+  title: string;
+  description?: string;
+  dependencies: string[];
+  registryDependencies: string[];
+  files: RegistryItemFileJson[];
+}
+
+/** shadcn-compatible registry index (https://ui.shadcn.com/docs/registry/registry-json). */
+export interface RegistryIndexJson {
+  $schema: string;
+  name: string;
+  homepage: string;
+  items: Array<Omit<RegistryItemJson, '$schema'>>;
+}
+
+export interface RegistryGenerateResult {
+  outputDir: string;
+  registry: RegistryIndexJson;
+  itemCount: number;
+  warnings: string[];
+}
+
+export interface RegistryValidationResult {
+  valid: boolean;
+  itemCount: number;
+  errors: string[];
+  warnings: string[];
+}
+
 export type MotionEasing = 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out';
 
 export type MotionTransformOrigin =

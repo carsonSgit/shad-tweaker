@@ -20,6 +20,7 @@ import {
   createPreviewBrowserRouter,
 } from './routes/preview.js';
 import primitiveStartersRouter from './routes/primitiveStarters.js';
+import registryPublishRouter, { createRegistryFilesRouter } from './routes/registryPublish.js';
 import studioRouter from './routes/studio.js';
 import templatesRouter from './routes/templates.js';
 import tokensRouter from './routes/tokens.js';
@@ -98,6 +99,9 @@ app.use('/api/parser', parserRouter);
 app.use('/api/imports', importsRouter);
 app.use('/api/loaders', loadersRouter);
 app.use('/api/motion', motionRouter);
+app.use('/api/registry-publish', registryPublishRouter);
+// Public shadcn-compatible registry files (install with `shadcn add <url>/r/<name>.json`).
+app.use('/r', createRegistryFilesRouter());
 app.use('/api/primitive-starters', primitiveStartersRouter);
 app.use('/api/pixel-inspector', pixelInspectorRouter);
 app.use('/api/tokens', tokensRouter);
