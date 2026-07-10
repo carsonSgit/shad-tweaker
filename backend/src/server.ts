@@ -9,6 +9,7 @@ import backupRouter from './routes/backup.js';
 import componentsRouter from './routes/components.js';
 import editRouter from './routes/edit.js';
 import exportPackageRouter from './routes/exportPackage.js';
+import galleryRouter from './routes/gallery.js';
 import importsRouter from './routes/imports.js';
 import loadersRouter from './routes/loaders.js';
 import motionRouter from './routes/motion.js';
@@ -101,6 +102,7 @@ app.use('/api/imports', importsRouter);
 app.use('/api/loaders', loadersRouter);
 app.use('/api/motion', motionRouter);
 app.use('/api/export', exportPackageRouter);
+app.use('/api/gallery', galleryRouter);
 app.use('/api/registry-publish', registryPublishRouter);
 // Public shadcn-compatible registry files (install with `shadcn add <url>/r/<name>.json`).
 app.use('/r', createRegistryFilesRouter());

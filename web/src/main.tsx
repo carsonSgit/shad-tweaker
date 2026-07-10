@@ -10,6 +10,7 @@ import {
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ExportPanel } from './export/ExportPanel';
+import { GalleryWorkspace } from './gallery/GalleryWorkspace';
 import { LoadersWorkspace } from './loaders/LoadersWorkspace';
 import { MotionWorkspace } from './motion/MotionWorkspace';
 import { PixelInspectorWorkspace } from './pixel-inspector/PixelInspectorWorkspace';
@@ -130,6 +131,7 @@ function AreaPanel({
   area,
   selectedComponents,
   selectedPaths,
+  setArea,
   setSelectedPaths,
   setSettingsDirty,
   summary,
@@ -138,11 +140,18 @@ function AreaPanel({
   area: WorkbenchArea;
   selectedComponents: StudioSummary['components']['inventory'];
   selectedPaths: Set<string>;
+  setArea: (area: WorkbenchArea) => void;
   setSelectedPaths: (paths: Set<string>) => void;
   setSettingsDirty: (dirty: boolean) => void;
   summary: StudioSummary;
   onRefresh: () => Promise<void>;
 }) {
+  if (area === 'gallery') {
+    return (
+      <GalleryWorkspace setArea={setArea} setSelectedPaths={setSelectedPaths} summary={summary} />
+    );
+  }
+
   if (area === 'components') {
     return (
       <section className="panel">

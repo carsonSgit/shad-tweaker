@@ -18,6 +18,7 @@ import type {
   ComponentTokenOverride,
   DesignTokenMap,
   DesignTokenSet,
+  GalleryFixture,
   ImportConflictResolution,
   ImportPlan,
   MotionApplyResult,
@@ -535,6 +536,11 @@ export async function applyVariantGeneration(input: {
     method: 'POST',
     body: JSON.stringify(input),
   });
+}
+
+// Gallery
+export async function getGalleryFixtures(): Promise<ApiResponse<{ fixtures: GalleryFixture[] }>> {
+  return request('/api/gallery/fixtures');
 }
 
 // Component Export

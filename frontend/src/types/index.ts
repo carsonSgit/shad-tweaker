@@ -589,6 +589,35 @@ export interface ApplyImportPlanResult {
   rolledBack?: boolean;
 }
 
+export type GalleryFixtureKind =
+  | 'component'
+  | 'primitive'
+  | 'token-preset'
+  | 'variant-recipe'
+  | 'loader'
+  | 'motion-preset';
+
+/**
+ * A browsable gallery example that can launch a preloaded playground session.
+ * The same fixture format backs the gallery page and the playground deep links.
+ */
+export interface GalleryFixture {
+  id: string;
+  kind: GalleryFixtureKind;
+  title: string;
+  description: string;
+  tags: string[];
+  /** Workbench area the fixture opens in the playground. */
+  targetArea: string;
+  /** Component name to preselect when the fixture maps to a library component. */
+  componentName?: string;
+  /** Before/after values demonstrating the transformation. */
+  before?: string;
+  after?: string;
+  /** Fixture payload consumed by the target playground area. */
+  data?: Record<string, unknown>;
+}
+
 export type ComponentExportTarget = 'folder' | 'npm-package' | 'registry';
 
 export interface ComponentExportRequest {

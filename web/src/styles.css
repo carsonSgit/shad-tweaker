@@ -418,6 +418,60 @@ h1 {
   width: 100%;
 }
 
+.gallery-workspace {
+  gap: 18px;
+}
+
+.gallery-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.gallery-card {
+  align-content: start;
+  background: #fbfbfc;
+  border: 1px solid #e7eaee;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 14px;
+}
+
+.gallery-card span,
+.gallery-card small {
+  color: #6f7680;
+}
+
+.gallery-card small {
+  font-size: 12px;
+}
+
+.gallery-before-after {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gallery-before-after code {
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 2px 6px;
+}
+
+.gallery-before {
+  background: #fff4f2;
+  color: #8f1f18;
+  text-decoration: line-through;
+}
+
+.gallery-after {
+  background: #e8f5ed;
+  color: #206b3f;
+}
+
 .motion-workspace {
   gap: 18px;
 }

@@ -1,5 +1,6 @@
 export type WorkbenchArea =
   | 'components'
+  | 'gallery'
   | 'registries'
   | 'tokens'
   | 'variants'
@@ -24,6 +25,12 @@ export const WORKBENCH_AREAS: WorkbenchAreaMeta[] = [
     label: 'Components',
     shortLabel: 'Components',
     description: 'Browse, select, inspect, and edit local shadcn/ui components.',
+  },
+  {
+    id: 'gallery',
+    label: 'Gallery',
+    shortLabel: 'Gallery',
+    description: 'Browse example components, presets, and recipes that preload the playground.',
   },
   {
     id: 'registries',
