@@ -418,6 +418,82 @@ h1 {
   width: 100%;
 }
 
+.motion-workspace {
+  gap: 18px;
+}
+
+.motion-phases {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.motion-phase {
+  border: 1px solid #e7eaee;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.motion-phase legend {
+  color: #4f5661;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.motion-phase label {
+  color: #4f5661;
+  display: grid;
+  font-size: 13px;
+  gap: 4px;
+}
+
+.motion-phase input[type="range"],
+.motion-workspace .preview-controls input[type="range"] {
+  width: 100%;
+}
+
+.motion-player {
+  display: grid;
+  gap: 12px;
+}
+
+.motion-stage {
+  align-items: center;
+  background: repeating-conic-gradient(#f0f1f4 0% 25%, #ffffff 0% 50%) 0 0 / 24px 24px;
+  border: 1px solid #e7eaee;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  min-height: 180px;
+  overflow: hidden;
+  padding: 24px;
+}
+
+.motion-demo {
+  background: #ffffff;
+  border: 1px solid #dfe3e8;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(20 22 26 / 0.12);
+  display: grid;
+  gap: 4px;
+  padding: 18px 22px;
+}
+
+.motion-demo span {
+  color: #6f7680;
+  font-size: 13px;
+}
+
+.motion-outputs {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
 .loader-guidance {
   color: #4f5661;
   display: grid;

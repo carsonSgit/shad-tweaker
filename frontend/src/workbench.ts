@@ -47,7 +47,7 @@ export const WORKBENCH_AREAS: WorkbenchAreaMeta[] = [
     id: 'motion',
     label: 'Motion',
     shortLabel: 'Motion',
-    description: 'Inspect motion, easing, and duration token readiness.',
+    description: 'Design enter/exit animations, save motion presets, and apply them to slots.',
   },
   {
     id: 'loaders',

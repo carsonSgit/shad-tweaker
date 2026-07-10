@@ -10,6 +10,7 @@ import {
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LoadersWorkspace } from './loaders/LoadersWorkspace';
+import { MotionWorkspace } from './motion/MotionWorkspace';
 import { PixelInspectorWorkspace } from './pixel-inspector/PixelInspectorWorkspace';
 import { PreviewWorkspace } from './preview/PreviewWorkspace';
 import './styles.css';
@@ -243,17 +244,7 @@ function AreaPanel({
   }
 
   if (area === 'motion') {
-    const motion = activeTokenCategories(summary).filter((category) =>
-      ['motion', 'easing', 'duration'].includes(category)
-    );
-    return (
-      <section className="panel">
-        <Metric label="Motion categories" value={motion.length} />
-        <p>
-          {motion.length > 0 ? motion.join(', ') : 'No motion, easing, or duration tokens found.'}
-        </p>
-      </section>
-    );
+    return <MotionWorkspace selectedComponents={selectedComponents} summary={summary} />;
   }
 
   if (area === 'loaders') {
