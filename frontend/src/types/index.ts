@@ -589,6 +589,74 @@ export interface ApplyImportPlanResult {
   rolledBack?: boolean;
 }
 
+export type MotionEasing = 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out';
+
+export type MotionTransformOrigin =
+  | 'center'
+  | 'top'
+  | 'bottom'
+  | 'left'
+  | 'right'
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right';
+
+/**
+ * Behavior when the user prefers reduced motion:
+ * - 'disable': no transition or animation at all
+ * - 'fade-only': keep the opacity fade but drop transforms
+ * - 'full': play the animation unchanged
+ */
+export type MotionReducedMotionBehavior = 'disable' | 'fade-only' | 'full';
+
+/** The off-screen end of an enter/exit animation; the on-screen end is identity. */
+export interface MotionPhase {
+  opacity: number;
+  scale: number;
+  translateX: number;
+  translateY: number;
+}
+
+export interface MotionSettings {
+  durationMs: number;
+  delayMs: number;
+  easing: MotionEasing;
+  transformOrigin: MotionTransformOrigin;
+  enter: MotionPhase;
+  exit: MotionPhase;
+  reducedMotion: MotionReducedMotionBehavior;
+}
+
+export interface MotionPreset {
+  id: string;
+  name: string;
+  description?: string;
+  created: string;
+  settings: MotionSettings;
+}
+
+/** Generated styling output for a motion preset, in both supported formats. */
+export interface MotionOutput {
+  tailwindClasses: string;
+  css: string;
+}
+
+/** A className location in a component file that motion classes can target. */
+export interface MotionSlot {
+  line: number;
+  tagName: string;
+  classes: string[];
+  patchable: boolean;
+}
+
+export interface MotionApplyResult {
+  success: boolean;
+  modified: string[];
+  changes: number;
+  backupId?: string;
+}
+
 export type BrailleLoaderUsage = 'terminal' | 'web';
 
 export type BrailleLoaderReducedMotionMode = 'static-frame' | 'label-only';
