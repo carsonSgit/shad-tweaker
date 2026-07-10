@@ -357,6 +357,29 @@ export function LoadersWorkspace() {
       ) : (
         <p className="preset-status">Select a loader preset above to open the playground.</p>
       )}
+
+      <section className="preview-section">
+        <h2>Accessibility Guidance</h2>
+        <ul className="loader-guidance">
+          <li>
+            Loaders announce their label through <code>role="status"</code> and{' '}
+            <code>aria-live="polite"</code>; the spinning glyph itself is <code>aria-hidden</code>{' '}
+            so screen readers never hear raw braille characters.
+          </li>
+          <li>
+            Keep labels short and specific (“Saving draft…” beats “Loading…”) and update or remove
+            the loader as soon as the work finishes so the status region resolves.
+          </li>
+          <li>
+            Reduced-motion users get either a static frame with a visually hidden label or plain
+            label text — both variants respect <code>prefers-reduced-motion</code> automatically.
+          </li>
+          <li>
+            The same frame sets work in terminal/TUI contexts: render <code>frames[i]</code> on an
+            interval and print the reduced-motion frame when animation is unavailable or disabled.
+          </li>
+        </ul>
+      </section>
     </section>
   );
 }

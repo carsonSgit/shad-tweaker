@@ -418,6 +418,21 @@ h1 {
   width: 100%;
 }
 
+.loader-guidance {
+  color: #4f5661;
+  display: grid;
+  font-size: 13px;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.loader-guidance code {
+  background: #f0f1f4;
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
 .loader-stage {
   align-items: center;
   border: 1px solid #e7eaee;
