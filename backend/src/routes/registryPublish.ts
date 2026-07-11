@@ -11,6 +11,7 @@ import {
 } from '../services/registryPublisher.js';
 import { logger } from '../utils/logger.js';
 import { readPositiveInteger } from '../utils/numbers.js';
+import { isPathSafe } from '../utils/validation.js';
 
 const router = Router();
 
@@ -36,6 +37,25 @@ export function createRegistryPublishMutationLimiter(
 }
 
 const mutationLimiter = createRegistryPublishMutationLimiter();
+
+/** Guards the public registry file endpoints, which read from disk per request. */
+export function createRegistryFilesLimiter(
+  max = readPositiveInteger(process.env.REGISTRY_FILES_RATE_LIMIT_PER_MINUTE, 300)
+) {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      error: {
+        message: 'Too many registry file requests. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+      },
+    },
+  });
+}
 
 function sendError(res: Response, error: unknown, fallback: string): void {
   const validation = error instanceof RegistryPublishValidationError;
@@ -86,8 +106,9 @@ export default router;
  */
 export function createRegistryFilesRouter(): Router {
   const filesRouter = Router();
+  const filesLimiter = createRegistryFilesLimiter();
 
-  filesRouter.get('/registry.json', async (_req: Request, res: Response) => {
+  filesRouter.get('/registry.json', filesLimiter, async (_req: Request, res: Response) => {
     const registryPath = path.join(getRegistryOutputDir(), 'registry.json');
     if (!(await fs.pathExists(registryPath))) {
       res.status(404).json({
@@ -102,15 +123,24 @@ export function createRegistryFilesRouter(): Router {
     res.sendFile(registryPath);
   });
 
-  filesRouter.get('/:file', async (req: Request, res: Response) => {
-    if (!ITEM_FILE_PATTERN.test(req.params.file)) {
+  filesRouter.get('/:file', filesLimiter, async (req: Request, res: Response) => {
+    const fileName = path.basename(req.params.file);
+    if (fileName !== req.params.file || !ITEM_FILE_PATTERN.test(fileName)) {
       res.status(400).json({
         success: false,
         error: { message: 'Invalid registry item name.', code: 'REGISTRY_INVALID_ITEM' },
       });
       return;
     }
-    const itemPath = path.join(getRegistryOutputDir(), 'r', req.params.file);
+    const itemsDir = path.join(getRegistryOutputDir(), 'r');
+    const itemPath = path.join(itemsDir, fileName);
+    if (!isPathSafe(itemPath, itemsDir)) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Invalid registry item name.', code: 'REGISTRY_INVALID_ITEM' },
+      });
+      return;
+    }
     if (!(await fs.pathExists(itemPath))) {
       res.status(404).json({
         success: false,
