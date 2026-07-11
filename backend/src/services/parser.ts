@@ -164,7 +164,8 @@ export function parseComponentSourceFile(
     diagnostics.push({
       severity: 'info',
       code: 'UNSUPPORTED_CLASSNAME_EXPRESSION',
-      message: 'Some className expressions could not be reduced to static class literals.',
+      message:
+        'Some className values are computed at runtime (e.g. cn(...) with props) and are not editable as static classes. This is normal for shadcn components and does not affect previews.',
     });
   }
 

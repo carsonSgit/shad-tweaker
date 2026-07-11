@@ -10,6 +10,17 @@ export interface ShadcnTweakerConfig {
 
 const CONFIG_FILENAME = '.shadcn-tweaker.json';
 
+export const COMMON_COMPONENT_PATHS = [
+  'src/components/ui',
+  'components/ui',
+  'app/components/ui',
+  'src/ui',
+  'frontend/src/components/ui',
+  'frontend/src/components',
+  'frontend/components/ui',
+  'packages/ui/src/components',
+];
+
 const DEFAULT_CONFIG: ShadcnTweakerConfig = {
   componentsPath: './components/ui',
   backupsDir: './.shadcn-tweaker/backups',
@@ -38,8 +49,9 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<ShadcnTwe
       ...DEFAULT_CONFIG,
       ...config,
     };
-  } catch (_error) {
-    console.error(`Failed to read config file: ${configPath}`);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to read config file: ${configPath} (${reason})`);
     return null;
   }
 }
@@ -82,18 +94,7 @@ export async function resolveComponentsPath(
   }
 
   // Priority 3: Auto-detect common paths
-  const commonPaths = [
-    'src/components/ui',
-    'components/ui',
-    'app/components/ui',
-    'src/ui',
-    'frontend/src/components/ui',
-    'frontend/src/components',
-    'frontend/components/ui',
-    'packages/ui/src/components',
-  ];
-
-  for (const commonPath of commonPaths) {
+  for (const commonPath of COMMON_COMPONENT_PATHS) {
     const fullPath = path.join(cwd, commonPath);
     if (await fs.pathExists(fullPath)) {
       return fullPath;

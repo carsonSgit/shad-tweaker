@@ -346,7 +346,7 @@ export function PixelInspectorWorkspace({
               <button onClick={previewDraft} type="button">
                 Preview patch
               </button>
-              <button onClick={saveDraft} type="button">
+              <button className="btn-primary" onClick={saveDraft} type="button">
                 Save
               </button>
             </div>
