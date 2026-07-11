@@ -3,6 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import type express from 'express';
 import fs from 'fs-extra';
+import ts from 'typescript';
 import { createServer, type InlineConfig, type Plugin, type ViteDevServer } from 'vite';
 import {
   createPreviewRuntimeModule,
@@ -39,15 +40,16 @@ interface PreviewViteServerCache {
 // convention when no explicit mapping exists.
 export async function resolveWorkspacePreviewAlias(rootPath: string): Promise<string> {
   try {
-    const tsconfig = (await fs.readJson(path.join(rootPath, 'tsconfig.json'))) as {
-      compilerOptions?: { paths?: Record<string, string[]> };
-    };
-    const target = tsconfig.compilerOptions?.paths?.['@/*']?.[0];
+    // Use TypeScript's reader rather than fs.readJson: tsconfig files commonly
+    // contain comments, and rejecting valid JSONC silently breaks `@/` imports.
+    const tsconfig = ts.readConfigFile(path.join(rootPath, 'tsconfig.json'), ts.sys.readFile);
+    if (tsconfig.error) return rootPath;
+    const target = tsconfig.config.compilerOptions?.paths?.['@/*']?.[0];
     if (target) {
       return path.resolve(rootPath, target.replace(/\/?\*$/, ''));
     }
   } catch {
-    // Missing or unparseable (e.g. JSONC) tsconfig — fall through to the default.
+    // Missing or unparseable tsconfig — fall through to the default.
   }
   return rootPath;
 }

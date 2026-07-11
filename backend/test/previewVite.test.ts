@@ -189,9 +189,13 @@ describe('preview Vite middleware', () => {
 
   it('derives the @ alias target from the workspace tsconfig paths', async () => {
     const root = await createTempRoot();
-    await fs.writeJson(path.join(root, 'tsconfig.json'), {
-      compilerOptions: { paths: { '@/*': ['./src/*'] } },
-    });
+    await fs.writeFile(
+      path.join(root, 'tsconfig.json'),
+      `{
+        // tsconfig permits comments, unlike strict JSON.
+        "compilerOptions": { "paths": { "@/*": ["./src/*"] } }
+      }`
+    );
 
     assert.equal(await resolveWorkspacePreviewAlias(root), path.resolve(root, 'src'));
   });
