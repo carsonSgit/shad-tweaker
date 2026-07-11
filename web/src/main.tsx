@@ -9,8 +9,13 @@ import {
 } from '@studio-shared';
 import { StrictMode, useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ExportPanel } from './export/ExportPanel';
+import { GalleryWorkspace } from './gallery/GalleryWorkspace';
+import { LoadersWorkspace } from './loaders/LoadersWorkspace';
+import { MotionWorkspace } from './motion/MotionWorkspace';
 import { PixelInspectorWorkspace } from './pixel-inspector/PixelInspectorWorkspace';
 import { PreviewWorkspace } from './preview/PreviewWorkspace';
+import { RegistryPublishPanel } from './registry/RegistryPublishPanel';
 import './styles.css';
 
 function backupComponentCount(backup: StudioSummary['backups']['backups'][number]): number {
@@ -126,6 +131,7 @@ function AreaPanel({
   area,
   selectedComponents,
   selectedPaths,
+  setArea,
   setSelectedPaths,
   setSettingsDirty,
   summary,
@@ -134,11 +140,18 @@ function AreaPanel({
   area: WorkbenchArea;
   selectedComponents: StudioSummary['components']['inventory'];
   selectedPaths: Set<string>;
+  setArea: (area: WorkbenchArea) => void;
   setSelectedPaths: (paths: Set<string>) => void;
   setSettingsDirty: (dirty: boolean) => void;
   summary: StudioSummary;
   onRefresh: () => Promise<void>;
 }) {
+  if (area === 'gallery') {
+    return (
+      <GalleryWorkspace setArea={setArea} setSelectedPaths={setSelectedPaths} summary={summary} />
+    );
+  }
+
   if (area === 'components') {
     return (
       <section className="panel">
@@ -170,6 +183,7 @@ function AreaPanel({
             ))
           )}
         </div>
+        <ExportPanel selectedComponents={selectedComponents} />
       </section>
     );
   }
@@ -192,6 +206,7 @@ function AreaPanel({
             <span>{source.registryJsonUrl || source.baseUrl || 'local source'}</span>
           </article>
         ))}
+        <RegistryPublishPanel />
       </section>
     );
   }
@@ -242,17 +257,11 @@ function AreaPanel({
   }
 
   if (area === 'motion') {
-    const motion = activeTokenCategories(summary).filter((category) =>
-      ['motion', 'easing', 'duration'].includes(category)
-    );
-    return (
-      <section className="panel">
-        <Metric label="Motion categories" value={motion.length} />
-        <p>
-          {motion.length > 0 ? motion.join(', ') : 'No motion, easing, or duration tokens found.'}
-        </p>
-      </section>
-    );
+    return <MotionWorkspace selectedComponents={selectedComponents} summary={summary} />;
+  }
+
+  if (area === 'loaders') {
+    return <LoadersWorkspace />;
   }
 
   if (area === 'preview') {

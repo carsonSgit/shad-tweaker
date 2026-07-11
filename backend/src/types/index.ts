@@ -724,6 +724,7 @@ export interface WorkspaceManifest {
   tokenSets: DesignTokenSet[];
   componentTokenOverrides: Record<string, ComponentTokenOverride[]>;
   presets: Preset[];
+  motionPresets?: MotionPreset[];
   backups: BackupMetadata[];
 }
 
@@ -741,6 +742,213 @@ export interface BackupManifest {
     originalPath: string;
     backupPath: string;
   }>;
+}
+
+export type GalleryFixtureKind =
+  | 'component'
+  | 'primitive'
+  | 'token-preset'
+  | 'variant-recipe'
+  | 'loader'
+  | 'motion-preset';
+
+/**
+ * A browsable gallery example that can launch a preloaded playground session.
+ * The same fixture format backs the gallery page and the playground deep links.
+ */
+export interface GalleryFixture {
+  id: string;
+  kind: GalleryFixtureKind;
+  title: string;
+  description: string;
+  tags: string[];
+  /** Workbench area the fixture opens in the playground. */
+  targetArea: string;
+  /** Component name to preselect when the fixture maps to a library component. */
+  componentName?: string;
+  /** Before/after values demonstrating the transformation. */
+  before?: string;
+  after?: string;
+  /** Fixture payload consumed by the target playground area. */
+  data?: Record<string, unknown>;
+}
+
+export type ComponentExportTarget = 'folder' | 'npm-package' | 'registry';
+
+export interface ComponentExportRequest {
+  componentPaths: string[];
+  target: ComponentExportTarget;
+  /** Workspace-relative output directory; defaults to exports/<target>. */
+  outputDir?: string;
+  /** npm package name; only used by the npm-package target. */
+  packageName?: string;
+}
+
+export interface ComponentExportResult {
+  outputDir: string;
+  target: ComponentExportTarget;
+  /** Output-relative paths of every file written. */
+  files: string[];
+  /** npm dependencies detected across the exported components. */
+  dependencies: string[];
+  validation: {
+    valid: boolean;
+    errors: string[];
+  };
+}
+
+export interface RegistryItemFileJson {
+  path: string;
+  type: string;
+  content?: string;
+  target?: string;
+}
+
+/** shadcn-compatible registry item (https://ui.shadcn.com/docs/registry/registry-item-json). */
+export interface RegistryItemJson {
+  $schema: string;
+  name: string;
+  type: string;
+  title: string;
+  description?: string;
+  dependencies: string[];
+  registryDependencies: string[];
+  files: RegistryItemFileJson[];
+}
+
+/** shadcn-compatible registry index (https://ui.shadcn.com/docs/registry/registry-json). */
+export interface RegistryIndexJson {
+  $schema: string;
+  name: string;
+  homepage: string;
+  items: Array<Omit<RegistryItemJson, '$schema'>>;
+}
+
+export interface RegistryGenerateResult {
+  outputDir: string;
+  registry: RegistryIndexJson;
+  itemCount: number;
+  warnings: string[];
+}
+
+export interface RegistryValidationResult {
+  valid: boolean;
+  itemCount: number;
+  errors: string[];
+  warnings: string[];
+}
+
+export type MotionEasing = 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out';
+
+export type MotionTransformOrigin =
+  | 'center'
+  | 'top'
+  | 'bottom'
+  | 'left'
+  | 'right'
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right';
+
+/**
+ * Behavior when the user prefers reduced motion:
+ * - 'disable': no transition or animation at all
+ * - 'fade-only': keep the opacity fade but drop transforms
+ * - 'full': play the animation unchanged
+ */
+export type MotionReducedMotionBehavior = 'disable' | 'fade-only' | 'full';
+
+/** The off-screen end of an enter/exit animation; the on-screen end is identity. */
+export interface MotionPhase {
+  opacity: number;
+  scale: number;
+  translateX: number;
+  translateY: number;
+}
+
+export interface MotionSettings {
+  durationMs: number;
+  delayMs: number;
+  easing: MotionEasing;
+  transformOrigin: MotionTransformOrigin;
+  enter: MotionPhase;
+  exit: MotionPhase;
+  reducedMotion: MotionReducedMotionBehavior;
+}
+
+export interface MotionPreset {
+  id: string;
+  name: string;
+  description?: string;
+  created: string;
+  settings: MotionSettings;
+}
+
+/** Generated styling output for a motion preset, in both supported formats. */
+export interface MotionOutput {
+  /** Tailwind utility classes (tailwindcss-animate idiom for enter/exit). */
+  tailwindClasses: string;
+  /** Standalone CSS using variables and keyframes, honoring reduced motion. */
+  css: string;
+}
+
+/** A className location in a component file that motion classes can target. */
+export interface MotionSlot {
+  line: number;
+  tagName: string;
+  classes: string[];
+  patchable: boolean;
+}
+
+export interface MotionApplyResult {
+  success: boolean;
+  modified: string[];
+  changes: number;
+  backupId?: string;
+}
+
+export type BrailleLoaderUsage = 'terminal' | 'web';
+
+export type BrailleLoaderReducedMotionMode = 'static-frame' | 'label-only';
+
+export interface BrailleLoaderPreset {
+  id: string;
+  name: string;
+  description: string;
+  /** Animation frames; every glyph stays within the Unicode braille block. */
+  frames: string[];
+  /** Default frame interval in milliseconds. */
+  intervalMs: number;
+  /** Accessible label announced to screen readers while loading. */
+  defaultLabel: string;
+  /** Static glyph rendered when the user prefers reduced motion. */
+  reducedMotionFrame: string;
+  usage: BrailleLoaderUsage[];
+  tags: string[];
+}
+
+export interface BrailleLoaderCustomization {
+  presetId: string;
+  /** PascalCase identifier for the generated component. */
+  componentName?: string;
+  intervalMs?: number;
+  label?: string;
+  /** Glyph font size in rem. */
+  sizeRem?: number;
+  /** CSS color value or design-token reference, e.g. `var(--primary)`. */
+  color?: string;
+  reducedMotionMode?: BrailleLoaderReducedMotionMode;
+}
+
+export interface BrailleLoaderGenerated {
+  presetId: string;
+  componentName: string;
+  fileName: string;
+  code: string;
+  intervalMs: number;
+  label: string;
+  reducedMotionMode: BrailleLoaderReducedMotionMode;
 }
 
 export interface ApiResponse<T = unknown> {

@@ -2,8 +2,13 @@ import type {
   ApiResponse,
   ApplyImportPlanResult,
   BackupListItem,
+  BrailleLoaderCustomization,
+  BrailleLoaderGenerated,
+  BrailleLoaderPreset,
   Component,
   ComponentDetail,
+  ComponentExportRequest,
+  ComponentExportResult,
   ComponentLibraryCompareResult,
   ComponentLibraryDetail,
   ComponentLibraryDuplicate,
@@ -13,17 +18,25 @@ import type {
   ComponentTokenOverride,
   DesignTokenMap,
   DesignTokenSet,
+  GalleryFixture,
   ImportConflictResolution,
   ImportPlan,
+  MotionApplyResult,
+  MotionOutput,
+  MotionPreset,
+  MotionSettings,
+  MotionSlot,
   PixelInspectorAnalysis,
   PixelInspectorApplyRequest,
   PixelInspectorApplyResult,
   PixelInspectorPreviewRequest,
   Preset,
   Preview,
+  RegistryGenerateResult,
   RegistryItemSummary,
   RegistrySource,
   RegistrySourceHealth,
+  RegistryValidationResult,
   StudioSummary,
   Template,
   TokenCandidate,
@@ -520,6 +533,125 @@ export async function applyVariantGeneration(input: {
   }>
 > {
   return request('/api/variants/apply', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+// Gallery
+export async function getGalleryFixtures(): Promise<ApiResponse<{ fixtures: GalleryFixture[] }>> {
+  return request('/api/gallery/fixtures');
+}
+
+// Component Export
+export async function exportComponentPackage(
+  input: ComponentExportRequest
+): Promise<ApiResponse<{ result: ComponentExportResult }>> {
+  return request('/api/export', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+// Registry Publishing
+export async function generateLocalRegistry(input: {
+  name?: string;
+  homepage?: string;
+}): Promise<ApiResponse<RegistryGenerateResult>> {
+  return request('/api/registry-publish/generate', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function validateLocalRegistry(): Promise<
+  ApiResponse<{ validation: RegistryValidationResult }>
+> {
+  return request('/api/registry-publish/validate');
+}
+
+export async function getRegistryPublishInstructions(): Promise<
+  ApiResponse<{ instructions: string }>
+> {
+  return request('/api/registry-publish/instructions');
+}
+
+// Motion Editor
+export async function getMotionDefaults(): Promise<ApiResponse<{ settings: MotionSettings }>> {
+  return request('/api/motion/defaults');
+}
+
+export async function buildMotionOutput(
+  settings: MotionSettings
+): Promise<ApiResponse<{ output: MotionOutput }>> {
+  return request('/api/motion/output', {
+    method: 'POST',
+    body: JSON.stringify({ settings }),
+  });
+}
+
+export async function getMotionSlots(
+  componentPath: string
+): Promise<ApiResponse<{ slots: MotionSlot[] }>> {
+  return request('/api/motion/slots', {
+    method: 'POST',
+    body: JSON.stringify({ componentPath }),
+  });
+}
+
+export async function previewMotion(input: {
+  componentPath: string;
+  line: number;
+  settings: MotionSettings;
+}): Promise<ApiResponse<{ previews: Preview[]; totalChanges: number; tailwindClasses: string }>> {
+  return request('/api/motion/preview', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function applyMotion(input: {
+  componentPath: string;
+  line: number;
+  settings: MotionSettings;
+  createBackup?: boolean;
+}): Promise<ApiResponse<{ result: MotionApplyResult }>> {
+  return request('/api/motion/apply', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getMotionPresets(): Promise<ApiResponse<{ presets: MotionPreset[] }>> {
+  return request('/api/motion/presets');
+}
+
+export async function createMotionPreset(input: {
+  name: string;
+  description?: string;
+  settings: MotionSettings;
+}): Promise<ApiResponse<{ preset: MotionPreset }>> {
+  return request('/api/motion/presets', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteMotionPreset(id: string): Promise<ApiResponse<{ success: boolean }>> {
+  return request(`/api/motion/presets/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+// Braille Loaders
+export async function getBrailleLoaderPresets(): Promise<
+  ApiResponse<{ presets: BrailleLoaderPreset[] }>
+> {
+  return request('/api/loaders/presets');
+}
+
+export async function generateBrailleLoader(
+  input: BrailleLoaderCustomization
+): Promise<ApiResponse<{ generated: BrailleLoaderGenerated }>> {
+  return request('/api/loaders/generate', {
     method: 'POST',
     body: JSON.stringify(input),
   });

@@ -1,9 +1,11 @@
 export type WorkbenchArea =
   | 'components'
+  | 'gallery'
   | 'registries'
   | 'tokens'
   | 'variants'
   | 'motion'
+  | 'loaders'
   | 'pixel-inspector'
   | 'preview'
   | 'diff'
@@ -23,6 +25,12 @@ export const WORKBENCH_AREAS: WorkbenchAreaMeta[] = [
     label: 'Components',
     shortLabel: 'Components',
     description: 'Browse, select, inspect, and edit local shadcn/ui components.',
+  },
+  {
+    id: 'gallery',
+    label: 'Gallery',
+    shortLabel: 'Gallery',
+    description: 'Browse example components, presets, and recipes that preload the playground.',
   },
   {
     id: 'registries',
@@ -46,7 +54,13 @@ export const WORKBENCH_AREAS: WorkbenchAreaMeta[] = [
     id: 'motion',
     label: 'Motion',
     shortLabel: 'Motion',
-    description: 'Inspect motion, easing, and duration token readiness.',
+    description: 'Design enter/exit animations, save motion presets, and apply them to slots.',
+  },
+  {
+    id: 'loaders',
+    label: 'Loaders',
+    shortLabel: 'Loaders',
+    description: 'Browse braille loader presets and customize an exportable React loader.',
   },
   {
     id: 'pixel-inspector',

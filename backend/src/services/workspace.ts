@@ -75,6 +75,7 @@ function createDefaultManifest(now: string = new Date().toISOString()): Workspac
     tokenSets: [],
     componentTokenOverrides: {},
     presets: [],
+    motionPresets: [],
     backups: [],
   };
 }
@@ -190,6 +191,7 @@ function normalizeManifest(raw: unknown): WorkspaceManifest {
       : [],
     componentTokenOverrides: normalizeComponentTokenOverrides(candidate.componentTokenOverrides),
     presets: Array.isArray(candidate.presets) ? candidate.presets : [],
+    motionPresets: Array.isArray(candidate.motionPresets) ? candidate.motionPresets : [],
     backups: Array.isArray(candidate.backups) ? candidate.backups : [],
   };
 }
