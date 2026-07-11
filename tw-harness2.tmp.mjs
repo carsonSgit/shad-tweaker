@@ -1,0 +1,10 @@
+import path from 'node:path';
+import { createServer } from 'vite';
+import tailwindcss from '@tailwindcss/vite';
+const root = path.resolve('samples');
+const server = await createServer({ appType: 'custom', root, logLevel: 'silent', plugins: [tailwindcss()], server: { middlewareMode: true } });
+const result = await server.transformRequest('/.shadcn-tweaker/preview-styles.css?direct');
+const code = result?.code ?? '';
+console.log('D: real file → length', code.length, 'utility hits', (code.match(/\.rounded-full|\.inline-flex|\.bg-primary/g) ?? []).length);
+await server.close();
+process.exit(0);

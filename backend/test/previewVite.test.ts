@@ -5,7 +5,10 @@ import { afterEach, describe, it } from 'node:test';
 import type express from 'express';
 import fs from 'fs-extra';
 import type { InlineConfig } from 'vite';
-import { createPreviewViteMiddleware } from '../src/services/previewVite.js';
+import {
+  createPreviewViteMiddleware,
+  resolveWorkspacePreviewAlias,
+} from '../src/services/previewVite.js';
 
 const tempRoots: string[] = [];
 const testWorkspaceBase = path.join(
@@ -182,6 +185,24 @@ describe('preview Vite middleware', () => {
       '/node_modules/.vite/deps/react.js',
       '/@vite/client',
     ]);
+  });
+
+  it('derives the @ alias target from the workspace tsconfig paths', async () => {
+    const root = await createTempRoot();
+    await fs.writeJson(path.join(root, 'tsconfig.json'), {
+      compilerOptions: { paths: { '@/*': ['./src/*'] } },
+    });
+
+    assert.equal(await resolveWorkspacePreviewAlias(root), path.resolve(root, 'src'));
+  });
+
+  it('falls back to the workspace root when tsconfig has no @ alias', async () => {
+    const root = await createTempRoot();
+
+    assert.equal(await resolveWorkspacePreviewAlias(root), root);
+
+    await fs.writeFile(path.join(root, 'tsconfig.json'), '{ invalid jsonc');
+    assert.equal(await resolveWorkspacePreviewAlias(root), root);
   });
 
   it('closes the cached Vite server on request', async () => {

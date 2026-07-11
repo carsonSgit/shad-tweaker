@@ -275,18 +275,114 @@ function buildPreviewParams(request: ComponentPreviewRequest): URLSearchParams {
   return params;
 }
 
+// Browser path of the preview runtime module. It is served through the preview
+// Vite middleware (see previewVite.ts) so Vite can rewrite its bare imports.
+export const PREVIEW_RUNTIME_MODULE_PATH = '/__preview/runtime.js';
+
+// Browser path of the preview stylesheet, compiled by @tailwindcss/vite. It is
+// materialized as a real file inside the workspace's .shadcn-tweaker dir (see
+// previewVite.ts) because Tailwind's scanner ignores virtual modules.
+export const PREVIEW_STYLES_MODULE_PATH = '/.shadcn-tweaker/preview-styles.css';
+
+// Baseline shadcn theme tokens (zinc) so classes like bg-primary or
+// border-border render in previews even when the workspace has no global CSS.
+// The dark block keys off the frame's data-theme attribute.
+// The @source path is relative to .shadcn-tweaker/, where the file is written;
+// scanning the component directory explicitly is required — pointing @source
+// at the workspace root silently yields no utilities.
+export function createPreviewStylesCss(componentDirectory: string): string {
+  const sourceDir = `../${componentDirectory.replace(/^\.\//, '')}`;
+  return `@import "tailwindcss" source(none);
+@source ${JSON.stringify(sourceDir)};
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.141 0.005 285.823);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.141 0.005 285.823);
+  --primary: oklch(0.21 0.006 285.885);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.967 0.001 286.375);
+  --accent-foreground: oklch(0.21 0.006 285.885);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.705 0.015 286.067);
+}
+
+[data-theme="dark"] {
+  --background: oklch(0.141 0.005 285.823);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.21 0.006 285.885);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.21 0.006 285.885);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.92 0.004 286.32);
+  --primary-foreground: oklch(0.21 0.006 285.885);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.274 0.006 286.033);
+  --muted-foreground: oklch(0.705 0.015 286.067);
+  --accent: oklch(0.274 0.006 286.033);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.552 0.016 285.938);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+`;
+}
+
 export function createPreviewFrameHtml(request: ComponentPreviewRequest): string {
   const params = buildPreviewParams(request);
 
   const theme = escapeAttribute(request.theme ?? 'light');
   const density = escapeAttribute(request.density ?? 'default');
-  const runtimeSrc = escapeAttribute(`/studio/preview/runtime?${params.toString()}`);
+  const runtimeSrc = escapeAttribute(`${PREVIEW_RUNTIME_MODULE_PATH}?${params.toString()}`);
   return `<!doctype html>
 <html lang="en" data-theme="${theme}" data-density="${density}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Component preview</title>
+    <link rel="stylesheet" href="${PREVIEW_STYLES_MODULE_PATH}" />
     <style>
       :root {
         color-scheme: light;
@@ -335,6 +431,16 @@ export function createPreviewFrameHtml(request: ComponentPreviewRequest): string
   </head>
   <body>
     <div id="preview-root"></div>
+    <script type="module">
+      // Standard Vite backend-integration preamble: the component modules are
+      // transformed by @vitejs/plugin-react, which refuses to run unless the
+      // react-refresh runtime is installed by the embedding page.
+      import RefreshRuntime from "/@react-refresh";
+      RefreshRuntime.injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
     <script type="module" src="${runtimeSrc}"></script>
   </body>
 </html>`;
@@ -346,9 +452,10 @@ export async function createPreviewRuntimeModule(
 ): Promise<string> {
   await resolvePreviewComponentPath(cwd, request.componentPath);
 
-  const componentModulePath = `/studio/preview/component/${encodeURIComponent(
-    request.componentPath
-  )}`;
+  // Root-relative import into the Vite workspace root: Vite transforms the
+  // component TSX and resolves its own imports. (resolvePreviewComponentPath
+  // above already rejected traversal and non-workspace paths.)
+  const componentModulePath = `/${request.componentPath}`;
   const detail = await getComponentLibraryDetail(cwd, request.componentPath);
   const exportName = chooseDefaultExport(detail.exports, request.exportName);
   const parentOrigin = request.parentOrigin ?? getStudioOrigin();
@@ -408,18 +515,42 @@ if (!rootElement) {
 }
 
 const Component = ComponentModule[exportName] ?? (exportName === 'default' ? ComponentModule.default : undefined);
+
+function renderComponentPreview(withChildren) {
+  return React.createElement('div', {
+    'data-preview-state': previewProps['data-preview-state'],
+    'data-preview-label': previewProps['data-preview-label'],
+    'data-force-hover': previewProps['data-force-hover'],
+    'data-preview-variants': JSON.stringify(previewProps.variants ?? {}),
+  }, withChildren
+    ? React.createElement(Component, previewProps, exportName)
+    : React.createElement(Component, previewProps));
+}
+
+// First render passes the export name as a text child so children-based
+// components (Badge, Button, ...) are visible; components that reject
+// children (void elements like Input) throw, and this boundary retries
+// the render without children.
+class ChildrenFallbackBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { childless: false };
+  }
+  static getDerivedStateFromError() {
+    return { childless: true };
+  }
+  render() {
+    return renderComponentPreview(!this.state.childless);
+  }
+}
+
 if (!Component) {
   renderPreviewError(\`Component export not found: \${exportName}\`, 'PREVIEW_EXPORT_NOT_FOUND');
 } else {
   const root = createRoot(rootElement);
   root.render(
     React.createElement(PreviewErrorBoundary, null,
-      React.createElement('div', {
-        'data-preview-state': previewProps['data-preview-state'],
-        'data-preview-label': previewProps['data-preview-label'],
-        'data-force-hover': previewProps['data-force-hover'],
-        'data-preview-variants': JSON.stringify(previewProps.variants ?? {}),
-      }, React.createElement(Component, previewProps))
+      React.createElement(ChildrenFallbackBoundary)
     )
   );
   if (previewProps['data-preview-state'] === 'focus') {
