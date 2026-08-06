@@ -30,7 +30,7 @@
     "diff": "^7.0.0"
   },
   "devDependencies": {
-    "@types/diff": "^7.0.0",
+    "@types/diff": "^8.0.0",
     "@types/node": "^22.10.2",
     "@types/react": "^19.2.18",
     "tsx": "^4.19.2",
