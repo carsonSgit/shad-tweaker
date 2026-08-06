@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { type Request, type Response, Router } from 'express';
 import { applyChanges } from '../services/modifier.js';
 import {
@@ -8,6 +7,7 @@ import {
   listTemplates,
   updateTemplate,
 } from '../services/template.js';
+import { getWorkingDirectory } from '../services/workspace.js';
 import { logger } from '../utils/logger.js';
 import {
   validateComponentPaths,
@@ -17,9 +17,12 @@ import {
 
 const router = Router();
 
-// Get the project directory for path validation
-// Backend runs from the backend/ directory, so we need to go up one level to the project root
-const PROJECT_DIR = path.resolve(process.cwd(), '..');
+// Component paths are always validated against the active workspace
+// directory (SHADCN_TWEAKER_CWD / process.cwd()), not a hardcoded parent of
+// the backend's own cwd -- the backend does not necessarily run from a
+// `backend/` subdirectory of the target project (see cli/index.ts, which
+// spawns it with cwd set to the user's project root directly).
+const PROJECT_DIR = getWorkingDirectory();
 
 router.get('/', async (_req: Request, res: Response) => {
   try {
