@@ -17,6 +17,10 @@ function generateTempFileName(originalPath: string): string {
   return path.join(os.tmpdir(), `shadcn-tweaker-${uuid}-${baseName}`);
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export interface ModifyResult {
   success: boolean;
   modified: string[];
@@ -47,7 +51,7 @@ export async function previewChanges(
         matchCount = matches ? matches.length : 0;
         newContent = content.replace(searchPattern, replace);
       } else {
-        const escapedFind = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedFind = escapeRegExp(find);
         const regex = new RegExp(escapedFind, 'g');
         const matches = content.match(regex);
         matchCount = matches ? matches.length : 0;
@@ -106,7 +110,7 @@ export async function applyChanges(
         matchCount = matches ? matches.length : 0;
         newContent = content.replace(new RegExp(find, 'g'), replace);
       } else {
-        const escapedFind = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedFind = escapeRegExp(find);
         const regex = new RegExp(escapedFind, 'g');
         const matches = content.match(regex);
         matchCount = matches ? matches.length : 0;
@@ -168,7 +172,7 @@ const BATCH_ACTIONS: Record<string, (options?: Record<string, string>) => BatchA
   }),
   'remove-class': (options) => ({
     name: `Remove class: ${options?.className || ''}`,
-    find: `\\s*${options?.className || ''}`,
+    find: `\\s*${escapeRegExp(options?.className || '')}`,
     replace: '',
     isRegex: true,
   }),
