@@ -75,7 +75,13 @@
     "supertest": "^7.2.2",
     "tsx": "^4.21.0",
     "typescript": "^5.7.2",
-    "vite": "^7.2.7"
+    "vite": "^7.3.6"
+  },
+  "overrides": {
+    "form-data": "^4.0.6",
+    "ws": "^8.21.0",
+    "ip-address": "^10.4.0",
+    "postcss": "^8.5.19"
   },
   "engines": {
     "node": ">=18.0.0"
