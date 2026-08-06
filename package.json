@@ -1,6 +1,6 @@
 {
   "name": "shadcn-tweaker",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "description": "Terminal-based tool for batch customizing shadcn/ui components",
   "type": "module",
   "bin": {
