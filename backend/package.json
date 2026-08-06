@@ -1,6 +1,6 @@
 {
   "name": "shadcn-tweaker-backend",
-  "version": "2.0.6",
+  "version": "3.0.0",
   "type": "module",
   "description": "Backend service for shadcn component tweaker",
   "main": "dist/server.js",
