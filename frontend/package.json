@@ -1,6 +1,6 @@
 {
   "name": "shadcn-tweaker-frontend",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "type": "module",
   "description": "TUI interface for shadcn component tweaker",
   "main": "dist/index.js",
