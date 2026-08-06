@@ -141,8 +141,10 @@ export function LoadersWorkspace() {
       reducedMotionMode: draft.reducedMotionMode,
       componentName: draft.componentName.trim() || undefined,
     };
+    let cancelled = false;
     const timer = setTimeout(async () => {
       const result = await generateBrailleLoader(payload);
+      if (cancelled) return;
       if (result.success && result.data) {
         setGenerated(result.data.generated);
         setGenerateError(null);
@@ -151,7 +153,10 @@ export function LoadersWorkspace() {
         setGenerateError(result.error?.message || 'Failed to generate loader code.');
       }
     }, 250);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [selected, draft]);
 
   const copyCode = useCallback(async () => {

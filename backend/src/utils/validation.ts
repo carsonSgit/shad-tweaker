@@ -23,13 +23,15 @@ export const MAX_COMPONENT_IDENTIFIER_LENGTH = 128;
  */
 export function isPathSafe(targetPath: string, allowedBaseDir: string): boolean {
   try {
-    // Normalize both paths to handle different separators
-    const normalizedTarget = path.normalize(targetPath);
-    const normalizedBase = path.normalize(allowedBaseDir);
-
-    // Resolve to absolute paths
-    let resolvedTarget = path.resolve(normalizedTarget);
-    let resolvedBase = path.resolve(normalizedBase);
+    // Resolve the base first, then resolve the target *against that base*.
+    // Relative targets must never fall back to process.cwd(): the caller's
+    // allowedBaseDir is the only trusted anchor, and process.cwd() is not
+    // guaranteed to equal it (e.g. when this is called from a route running
+    // in a spawned backend process whose cwd is the target project root).
+    let resolvedBase = path.resolve(allowedBaseDir);
+    let resolvedTarget = path.isAbsolute(targetPath)
+      ? path.normalize(targetPath)
+      : path.resolve(resolvedBase, targetPath);
 
     // On Windows, paths are case-insensitive, so we need to compare in lowercase
     if (process.platform === 'win32') {
