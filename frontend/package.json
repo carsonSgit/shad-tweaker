@@ -27,7 +27,7 @@
     "ink-text-input": "^6.0.0",
     "react": "^19.2.8",
     "cli-highlight": "^2.1.11",
-    "diff": "^7.0.0"
+    "diff": "^9.0.0"
   },
   "devDependencies": {
     "@types/diff": "^8.0.0",
