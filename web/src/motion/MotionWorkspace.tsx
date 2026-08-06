@@ -218,11 +218,16 @@ export function MotionWorkspace({
   }, [refreshPresets]);
 
   useEffect(() => {
+    let cancelled = false;
     const timer = setTimeout(async () => {
       const result = await buildMotionOutput(settings);
+      if (cancelled) return;
       if (result.success && result.data) setOutput(result.data.output);
     }, 250);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [settings]);
 
   useEffect(() => {
