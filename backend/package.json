@@ -18,7 +18,7 @@
     "express-rate-limit": "^8.4.1",
     "fs-extra": "^11.2.0",
     "typescript": "^5.3.3",
-    "uuid": "^9.0.1",
+    "uuid": "^14.0.1",
     "vite": "^7.3.6"
   },
   "devDependencies": {
