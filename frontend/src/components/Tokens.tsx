@@ -192,18 +192,10 @@ export function Tokens({ summary }: { summary: StudioSummary | null }) {
     setError(null);
     setStatus(null);
 
-    const patched = withEdits(activeSet, edits);
-    const updated = await updateTokenSet(activeSet.id, {
-      name: activeSet.name,
-      description: activeSet.description,
-      tokens: patched,
-    });
-    if (!updated.success) {
-      setError(updated.error?.message ?? 'Failed to update token set');
-      setBusy(false);
-      return;
-    }
-
+    // Patch the component files before persisting the token set. Both calls are
+    // idempotent, so the ordering only matters for what a mid-way failure leaves
+    // behind: patch-first means a failed patch persists nothing, whereas
+    // set-first would leave the token set claiming values the files never got.
     let applied = 0;
     if (componentPaths.length > 0) {
       const response = await applyTokenPatch({
@@ -219,6 +211,20 @@ export function Tokens({ summary }: { summary: StudioSummary | null }) {
         return;
       }
       applied = response.data?.result.changes ?? 0;
+    }
+
+    const patched = withEdits(activeSet, edits);
+    const updated = await updateTokenSet(activeSet.id, {
+      name: activeSet.name,
+      description: activeSet.description,
+      tokens: patched,
+    });
+    if (!updated.success) {
+      setError(
+        `${updated.error?.message ?? 'Failed to update token set'} - ${applied} file change(s) were already written; a backup was created. Re-run to retry.`
+      );
+      setBusy(false);
+      return;
     }
 
     setTokenSets((current) =>

@@ -84,6 +84,12 @@ export function DiffPreview({
 
   const fileIdx = files.length > 0 ? Math.min(currentIdx, files.length - 1) : 0;
 
+  const file = files[fileIdx];
+  const diffLines = file
+    ? Diff.createPatch(file.path, file.before, file.after, 'Current', 'Proposed').split('\n')
+    : [];
+  const maxScroll = Math.max(0, diffLines.length - visibleLines);
+
   useInput(
     (input, key) => {
       if (key.escape || input === 'q') {
@@ -99,7 +105,7 @@ export function DiffPreview({
       } else if (key.upArrow) {
         setScrollOffset((o) => Math.max(0, o - 1));
       } else if (key.downArrow) {
-        setScrollOffset((o) => o + 1);
+        setScrollOffset((o) => Math.min(maxScroll, o + 1));
       } else if (input === 'y' || key.return) {
         onSubmit?.();
       }
@@ -118,12 +124,8 @@ export function DiffPreview({
     );
   }
 
-  const file = files[fileIdx];
   const totalChanges = files.reduce((sum, entry) => sum + countChanges(entry), 0) + values.length;
 
-  const diffLines = file
-    ? Diff.createPatch(file.path, file.before, file.after, 'Current', 'Proposed').split('\n')
-    : [];
   const displayLines = diffLines.slice(scrollOffset, scrollOffset + visibleLines);
 
   return (
