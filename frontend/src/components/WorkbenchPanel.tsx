@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SYMBOLS, THEME } from '../App.js';
 import { getStudioSummary } from '../api/client.js';
 import type { StudioSummary } from '../types/index.js';
@@ -225,7 +225,7 @@ export function useStudioSummary() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     const result = await getStudioSummary();
@@ -235,11 +235,11 @@ export function useStudioSummary() {
       setError(result.error?.message || 'Failed to load studio summary');
     }
     setLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
 
   return { summary, loading, error, refresh };
 }

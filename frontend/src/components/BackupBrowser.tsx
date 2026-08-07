@@ -359,9 +359,7 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
               </Text>
             </Box>
             <Box marginBottom={1}>
-              <Text color={THEME.muted}>
-                This will overwrite your current files with backup{' '}
-              </Text>
+              <Text color={THEME.muted}>This will overwrite your current files with backup </Text>
               <Text color={THEME.secondary}>{selectedBackupId}</Text>
               <Text color={THEME.muted}> ({previews.length} changed file(s)).</Text>
             </Box>
@@ -439,8 +437,7 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
                 </Box>
                 <Box marginLeft={3}>
                   <Text color={THEME.muted}>
-                    {dateStr} {timeStr} {SYMBOLS.line}{' '}
-                    {backup.components} files
+                    {dateStr} {timeStr} {SYMBOLS.line} {backup.components} files
                   </Text>
                 </Box>
               </Box>

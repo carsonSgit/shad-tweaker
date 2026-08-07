@@ -190,9 +190,7 @@ export function ComponentList({
 
               {typeof libraryMetadata.variantCount === 'number' &&
                 libraryMetadata.variantCount > 0 && (
-                  <Text color={THEME.primary}>
-                    {' '}{libraryMetadata.variantCount} variants
-                  </Text>
+                  <Text color={THEME.primary}> {libraryMetadata.variantCount} variants</Text>
                 )}
 
               {/* File indicator for selected */}
