@@ -80,8 +80,10 @@ yarn.lock
 # AI/IDE local settings
 .claude/
 
-# Sample components (dev only)
-components/
+# Sample components (dev only) — root-level scratch dir the tool writes into.
+# Must stay anchored: an unanchored `components/` also swallows
+# frontend/src/components/, silently dropping TUI source from commits.
+/components/
 
 # Tool version managers
 .tool-versions

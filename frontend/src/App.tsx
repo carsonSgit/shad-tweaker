@@ -42,9 +42,9 @@ export const SYMBOLS = {
   horizontalLine: '═',
 } as const;
 
-export function App() {
+export function App({ initialArea }: { initialArea?: WorkbenchArea }) {
   const { exit } = useApp();
-  const { screen, navigate, goBack } = useNavigation('components');
+  const { screen, navigate, goBack } = useNavigation(initialArea ?? 'components');
   const { summary, loading: summaryLoading, error: summaryError, refresh } = useStudioSummary();
   const {
     components,
@@ -216,6 +216,8 @@ export function App() {
       case 'motion':
       case 'loaders':
       case 'pixel-inspector':
+      case 'import':
+      case 'export':
       case 'diff':
       case 'settings':
         return (

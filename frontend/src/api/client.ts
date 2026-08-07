@@ -523,6 +523,17 @@ export async function deletePixelInspectorPreset(
   });
 }
 
+export async function previewVariantGeneration(input: {
+  componentPath: string;
+  targetDefinition: string;
+  operation: VariantPreviewOperation;
+}): Promise<ApiResponse<{ preview: VariantGenerationPreview }>> {
+  return request('/api/variants/preview', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 export async function applyVariantGeneration(input: {
   componentPath: string;
   targetDefinition: string;

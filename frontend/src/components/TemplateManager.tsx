@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { SYMBOLS, THEME } from '../App.js';
 import * as api from '../api/client.js';
 import type { Preview, Template, TemplateRule } from '../types/index.js';
+import { PresetSelector } from './PresetSelector.js';
 
 interface TemplateManagerProps {
   onApplyTemplate: (rules: TemplateRule[]) => void;
@@ -14,7 +15,7 @@ interface TemplateManagerProps {
   onDirectApply?: (message: string) => void;
 }
 
-type Mode = 'list' | 'suboptions' | 'create' | 'view' | 'select-components' | 'confirm';
+type Mode = 'list' | 'suboptions' | 'create' | 'view' | 'select-components' | 'confirm' | 'presets';
 
 // ============================================
 // Built-in Quick Templates with Sub-options
@@ -245,6 +246,7 @@ export function TemplateManager({
   const [mode, setMode] = useState<Mode>('list');
   const [cursor, setCursor] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [presetEntryId, setPresetEntryId] = useState<string | null>(null);
 
   const [selectedQuickTemplate, setSelectedQuickTemplate] = useState<QuickTemplate | null>(null);
   const [subOptionCursor, setSubOptionCursor] = useState(0);
@@ -543,6 +545,9 @@ export function TemplateManager({
         } else {
           onApplyTemplate(selectedTemplate.rules);
         }
+      } else if (input === 'p' && selectedTemplate) {
+        setPresetEntryId(selectedTemplate.id);
+        setMode('presets');
       } else if (input === 'd' && selectedTemplate) {
         handleDelete(selectedTemplate.id);
       }
@@ -570,6 +575,10 @@ export function TemplateManager({
           setMode('view');
         }
       }
+    } else if (input === 'p') {
+      setPresetEntryId(null);
+      setMode('presets');
+      return;
     } else if (input === 'n') {
       setMode('create');
       setNewName('');
@@ -657,6 +666,29 @@ export function TemplateManager({
       }
     }
   };
+
+  if (mode === 'presets') {
+    return (
+      <PresetSelector
+        initialPresetId={presetEntryId ?? undefined}
+        selectedPaths={selectedPaths}
+        onBack={() => {
+          setPresetEntryId(null);
+          setSelectedTemplate(null);
+          setMode('list');
+          fetchTemplates();
+        }}
+        onApplied={(message) => {
+          if (onDirectApply) {
+            onDirectApply(message);
+          } else {
+            setPresetEntryId(null);
+            setMode('list');
+          }
+        }}
+      />
+    );
+  }
 
   if (loading) {
     return <LoadingSpinner message="Loading templates..." />;
@@ -1121,6 +1153,7 @@ export function TemplateManager({
                 <Text color={THEME.secondary}>a</Text> Load │{' '}
               </>
             )}
+            <Text color={THEME.secondary}>p</Text> Preview as preset │{' '}
             <Text color={THEME.secondary}>d</Text> Delete │{' '}
             <Text color={THEME.secondary}>q/Esc</Text> Back
           </Text>
@@ -1209,8 +1242,9 @@ export function TemplateManager({
       <Box justifyContent="center">
         <Text color={THEME.muted}>
           <Text color={THEME.secondary}>1-{Math.min(9, totalQuickTemplates)}</Text> Quick │{' '}
-          <Text color={THEME.secondary}>↵</Text> Select │ <Text color={THEME.secondary}>n</Text> New
-          │ <Text color={THEME.secondary}>Esc</Text> Back
+          <Text color={THEME.secondary}>↵</Text> Select │ <Text color={THEME.secondary}>p</Text>{' '}
+          Presets │ <Text color={THEME.secondary}>n</Text> New │{' '}
+          <Text color={THEME.secondary}>Esc</Text> Back
         </Text>
       </Box>
     </Box>
