@@ -10,6 +10,8 @@ export type WorkbenchArea =
   | 'preview'
   | 'diff'
   | 'backups'
+  | 'import'
+  | 'export'
   | 'settings';
 
 export interface WorkbenchAreaMeta {
@@ -85,6 +87,18 @@ export const WORKBENCH_AREAS: WorkbenchAreaMeta[] = [
     label: 'Backups',
     shortLabel: 'Backups',
     description: 'Browse restore points and recover previous component versions.',
+  },
+  {
+    id: 'import',
+    label: 'Import',
+    shortLabel: 'Import',
+    description: 'Plan and run component imports from a registry source.',
+  },
+  {
+    id: 'export',
+    label: 'Export',
+    shortLabel: 'Export',
+    description: 'Export or publish the current component set to a target.',
   },
   {
     id: 'settings',

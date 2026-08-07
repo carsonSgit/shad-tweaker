@@ -27,6 +27,8 @@ const screenLabels: Record<Screen, { label: string; icon: string }> = {
   motion: { label: 'Motion', icon: 'm' },
   loaders: { label: 'Loaders', icon: 'l' },
   'pixel-inspector': { label: 'Inspector', icon: 'i' },
+  import: { label: 'Import', icon: 'I' },
+  export: { label: 'Export', icon: 'E' },
   diff: { label: 'Diff', icon: 'd' },
   settings: { label: 'Settings', icon: 's' },
 };

@@ -95,7 +95,11 @@ async function startBackend(
   return backend;
 }
 
-async function startFrontend(backendUrl: string, cwd: string): Promise<ChildProcess> {
+async function startFrontend(
+  backendUrl: string,
+  cwd: string,
+  initialArea?: string
+): Promise<ChildProcess> {
   const projectRoot = getProjectRoot();
   const frontendPath = path.join(projectRoot, 'frontend', 'dist', 'index.js');
 
@@ -104,6 +108,7 @@ async function startFrontend(backendUrl: string, cwd: string): Promise<ChildProc
       ...process.env,
       BACKEND_URL: backendUrl,
       SHADCN_TWEAKER_CWD: cwd,
+      ...(initialArea ? { SHADCN_INITIAL_AREA: initialArea } : {}),
     },
     cwd,
     stdio: 'inherit',
@@ -139,9 +144,9 @@ async function prepareBackend(options: CLIOptions): Promise<{
   return { backend, backendUrl, cwd };
 }
 
-async function launchTui(options: CLIOptions): Promise<void> {
+async function launchWorkflow(area: string | undefined, options: CLIOptions): Promise<void> {
   const { backend, backendUrl, cwd } = await prepareBackend(options);
-  const frontend = await startFrontend(backendUrl, cwd);
+  const frontend = await startFrontend(backendUrl, cwd, area);
 
   const cleanup = () => {
     frontend.kill();
@@ -164,6 +169,10 @@ async function launchTui(options: CLIOptions): Promise<void> {
       process.exit(code);
     }
   });
+}
+
+async function launchTui(options: CLIOptions): Promise<void> {
+  return launchWorkflow(undefined, options);
 }
 
 function openBrowser(url: string): void {
@@ -275,6 +284,24 @@ async function main() {
     .action(async (options: StudioOptions) => {
       await launchWebStudio({ ...options, web: true });
     });
+
+  // One-shot workflow commands — each routes through the shared launchWorkflow
+  // core so the TUI opens directly into the relevant workbench area.
+  const workflowCommand = (name: string, area: string, description: string) =>
+    program
+      .command(name)
+      .description(description)
+      .option('-p, --path <path>', 'Path to shadcn components directory')
+      .option('--port <port>', 'Backend server port (default: auto-detect)')
+      .action(async (options: CLIOptions) => {
+        await launchWorkflow(area, options);
+      });
+
+  workflowCommand('import', 'import', 'Plan and run a component import from the TUI');
+  workflowCommand('tokens', 'tokens', 'Adjust the active token set from the TUI');
+  workflowCommand('variants', 'variants', 'Edit component variants from the TUI');
+  workflowCommand('export', 'export', 'Export or publish the current component set from the TUI');
+  workflowCommand('backup', 'backups', 'Restore a previous backup from the TUI');
 
   await program.parseAsync(process.argv);
 }

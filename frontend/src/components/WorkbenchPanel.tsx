@@ -1,11 +1,17 @@
 import { Box, Text, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
-import { getStudioSummary } from '../api/client.js';
 import { SYMBOLS, THEME } from '../App.js';
+import { getStudioSummary } from '../api/client.js';
 import type { StudioSummary } from '../types/index.js';
 import type { WorkbenchArea } from '../workbench.js';
 import { getWorkbenchAreaMeta } from '../workbench.js';
+import { DiffPreview } from './DiffPreview.js';
+import { ExportView } from './ExportView.js';
+import { ImportView } from './ImportView.js';
+import { Registries } from './Registries.js';
+import { Tokens } from './Tokens.js';
+import { Variants } from './Variants.js';
 
 interface WorkbenchPanelProps {
   area: WorkbenchArea;
@@ -63,7 +69,9 @@ export function WorkbenchPanel({
   if (error && !summary) {
     return (
       <Box flexDirection="column">
-        <Text color={THEME.error}>{SYMBOLS.cross} {error}</Text>
+        <Text color={THEME.error}>
+          {SYMBOLS.cross} {error}
+        </Text>
         <Text color={THEME.muted}>Press r to retry.</Text>
       </Box>
     );
@@ -80,12 +88,14 @@ export function WorkbenchPanel({
       </Box>
 
       {area === 'registries' && <Registries summary={summary} />}
+      {area === 'import' && <ImportView summary={summary} onNavigate={onNavigate} />}
       {area === 'tokens' && <Tokens summary={summary} />}
       {area === 'variants' && <Variants summary={summary} />}
       {area === 'motion' && <Motion summary={summary} />}
       {area === 'pixel-inspector' && <PixelInspector summary={summary} />}
       {area === 'preview' && <PreviewHub onNavigate={onNavigate} />}
       {area === 'diff' && <DiffHub summary={summary} onNavigate={onNavigate} />}
+      {area === 'export' && <ExportView summary={summary} onNavigate={onNavigate} />}
       {area === 'settings' && <Settings summary={summary} />}
 
       <Box marginTop={1}>
@@ -93,80 +103,6 @@ export function WorkbenchPanel({
         <Text color={THEME.secondary}>r</Text>
         <Text color={THEME.muted}> to refresh summary data.</Text>
       </Box>
-    </Box>
-  );
-}
-
-function Registries({ summary }: { summary: StudioSummary | null }) {
-  const sources = summary?.registries.sources ?? [];
-  const enabled = sources.filter((source) => source.enabled).length;
-  const health = summary?.registries.health ?? [];
-  const items = summary?.registries.items ?? [];
-
-  return (
-    <Box flexDirection="column" borderStyle="single" borderColor={THEME.muted} paddingX={1}>
-      <Text>
-        <Text color={THEME.secondary}>{sources.length}</Text> sources,{' '}
-        <Text color={THEME.success}>{enabled}</Text> enabled,{' '}
-        <Text color={THEME.secondary}>{items.length}</Text> items visible
-      </Text>
-      {sources.length === 0 ? (
-        <Text color={THEME.muted}>No registry sources configured yet.</Text>
-      ) : (
-        sources.slice(0, 8).map((source) => {
-          const sourceHealth = health.find((item) => item.sourceId === source.id);
-          return (
-            <Text key={source.id}>
-              {source.enabled ? SYMBOLS.check : SYMBOLS.circle} {source.name} ({source.type}){' '}
-              <Text color={THEME.muted}>{source.registryJsonUrl || source.baseUrl || 'local'}</Text>{' '}
-              <Text color={THEME.secondary}>{sourceHealth?.status ?? 'not checked'}</Text>
-            </Text>
-          );
-        })
-      )}
-    </Box>
-  );
-}
-
-function Tokens({ summary }: { summary: StudioSummary | null }) {
-  const sets = summary?.tokens.tokenSets ?? [];
-  const categories = tokenCategories(summary);
-  const frequency = summary?.tokens.frequency?.entries ?? [];
-  const inconsistencies = summary?.tokens.inconsistencies?.entries ?? [];
-
-  return (
-    <Box flexDirection="column" borderStyle="single" borderColor={THEME.muted} paddingX={1}>
-      <Text>
-        <Text color={THEME.secondary}>{sets.length}</Text> token sets,{' '}
-        <Text color={THEME.secondary}>{categories.length}</Text> active categories,{' '}
-        <Text color={THEME.accent}>{inconsistencies.length}</Text> inconsistency groups
-      </Text>
-      <Text color={THEME.muted}>Categories: {categories.join(', ') || 'none yet'}</Text>
-      {frequency.slice(0, 5).map((entry) => (
-        <Text key={`${entry.category}:${entry.value}`}>
-          {entry.category} {entry.value} - {entry.occurrences} uses
-        </Text>
-      ))}
-    </Box>
-  );
-}
-
-function Variants({ summary }: { summary: StudioSummary | null }) {
-  const components = summary?.variants.components ?? [];
-  const systems = new Set(components.flatMap((component) => component.systems));
-
-  return (
-    <Box flexDirection="column" borderStyle="single" borderColor={THEME.muted} paddingX={1}>
-      <Text>
-        <Text color={THEME.secondary}>{components.length}</Text> components with variants, systems:{' '}
-        <Text color={THEME.muted}>{[...systems].join(', ') || 'none detected'}</Text>
-      </Text>
-      {components.slice(0, 8).map((component) => (
-        <Text key={component.path}>
-          {component.name} - {component.variantCount} definitions - axes:{' '}
-          {component.axes.join(', ') || 'none'}
-        </Text>
-      ))}
     </Box>
   );
 }
@@ -202,7 +138,9 @@ function PixelInspector({ summary }: { summary: StudioSummary | null }) {
         <Text color={THEME.secondary}>{componentCount}</Text>, token sets:{' '}
         <Text color={THEME.secondary}>{tokenSetCount}</Text>
       </Text>
-      <Text color={THEME.muted}>Launch with studio --web to tune classes in the preview iframe.</Text>
+      <Text color={THEME.muted}>
+        Launch with studio --web to tune classes in the preview iframe.
+      </Text>
     </Box>
   );
 }
@@ -239,6 +177,14 @@ function DiffHub({
   return (
     <Box flexDirection="column" borderStyle="single" borderColor={THEME.muted} paddingX={1}>
       <Text>Diffs appear after edit previews or backup preview selection.</Text>
+      <DiffPreview
+        title="Pending tweaks"
+        files={[]}
+        values={[]}
+        interactive={false}
+        emptyMessage="No pending tweaks staged. Stage changes from import, preset, variant or export flows."
+      />
+
       {latestBackup ? (
         <Text>
           Latest backup: {latestBackup.id} ({countBackupComponents(latestBackup)} components)

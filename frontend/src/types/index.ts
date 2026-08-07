@@ -815,6 +815,8 @@ export type Screen =
   | 'motion'
   | 'loaders'
   | 'pixel-inspector'
+  | 'import'
+  | 'export'
   | 'diff'
   | 'settings'
   | 'dashboard'

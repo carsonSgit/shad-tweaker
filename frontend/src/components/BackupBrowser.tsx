@@ -22,6 +22,7 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
   const [error, setError] = useState<string | null>(null);
   const [cursor, setCursor] = useState(0);
   const [mode, setMode] = useState<Mode>('list');
+  const [confirming, setConfirming] = useState(false);
 
   // Preview state
   const [selectedBackupId, setSelectedBackupId] = useState<string | null>(null);
@@ -88,6 +89,18 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
     if (restoring || loadingPreview) return;
 
     if (mode === 'preview') {
+      if (confirming) {
+        if (input === 'y' || key.return) {
+          setConfirming(false);
+          if (selectedBackupId) {
+            handleRestore(selectedBackupId);
+          }
+        } else if (input === 'n' || input === 'q' || key.escape) {
+          setConfirming(false);
+        }
+        return;
+      }
+
       if (key.escape || input === 'q') {
         setMode('list');
         setPreviews([]);
@@ -103,9 +116,7 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
       } else if (key.downArrow) {
         setScrollOffset((o) => o + 1);
       } else if (input === 'y' || key.return) {
-        if (selectedBackupId) {
-          handleRestore(selectedBackupId);
-        }
+        setConfirming(true);
       }
       return;
     }
@@ -330,8 +341,41 @@ export function BackupBrowser({ onRestore, onBack }: BackupBrowserProps) {
           <Text bold color={THEME.success}>
             Enter
           </Text>
-          <Text color={THEME.success}> to restore</Text>
+          <Text color={THEME.success}> to confirm restore</Text>
         </Box>
+
+        {confirming && (
+          <Box
+            marginTop={1}
+            borderStyle="round"
+            borderColor={THEME.error}
+            paddingX={2}
+            paddingY={1}
+            flexDirection="column"
+          >
+            <Box marginBottom={1}>
+              <Text bold color={THEME.error}>
+                {SYMBOLS.cross} Confirm Restore
+              </Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text color={THEME.muted}>
+                This will overwrite your current files with backup{' '}
+              </Text>
+              <Text color={THEME.secondary}>{selectedBackupId}</Text>
+              <Text color={THEME.muted}> ({previews.length} changed file(s)).</Text>
+            </Box>
+            <Box justifyContent="center">
+              <Text color={THEME.success}>Press </Text>
+              <Text bold color={THEME.success}>
+                y
+              </Text>
+              <Text color={THEME.success}> to restore │ </Text>
+              <Text color={THEME.error}> n/Esc </Text>
+              <Text color={THEME.error}>to cancel</Text>
+            </Box>
+          </Box>
+        )}
 
         {/* Controls */}
         <Box marginTop={1} justifyContent="center">
