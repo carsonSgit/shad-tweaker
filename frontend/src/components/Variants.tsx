@@ -6,9 +6,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { SYMBOLS, THEME } from '../App.js';
 import {
   applyVariantGeneration,
-  getBackendUrl,
   getVariantComponent,
   getVariantComponents,
+  previewVariantGeneration,
 } from '../api/client.js';
 import type {
   StudioSummary,
@@ -16,7 +16,6 @@ import type {
   VariantComponentDetail,
   VariantComponentSummary,
   VariantDefinitionDetail,
-  VariantGenerationPreview,
   VariantPreviewOperation,
   VariantValue,
 } from '../types/index.js';
@@ -58,32 +57,6 @@ function windowStart(cursor: number, length: number): number {
 
 function isEditableDefinition(definition: VariantDefinitionDetail | undefined): boolean {
   return definition?.system === 'cva' || definition?.system === 'tv';
-}
-
-async function fetchVariantPreview(
-  componentPath: string,
-  targetDefinition: string,
-  operation: VariantPreviewOperation
-): Promise<VariantGenerationPreview | null> {
-  const base = getBackendUrl();
-  try {
-    const response = await fetch(`${base}/api/variants/preview`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ componentPath, targetDefinition, operation }),
-    });
-    const data = (await response.json()) as {
-      success: boolean;
-      preview?: VariantGenerationPreview;
-      error?: { message?: string };
-    };
-    if (!response.ok || !data.success || !data.preview) {
-      return null;
-    }
-    return data.preview;
-  } catch {
-    return null;
-  }
 }
 
 export function Variants({ summary }: { summary: StudioSummary | null }) {
@@ -151,14 +124,18 @@ export function Variants({ summary }: { summary: StudioSummary | null }) {
       if (!activeComponent || !activeDefinition) return;
       setBusy(true);
       setError(null);
-      const preview = await fetchVariantPreview(
-        activeComponent.path,
-        activeDefinition.name,
-        operation
-      );
+      const response = await previewVariantGeneration({
+        componentPath: activeComponent.path,
+        targetDefinition: activeDefinition.name,
+        operation,
+      });
       setBusy(false);
-      if (!preview) {
-        setError('Could not preview variant change (unsupported definition or invalid operation).');
+      const preview = response.data?.preview;
+      if (!response.success || !preview) {
+        setError(
+          response.error?.message ||
+            'Could not preview variant change (unsupported definition or invalid operation).'
+        );
         return;
       }
       setPendingOp(operation);

@@ -1,4 +1,4 @@
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
 import { SYMBOLS, THEME } from '../App.js';
@@ -47,14 +47,9 @@ export function PreviewView({
     fetchPreview();
   }, [componentPaths, find, replace, isRegex]);
 
-  useInput(
-    (input, key) => {
-      if (key.escape || input === 'q') {
-        onCancel();
-      }
-    },
-    { isActive: applying }
-  );
+  // Cancel is owned by the DiffPreview pane below, which is unmounted while
+  // `applying` — matching the pre-extraction behaviour of ignoring all input
+  // once an apply is in flight (there is no way to abort it).
 
   const handleApply = async () => {
     setApplying(true);
