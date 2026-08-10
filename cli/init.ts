@@ -1,21 +1,19 @@
 import path from 'node:path';
+import chalk from 'chalk';
 import fs from 'fs-extra';
 import inquirer from 'inquirer';
-import { configExists, getDefaultConfig, type ShadcnTweakerConfig, saveConfig } from './config.js';
-
-const COMMON_PATHS = [
-  'src/components/ui',
-  'components/ui',
-  'app/components/ui',
-  'src/ui',
-  'frontend/src/components/ui',
-  'frontend/components/ui',
-];
+import {
+  COMMON_COMPONENT_PATHS,
+  configExists,
+  getDefaultConfig,
+  type ShadcnTweakerConfig,
+  saveConfig,
+} from './config.js';
 
 async function detectExistingPaths(cwd: string): Promise<string[]> {
   const existing: string[] = [];
 
-  for (const p of COMMON_PATHS) {
+  for (const p of COMMON_COMPONENT_PATHS) {
     const fullPath = path.join(cwd, p);
     if (await fs.pathExists(fullPath)) {
       existing.push(p);
@@ -47,6 +45,7 @@ export async function runInit(cwd: string): Promise<void> {
     ]);
 
     if (!overwrite) {
+      console.log(chalk.yellow('Keeping the existing configuration.'));
       return;
     }
   }
@@ -112,6 +111,13 @@ export async function runInit(cwd: string): Promise<void> {
         name: 'customPath',
         message: 'Enter the path to your components directory:',
         default: defaults.componentsPath,
+        validate: async (input: string) => {
+          const fullPath = path.isAbsolute(input) ? input : path.join(cwd, input);
+          if (await fs.pathExists(fullPath)) {
+            return true;
+          }
+          return `Directory not found: ${fullPath}`;
+        },
       },
     ]);
     componentsPath = customPath;
@@ -189,4 +195,11 @@ export async function runInit(cwd: string): Promise<void> {
       }
     }
   }
+
+  console.log();
+  console.log(chalk.green('✔ Configuration saved to .shadcn-tweaker.json'));
+  console.log(chalk.dim(`  Components path: ${config.componentsPath}`));
+  console.log(chalk.dim(`  Backups: ${config.backupsDir} (max ${config.maxBackups})`));
+  console.log();
+  console.log(`Run ${chalk.cyan('shadcn-tweaker')} to launch the TUI.`);
 }

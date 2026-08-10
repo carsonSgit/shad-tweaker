@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { type ChildProcess, spawn } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import chalk from 'chalk';
@@ -23,6 +24,18 @@ function getProjectRoot(): string {
   }
 
   return root;
+}
+
+function getPackageVersion(): string {
+  try {
+    const packageJsonPath = path.join(getProjectRoot(), 'package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')) as {
+      version?: string;
+    };
+    return packageJson.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
 }
 
 async function findAvailablePort(startPort = 3001): Promise<number> {
@@ -58,13 +71,21 @@ interface StudioOptions extends CLIOptions {
 
 type StudioSurface = 'tui' | 'web';
 
+type BackendProcess = ChildProcess & { stderrTail: string[] };
+
 async function startBackend(
   port: number,
   componentsPath: string | null,
   cwd: string
-): Promise<ChildProcess> {
+): Promise<BackendProcess> {
   const projectRoot = getProjectRoot();
   const backendPath = path.join(projectRoot, 'backend', 'dist', 'server.js');
+
+  if (!fs.existsSync(backendPath)) {
+    console.error(chalk.red(`Backend build not found at ${backendPath}`));
+    console.error(chalk.yellow('Run "bun run build" first, or reinstall shadcn-tweaker.'));
+    process.exit(1);
+  }
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -82,17 +103,23 @@ async function startBackend(
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  // Suppress backend output in normal operation
+  // Suppress backend output in normal operation, but keep recent stderr
+  // so startup failures can be reported with their actual cause.
+  const stderrTail: string[] = [];
   backend.stdout?.on('data', () => {});
   backend.stderr?.on('data', (data) => {
     const msg = data.toString();
+    stderrTail.push(msg);
+    if (stderrTail.length > 20) {
+      stderrTail.shift();
+    }
     // Only show critical errors
     if (msg.includes('Error') || msg.includes('EADDRINUSE')) {
       console.error(chalk.red(msg));
     }
   });
 
-  return backend;
+  return Object.assign(backend, { stderrTail });
 }
 
 async function startFrontend(
@@ -118,7 +145,7 @@ async function startFrontend(
 }
 
 async function prepareBackend(options: CLIOptions): Promise<{
-  backend: ChildProcess;
+  backend: BackendProcess;
   backendUrl: string;
   cwd: string;
 }> {
@@ -127,16 +154,35 @@ async function prepareBackend(options: CLIOptions): Promise<{
   const componentsPath = await resolveComponentsPath(options.path, cwd);
 
   if (!componentsPath && !hasConfig) {
+    console.error(chalk.red('Could not find a shadcn components directory.'));
+    console.error(
+      chalk.yellow(
+        'Run "shadcn-tweaker init" to configure your project, or pass --path <path> to your components directory.'
+      )
+    );
     process.exit(1);
   }
 
-  const port = options.port ? Number.parseInt(options.port, 10) : await findAvailablePort();
+  let port: number;
+  if (options.port) {
+    port = Number.parseInt(options.port, 10);
+    if (Number.isNaN(port) || port < 1 || port > 65535) {
+      console.error(chalk.red(`Invalid port "${options.port}". Use a number between 1 and 65535.`));
+      process.exit(1);
+    }
+  } else {
+    port = await findAvailablePort();
+  }
   const backendUrl = `http://localhost:${port}`;
   const backend = await startBackend(port, componentsPath, cwd);
   const serverReady = await waitForServer(backendUrl);
 
   if (!serverReady) {
     console.error(chalk.red('Failed to start backend server'));
+    const stderrOutput = backend.stderrTail.join('').trim();
+    if (stderrOutput) {
+      console.error(chalk.dim(stderrOutput));
+    }
     backend.kill();
     process.exit(1);
   }
@@ -222,6 +268,13 @@ async function chooseStudioSurface(options: StudioOptions): Promise<StudioSurfac
   if (options.tui) return 'tui';
   if (options.web) return 'web';
 
+  if (!process.stdin.isTTY) {
+    console.error(
+      chalk.red('No interactive terminal detected. Pass --tui or --web to pick a studio surface.')
+    );
+    process.exit(1);
+  }
+
   const answer = await inquirer.prompt<{ surface: StudioSurface }>([
     {
       type: 'list',
@@ -242,7 +295,7 @@ async function main() {
   program
     .name('shadcn-tweaker')
     .description('Terminal-based tool for batch customizing shadcn/ui components')
-    .version('1.0.0');
+    .version(getPackageVersion());
 
   program
     .command('init')
@@ -266,7 +319,10 @@ async function main() {
     .option('--tui', 'Launch the terminal workbench')
     .option('--web', 'Launch the browser studio')
     .option('--no-open', 'Print the browser studio URL without opening it')
-    .action(async (options: StudioOptions) => {
+    .action(async (_options: StudioOptions, command: Command) => {
+      // Merge in root-level options so `studio --port`/`--path` work even when
+      // commander attributes those flags to the root program.
+      const options = command.optsWithGlobals<StudioOptions>();
       const surface = await chooseStudioSurface(options);
       if (surface === 'web') {
         await launchWebStudio(options);
@@ -281,7 +337,8 @@ async function main() {
     .option('-p, --path <path>', 'Path to shadcn components directory')
     .option('--port <port>', 'Backend server port (default: auto-detect)')
     .option('--no-open', 'Print the browser studio URL without opening it')
-    .action(async (options: StudioOptions) => {
+    .action(async (_options: StudioOptions, command: Command) => {
+      const options = command.optsWithGlobals<StudioOptions>();
       await launchWebStudio({ ...options, web: true });
     });
 

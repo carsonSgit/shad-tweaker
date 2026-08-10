@@ -73,7 +73,7 @@ export function RegistryPublishPanel() {
             value={homepage}
           />
         </label>
-        <button disabled={generating} onClick={generate} type="button">
+        <button className="btn-primary" disabled={generating} onClick={generate} type="button">
           {generating ? 'Generating…' : 'Generate registry'}
         </button>
         <button onClick={toggleInstructions} type="button">

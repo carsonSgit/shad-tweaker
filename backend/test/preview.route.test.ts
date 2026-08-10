@@ -403,7 +403,7 @@ export function ButtonIcon() { return <span>Icon</span>; }`
     assert.equal(res.status, 200);
     assert.match(res.headers['content-type'], /html/);
     assert.match(res.text, /id="preview-root"/);
-    assert.match(res.text, /\/studio\/preview\/runtime/);
+    assert.match(res.text, /\/__preview\/runtime\.js/);
     assert.match(res.text, /data-theme="light"/);
     assert.match(res.text, /data-density="default"/);
   });
@@ -425,6 +425,32 @@ export function ButtonIcon() { return <span>Icon</span>; }`
       "frame-ancestors 'self' http://localhost:* http://127.0.0.1:*"
     );
     assert.equal(res.headers['x-frame-options'], undefined);
+  });
+
+  it('allows cross-origin module fetches from the sandboxed preview frame', async () => {
+    // The studio embeds the preview frame with sandbox="allow-scripts", which
+    // gives the frame document a null origin. Its module script (and any module
+    // it imports) is fetched in CORS mode, so every preview browser response
+    // must carry Access-Control-Allow-Origin — without it the preview renders
+    // an empty #preview-root.
+    const root = await createTempRoot();
+    await fs.writeFile(
+      path.join(root, 'components/ui/badge.tsx'),
+      `export function Badge() { return <span>Badge</span>; }`
+    );
+
+    const runtimeRes = await request(app).get('/studio/preview/runtime').query({
+      componentPath: 'components/ui/badge.tsx',
+      exportName: 'Badge',
+    });
+    assert.equal(runtimeRes.status, 200);
+    assert.equal(runtimeRes.headers['access-control-allow-origin'], '*');
+
+    const componentRes = await request(app).get(
+      `/studio/preview/component/${encodeURIComponent('components/ui/badge.tsx')}`
+    );
+    assert.equal(componentRes.status, 200);
+    assert.equal(componentRes.headers['access-control-allow-origin'], '*');
   });
 
   it('escapes preview frame theme and density attributes', () => {
@@ -455,7 +481,7 @@ export function ButtonIcon() { return <span>Icon</span>; }`
 
     assert.equal(res.status, 200);
     assert.match(res.headers['content-type'], /javascript/);
-    assert.match(res.text, /from ["']\/studio\/preview\/component\//);
+    assert.match(res.text, /from ["']\/components\/ui\/card\.tsx["']/);
     assert.match(res.text, /const exportName = "Card"/);
     assert.match(res.text, /const parentOrigin = "http:\/\/127\.0\.0\.1:\d+"/);
     assert.equal(res.text.match(/postMessage\(/g)?.length, 2);

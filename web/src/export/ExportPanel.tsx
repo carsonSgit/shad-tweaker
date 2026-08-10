@@ -96,7 +96,7 @@ export function ExportPanel({
                 />
               </label>
             ) : null}
-            <button disabled={exporting} onClick={runExport} type="button">
+            <button className="btn-primary" disabled={exporting} onClick={runExport} type="button">
               {exporting
                 ? 'Exporting…'
                 : `Export ${selectedComponents.length} component${

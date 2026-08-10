@@ -145,8 +145,10 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 export function createPreviewApp() {
   const previewApp = express();
-  // The preview server intentionally omits CORS: browser-loaded frame and module
-  // resources are served directly, while JSON preview APIs stay on the main app.
+  // The preview frame is sandboxed with a null origin, so both the express
+  // browser routes and the Vite middleware must allow cross-origin module
+  // fetches (Access-Control-Allow-Origin: *). JSON preview APIs stay on the
+  // main app.
   previewApp.use(express.json({ limit: '1mb' }));
   previewApp.use(express.urlencoded({ extended: true, limit: '1mb' }));
   previewApp.use('/studio/preview', previewBrowserLimiter, createPreviewBrowserRouter());

@@ -95,8 +95,12 @@ export function PreviewWorkspace({ selectedComponents, summary }: PreviewWorkspa
           {manifest.diagnostics.length > 0 ? (
             <div className="preview-diagnostics">
               {manifest.diagnostics.map((diagnostic) => (
-                <span key={`${diagnostic.code}:${diagnostic.message}`}>
-                  {diagnostic.severity}: {diagnostic.message}
+                <span
+                  className={`preview-diagnostic-item severity-${diagnostic.severity}`}
+                  key={`${diagnostic.code}:${diagnostic.message}`}
+                >
+                  <strong>{diagnostic.severity === 'info' ? 'note' : diagnostic.severity}</strong>{' '}
+                  {diagnostic.message}
                 </span>
               ))}
             </div>

@@ -93,6 +93,11 @@ export function createPreviewBrowserRouter(): Router {
     // The preview frame is intentionally embeddable by the local studio. CSP is
     // the framing control here; X-Frame-Options cannot express cross-port local origins.
     res.setHeader('Content-Security-Policy', PREVIEW_FRAME_CSP);
+    // The frame is sandboxed (allow-scripts without allow-same-origin), so its
+    // document has a null origin and its module scripts are fetched in CORS
+    // mode. `*` is the only value that matches a null origin; these routes are
+    // read-only and local-only, so wildcard exposure adds nothing new.
+    res.setHeader('Access-Control-Allow-Origin', '*');
     next();
   });
 

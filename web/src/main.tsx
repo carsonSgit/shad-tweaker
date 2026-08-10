@@ -32,8 +32,44 @@ function activeTokenCategories(summary: StudioSummary | null): string[] {
   return [...categories].sort();
 }
 
+type Theme = 'light' | 'dark';
+
+function initialTheme(): Theme {
+  return localStorage.getItem('studio-theme') === 'dark' ? 'dark' : 'light';
+}
+
+function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
+  const dark = theme === 'dark';
+  return (
+    <button aria-pressed={dark} className="theme-toggle" onClick={onToggle} type="button">
+      {dark ? (
+        <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+          <path
+            d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"
+            stroke="currentColor"
+            strokeLinejoin="round"
+            strokeWidth="2"
+          />
+        </svg>
+      ) : (
+        <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+          <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
+          <path
+            d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth="2"
+          />
+        </svg>
+      )}
+      {dark ? 'Dark mode' : 'Light mode'}
+    </button>
+  );
+}
+
 function App() {
   const [area, setArea] = useState<WorkbenchArea>('components');
+  const [theme, setTheme] = useState<Theme>(initialTheme);
   const [summary, setSummary] = useState<StudioSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +95,11 @@ function App() {
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('studio-theme', theme);
+  }, [theme]);
+
   const selectedComponents = useMemo(
     () =>
       (summary?.components.inventory ?? []).filter((component) =>
@@ -77,7 +118,7 @@ function App() {
         <nav aria-label="Workbench areas">
           {WORKBENCH_AREAS.map((item, index) => (
             <button
-              className={item.id === area ? 'active' : ''}
+              className={item.id === area ? 'nav-item active' : 'nav-item'}
               key={item.id}
               onClick={() => setArea(item.id)}
               type="button"
@@ -87,6 +128,7 @@ function App() {
             </button>
           ))}
         </nav>
+        <ThemeToggle onToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')} theme={theme} />
       </aside>
 
       <section className="content">
@@ -160,6 +202,10 @@ function AreaPanel({
           <Metric label="Selected" value={selectedPaths.size} />
           <Metric label="With variants" value={summary.variants.components.length} />
         </div>
+        <p className="hint">
+          Check components to select them for export or batch edits, or open one in the Preview
+          workspace.
+        </p>
         <div className="table">
           {summary.components.inventory.length === 0 ? (
             <p>No components found in {summary.workspace.manifest.config.componentDirectory}.</p>
@@ -179,6 +225,18 @@ function AreaPanel({
                 <strong>{component.name}</strong>
                 <span>{component.path}</span>
                 <span>{component.variantCount} variants</span>
+                <button
+                  className="row-action"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setSelectedPaths(new Set([component.path]));
+                    setArea('preview');
+                  }}
+                  type="button"
+                >
+                  Preview
+                </button>
               </label>
             ))
           )}
@@ -422,7 +480,7 @@ function SettingsPanel({
         </label>
       </div>
       <div className="actions">
-        <button disabled={!dirty} onClick={save} type="button">
+        <button className="btn-primary" disabled={!dirty} onClick={save} type="button">
           Save settings
         </button>
         <button onClick={() => setDraft(config)} type="button">
