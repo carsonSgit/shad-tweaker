@@ -19,7 +19,7 @@
     "fs-extra": "^11.2.0",
     "typescript": "^5.3.3",
     "uuid": "^14.0.1",
-    "vite": "^7.3.6"
+    "vite": "^8.2.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
